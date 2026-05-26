@@ -1,0 +1,13 @@
+project_id = "zhtqkygjvaaizbdwwsbi"
+
+[functions.obtener-cae-afip]
+verify_jwt = false
+
+[functions.consultar-ultimo-comprobante]
+verify_jwt = false
+
+[functions.consultar-padron-afip]
+verify_jwt = false
+
+[functions.admin-comercios]
+verify_jwt = false
