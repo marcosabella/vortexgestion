@@ -433,6 +433,7 @@ export const useCajaDiaria = (fecha: string) => {
         title: "Ventas registradas en caja",
         description: `Se agregaron ${movimientos.length} comprobante${movimientos.length === 1 ? "" : "s"} como movimiento de caja`,
       });
+      window.location.reload();
     },
     onError: (error: Error) => {
       toast({
