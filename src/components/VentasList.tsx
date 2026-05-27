@@ -16,7 +16,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { generarQRAfip } from "@/utils/afipQr";
-import { buildFacturaHtmlFile } from "@/utils/facturaPrint";
+import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
@@ -177,7 +177,20 @@ export const VentasList = () => {
       }
     }
 
-    const comprobanteFile = buildFacturaHtmlFile({ venta, comercio, afipConfig, qrDataUrl });
+    let comprobanteFile: File;
+
+    try {
+      comprobanteFile = await buildFacturaWhatsAppPdfFile({ venta, comercio, afipConfig, qrDataUrl });
+    } catch (error) {
+      console.error("No se pudo generar el comprobante ARCA PDF para WhatsApp:", error);
+      toast({
+        title: "No se pudo generar el PDF",
+        description: "No se pudo preparar el comprobante ARCA para compartir.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const shareData: ShareData = {
       title: `Comprobante ${venta.numero_comprobante}`,
       text: message,
@@ -198,7 +211,7 @@ export const VentasList = () => {
     openWhatsAppText(venta);
     toast({
       title: "Comprobante generado",
-      description: "WhatsApp Web no permite adjuntar archivos automaticamente. Se descargo el mismo comprobante que se imprime para adjuntarlo al chat.",
+      description: "WhatsApp Web no permite adjuntar archivos automaticamente. Se descargo el comprobante ARCA en PDF para adjuntarlo al chat.",
     });
   };
 
