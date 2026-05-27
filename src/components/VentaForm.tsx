@@ -511,21 +511,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
             {/* Datos principales */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="numero_comprobante"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de Comprobante</FormLabel>
-                    <FormControl>
-                      <Input {...field} readOnly className="bg-muted" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(10.5rem,0.85fr)_minmax(11rem,1fr)_minmax(10.5rem,0.85fr)_minmax(22rem,2.3fr)]">
               <FormField
                 control={form.control}
                 name="fecha_venta"
@@ -539,9 +525,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+              
               <FormField
                 control={form.control}
                 name="tipo_comprobante"
@@ -562,6 +546,20 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="numero_comprobante"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Comprobante</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly className="bg-muted" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

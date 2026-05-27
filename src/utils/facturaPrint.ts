@@ -10,6 +10,10 @@ interface FacturaPrintOptions {
   qrDataUrl?: string;
 }
 
+interface FacturaHtmlOptions {
+  autoPrint?: boolean;
+}
+
 const CODIGOS_COMPROBANTE: Record<string, string> = {
   factura_a: "001",
   factura_b: "006",
@@ -125,17 +129,6 @@ export const getFacturaPrintStyles = () => `
     flex-direction: column;
     justify-content: center;
     position: relative;
-  }
-
-  .header-center::before {
-    background: #000;
-    content: "";
-    height: 19px;
-    left: 50%;
-    position: absolute;
-    top: -19px;
-    transform: translateX(-50%);
-    width: 2px;
   }
 
   .comercio-nombre {
@@ -623,7 +616,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   `;
 };
 
-export const buildFacturaPrintHtml = (options: FacturaPrintOptions) => `
+export const buildFacturaPrintHtml = (options: FacturaPrintOptions, htmlOptions: FacturaHtmlOptions = {}) => `
   <!doctype html>
   <html>
     <head>
@@ -633,12 +626,21 @@ export const buildFacturaPrintHtml = (options: FacturaPrintOptions) => `
     </head>
     <body>
       ${buildFacturaPrintBody(options)}
+      ${
+        htmlOptions.autoPrint
+          ? `<script>
+              window.addEventListener("load", function () {
+                window.setTimeout(function () { window.print(); }, 100);
+              });
+            </script>`
+          : ""
+      }
     </body>
   </html>
 `;
 
-export const buildFacturaHtmlFile = (options: FacturaPrintOptions) => {
-  const html = buildFacturaPrintHtml(options);
+export const buildFacturaHtmlFile = (options: FacturaPrintOptions, htmlOptions: FacturaHtmlOptions = {}) => {
+  const html = buildFacturaPrintHtml(options, htmlOptions);
   const filename = `comprobante-${sanitizeFilename(options.venta.numero_comprobante || "venta")}.html`;
 
   return new File([html], filename, { type: "text/html" });

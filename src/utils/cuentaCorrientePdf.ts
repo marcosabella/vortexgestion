@@ -2,8 +2,10 @@ import { format } from "date-fns";
 import { CuentaCorriente, CuentaCorrienteResumen, CONCEPTOS_MOVIMIENTO } from "@/types/cuenta-corriente";
 import { Comercio } from "@/types/comercio";
 
-const PAGE_WIDTH = 612;
-const PAGE_HEIGHT = 792;
+const PAGE_WIDTH = 595;
+const PAGE_HEIGHT = 842;
+const LAYOUT_WIDTH = 612;
+const A4_HORIZONTAL_SCALE = PAGE_WIDTH / LAYOUT_WIDTH;
 const LEFT = 48;
 const RIGHT = 588;
 const DETAIL_LEFT = 18;
@@ -228,7 +230,7 @@ const drawHeader = (
     opText("Consumidor Final", 322, 187, 8.5, "F1"),
     opText("Saldo correspondiente al:", 420, 187, 8.5, "F2"),
     opText(ultimoMovimiento, 530, 187, 8.5, "F1", "left", 54),
-    opText(`Pagina ${pageNumber}/${totalPages}`, RIGHT, 766, 7.5, "F1", "right"),
+    opText(`Pagina ${pageNumber}/${totalPages}`, RIGHT, PAGE_HEIGHT - 26, 7.5, "F1", "right"),
   ].filter(Boolean);
 };
 
@@ -281,7 +283,7 @@ const drawSummary = (resumen: CuentaCorrienteResumen, tableBottom: number, isLas
     opLine(18, tableBottom + 18, 594, tableBottom + 18),
     opText(
       `Usted posee un ${saldoTexto} de: ${formatMoney(Math.abs(saldo))}`,
-      PAGE_WIDTH / 2,
+      LAYOUT_WIDTH / 2,
       tableBottom + 36,
       8.75,
       "F2",
@@ -292,8 +294,8 @@ const drawSummary = (resumen: CuentaCorrienteResumen, tableBottom: number, isLas
 };
 
 const drawFooter = () => [
-  opText("Sistema de Ventas Web", 214, 763, 7.15, "F3"),
-  opText("Resumen de Cuenta Corriente", 331, 763, 7.15, "F3"),
+  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText("Resumen de Cuenta Corriente", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
 ];
 
 const createPageContent = (
@@ -309,7 +311,8 @@ const createPageContent = (
 
   return [
     "q",
-    "18 18 576 756 re W n",
+    `${A4_HORIZONTAL_SCALE.toFixed(6)} 0 0 1 0 0 cm`,
+    `18 18 576 ${PAGE_HEIGHT - 36} re W n`,
     ...drawHeader(resumen, pageNumber, totalPages, comercio, logoImage),
     ...table.ops,
     ...drawSummary(resumen, table.tableBottom, isLastPage),

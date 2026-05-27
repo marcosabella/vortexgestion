@@ -376,8 +376,8 @@ export const VentasList = () => {
                   <FacturaImpresion venta={selectedVenta} />
                   <Button
                     onClick={() => handleSendWhatsApp(selectedVenta)}
-                    variant="outline"
                     size="sm"
+                    className="bg-[#25D366] text-white hover:bg-[#1DA851]"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
                     WhatsApp
