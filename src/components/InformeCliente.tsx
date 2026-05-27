@@ -12,6 +12,7 @@ import { format, subMonths, subYears, startOfMonth, endOfMonth } from "date-fns"
 import { es } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 
 interface InformeClienteProps {
   cliente: Cliente;
@@ -224,6 +225,7 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
 
   return (
     <div className="space-y-6">
+      <ReportPrintHeader />
       <div className="flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Calendar className="h-5 w-5 text-muted-foreground" />

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
 import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel } from '@/types/venta';
 
@@ -133,6 +134,7 @@ const ListadoVentas = () => {
       </style>
       
       <div className="max-w-7xl mx-auto">
+        <ReportPrintHeader />
         <div className="mb-6 flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Reporte de Ventas</h1>

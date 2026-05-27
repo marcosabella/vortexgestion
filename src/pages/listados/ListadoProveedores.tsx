@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -133,6 +134,7 @@ const ListadoProveedores = () => {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        <ReportPrintHeader />
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Reporte de Proveedores</h1>

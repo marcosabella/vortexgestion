@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { useActualizarCierreCaja, useCajasDiarias, useEliminarCaja, useReabrirCaja } from "@/hooks/useCaja";
 import { CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
 import { getTipoPagoLabel, getVentaTipoPagoLabel, PagoVenta, Venta } from "@/types/venta";
@@ -267,6 +268,7 @@ const ListadoCaja = () => {
       </style>
 
       <div className="mx-auto max-w-7xl space-y-6">
+        <ReportPrintHeader />
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-foreground">Listado de Caja</h1>

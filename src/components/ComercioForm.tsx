@@ -1,10 +1,14 @@
+import { ChangeEvent, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { ImagePlus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { ComercioFormData } from "@/types/comercio";
 
 const formSchema = z.object({
@@ -23,14 +27,23 @@ const formSchema = z.object({
 
 interface ComercioFormProps {
   initialData?: ComercioFormData;
+  comercioId?: string;
   onSubmit: (data: ComercioFormData) => void;
   isLoading?: boolean;
 }
 
-export const ComercioForm = ({ initialData, onSubmit, isLoading }: ComercioFormProps) => {
+const LOGO_BUCKET = "comercio-logos";
+const MAX_LOGO_SIZE = 2 * 1024 * 1024;
+const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+export const ComercioForm = ({ initialData, comercioId, onSubmit, isLoading }: ComercioFormProps) => {
+  const { toast } = useToast();
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ComercioFormData>({
     resolver: zodResolver(formSchema),
@@ -48,6 +61,58 @@ export const ComercioForm = ({ initialData, onSubmit, isLoading }: ComercioFormP
       logo_url: "",
     },
   });
+  const logoUrl = watch("logo_url");
+
+  const handleLogoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !comercioId) return;
+
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      toast({
+        variant: "destructive",
+        title: "Formato no admitido",
+        description: "Seleccione un logo PNG, JPG o WEBP.",
+      });
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "Archivo demasiado grande",
+        description: "El logo debe pesar hasta 2 MB.",
+      });
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const logoPath = `${comercioId}/logo`;
+      const { error } = await supabase.storage.from(LOGO_BUCKET).upload(logoPath, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: true,
+      });
+      if (error) throw error;
+
+      const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(logoPath);
+      const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
+      setValue("logo_url", publicUrl, { shouldDirty: true, shouldValidate: true });
+      toast({
+        title: "Logo cargado",
+        description: "Guarde los datos para aplicarlo en comprobantes y reportes.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "No se pudo cargar el logo",
+        description: error instanceof Error ? error.message : "Intente nuevamente.",
+      });
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   return (
     <Card>
@@ -131,13 +196,50 @@ export const ComercioForm = ({ initialData, onSubmit, isLoading }: ComercioFormP
               )}
             </div>
 
-            <div className="md:col-span-2">
-              <Label htmlFor="logo_url">URL del Logo</Label>
-              <Input id="logo_url" {...register("logo_url")} placeholder="https://..." />
+            <div className="space-y-3 md:col-span-2">
+              <Label>Logo del comercio</Label>
+              <div className="flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center">
+                <div className="flex h-24 w-40 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/20">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo del comercio" className="max-h-full max-w-full object-contain p-2" />
+                  ) : (
+                    <ImagePlus className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" disabled={isUploadingLogo || !comercioId} asChild>
+                    <label htmlFor="logo_file" className="cursor-pointer">
+                      <Upload className="mr-2 h-4 w-4" />
+                      {isUploadingLogo ? "Subiendo..." : "Subir logo"}
+                    </label>
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isUploadingLogo}
+                      onClick={() => setValue("logo_url", "", { shouldDirty: true })}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Quitar
+                    </Button>
+                  )}
+                  <Input
+                    id="logo_file"
+                    className="sr-only"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleLogoUpload}
+                    disabled={!comercioId || isUploadingLogo}
+                  />
+                  <input type="hidden" {...register("logo_url")} />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">PNG, JPG o WEBP. Maximo 2 MB.</p>
             </div>
           </div>
 
-          <Button type="submit" variant="success" disabled={isLoading}>
+          <Button type="submit" variant="success" disabled={isLoading || isUploadingLogo}>
             {isLoading ? "Guardando..." : "Guardar"}
           </Button>
         </form>

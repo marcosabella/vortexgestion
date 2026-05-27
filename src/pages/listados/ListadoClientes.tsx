@@ -26,6 +26,7 @@ import { PROVINCIAS_ARGENTINA, SITUACIONES_AFIP } from "@/types/cliente";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Cliente } from "@/types/cliente";
 import { InformeCliente } from "@/components/InformeCliente";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 
 const ListadoClientes = () => {
   const { data: clientes, isLoading } = useClientes();
@@ -138,6 +139,7 @@ const ListadoClientes = () => {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        <ReportPrintHeader />
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>

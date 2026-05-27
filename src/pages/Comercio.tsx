@@ -45,7 +45,9 @@ const Comercio = () => {
 
         {comercio ? (
           <ComercioForm
+            key={comercio.id}
             initialData={comercio}
+            comercioId={comercio.id}
             onSubmit={handleSubmit}
             isLoading={updateComercio.isPending}
           />

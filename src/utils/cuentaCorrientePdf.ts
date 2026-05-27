@@ -71,7 +71,7 @@ const formatDate = (value?: string | null) => {
   return format(date, "dd/MM/yyyy");
 };
 
-const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "/logo.png";
+const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
 const resolveAssetUrl = (url: string) => {
   if (typeof window === "undefined") return url;
@@ -419,8 +419,9 @@ const createPdfBlob = (contents: string[], logoImage?: PdfImage | null) => {
     objects.push([`<< /Length ${length} >>\nstream\n${content}\nendstream`]);
   });
 
-  const pdfParts: Array<string | Uint8Array> = ["%PDF-1.4\n"];
-  let byteLength = encoder.encode(pdfParts[0]).length;
+  const pdfHeader = "%PDF-1.4\n";
+  const pdfParts: Array<string | Uint8Array> = [pdfHeader];
+  let byteLength = encoder.encode(pdfHeader).length;
   const offsets = [0];
   const appendPart = (part: string | Uint8Array) => {
     pdfParts.push(part);

@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { useCajaDiaria } from "@/hooks/useCaja";
 import { buildCajaResumen, CajaMovimiento, CajaMovimientoTipo, esMovimientoManual, getCajaMovimientoLabel, MOVIMIENTOS_CAJA } from "@/types/caja";
 import { getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
@@ -196,6 +197,7 @@ const CajaDiaria = () => {
       </style>
 
       <div className="mx-auto max-w-7xl space-y-6">
+        <ReportPrintHeader />
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-foreground">Caja Diaria</h1>

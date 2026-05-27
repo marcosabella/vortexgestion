@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { Printer, Search, Package, AlertCircle, TrendingUp, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -122,6 +123,7 @@ const ListadoProductos = () => {
       </div>
 
       <div className="print-area">
+        <ReportPrintHeader />
         <h1 className="print-title text-2xl font-bold hidden print:block mb-6">Reporte de Productos</h1>
 
         {/* Estadísticas */}

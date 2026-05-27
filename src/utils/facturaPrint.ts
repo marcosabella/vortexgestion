@@ -63,7 +63,7 @@ const sanitizeFilename = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
-const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "/logo.png";
+const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
 export const getFacturaPrintStyles = () => `
   * {
@@ -260,22 +260,12 @@ export const getFacturaPrintStyles = () => `
 
   .totales-section {
     background: #fff;
-    //border-right: 1px solid #000;
+    border-right: 1px solid #000;
     bottom: 178px;
     left: 0;
     padding: 8px 10px;
     position: absolute;
-    right: 0;
-  }
-
-  .totales-section::after {
-    //background: #000;
-    bottom: 0;
-    content: "";
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 1px;
+    right: -1px;
   }
 
   .sin-cae .totales-section {
