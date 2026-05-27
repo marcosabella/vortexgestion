@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
 import VentaForm from "./VentaForm"
-import { Venta, TIPOS_COMPROBANTE, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
 import { useComercio } from "@/hooks/useComercio";
@@ -23,6 +23,9 @@ export const VentasList = () => {
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
+  const hasAfipCertificates = Boolean(
+    afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
+  );
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingVenta, setEditingVenta] = useState<Venta | null>(null);
@@ -74,6 +77,7 @@ export const VentasList = () => {
   };
 
   const buildWhatsAppMessage = (venta: Venta) => {
+    const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
     const tipoComprobante =
       TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label ||
       "Comprobante";
@@ -112,14 +116,14 @@ export const VentasList = () => {
       "Detalle:",
       items,
       "",
-      `Subtotal: ${formatCurrency(venta.subtotal)}`,
+      ...(discriminaIva ? [`Subtotal neto: ${formatCurrency(venta.subtotal)}`] : []),
       ...(Number(venta.monto_descuento || 0) > 0 || Number(venta.porcentaje_descuento || 0) > 0
         ? [`Descuento venta: ${venta.porcentaje_descuento || 0}% + ${formatCurrency(Number(venta.monto_descuento || 0))}`]
         : []),
       ...(Number(venta.monto_recargo || 0) > 0 || Number(venta.porcentaje_recargo || 0) > 0
         ? [`Recargo venta: ${venta.porcentaje_recargo || 0}% + ${formatCurrency(Number(venta.monto_recargo || 0))}`]
         : []),
-      `IVA: ${formatCurrency(venta.total_iva)}`,
+      ...(discriminaIva ? [`IVA: ${formatCurrency(venta.total_iva)}`] : []),
       `Total: ${formatCurrency(venta.total)}`,
       "",
       "Pago:",
@@ -362,7 +366,7 @@ export const VentasList = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {!selectedVenta.cae && selectedVenta.tipo_comprobante !== 'ticket_fiscal' && (
+                  {!selectedVenta.cae && selectedVenta.tipo_comprobante !== 'ticket_fiscal' && hasAfipCertificates && (
                     <Button
                       onClick={() => obtenerCAE(selectedVenta.id)}
                       disabled={isObteniendoCAE}
@@ -397,8 +401,8 @@ export const VentasList = () => {
                         <TableHead>P.U.</TableHead>
                         <TableHead>Desc.</TableHead>
                         <TableHead>Recargo</TableHead>
-                        <TableHead>Subtotal</TableHead>
-                        <TableHead>IVA</TableHead>
+                        {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <TableHead>Subtotal neto</TableHead>}
+                        {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <TableHead>IVA</TableHead>}
                         <TableHead>Total</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -411,8 +415,8 @@ export const VentasList = () => {
                           <TableCell>${item.precio_unitario.toFixed(2)}</TableCell>
                           <TableCell>${Number(item.monto_descuento || 0).toFixed(2)}</TableCell>
                           <TableCell>${Number(item.monto_recargo || 0).toFixed(2)}</TableCell>
-                          <TableCell>${item.subtotal.toFixed(2)}</TableCell>
-                          <TableCell>${item.monto_iva.toFixed(2)}</TableCell>
+                          {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <TableCell>${item.subtotal.toFixed(2)}</TableCell>}
+                          {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <TableCell>${item.monto_iva.toFixed(2)}</TableCell>}
                           <TableCell>${item.total.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
@@ -467,13 +471,13 @@ export const VentasList = () => {
               <div className="border-t pt-4">
                 <div className="grid grid-cols-3 gap-4 text-right">
                   <div>
-                    <p><strong>Subtotal:</strong> ${selectedVenta.subtotal.toFixed(2)}</p>
+                    {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>Subtotal neto:</strong> ${selectedVenta.subtotal.toFixed(2)}</p>}
                     {(Number(selectedVenta.monto_descuento || 0) > 0 || Number(selectedVenta.porcentaje_descuento || 0) > 0) && (
                       <p><strong>Desc. venta:</strong> {selectedVenta.porcentaje_descuento || 0}% + ${Number(selectedVenta.monto_descuento || 0).toFixed(2)}</p>
                     )}
                   </div>
                   <div>
-                    <p><strong>IVA:</strong> ${selectedVenta.total_iva.toFixed(2)}</p>
+                    {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>IVA:</strong> ${selectedVenta.total_iva.toFixed(2)}</p>}
                     {(Number(selectedVenta.monto_recargo || 0) > 0 || Number(selectedVenta.porcentaje_recargo || 0) > 0) && (
                       <p><strong>Recargo venta:</strong> {selectedVenta.porcentaje_recargo || 0}% + ${Number(selectedVenta.monto_recargo || 0).toFixed(2)}</p>
                     )}

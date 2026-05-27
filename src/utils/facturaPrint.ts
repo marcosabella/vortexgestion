@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
-import { getVentaTipoPagoLabel, Venta } from "@/types/venta";
+import { discriminaIvaEnComprobante, getVentaTipoPagoLabel, Venta } from "@/types/venta";
 
 interface FacturaPrintOptions {
   venta: Venta;
@@ -436,6 +436,7 @@ const getTipoPagoLabel = (venta: Venta) => {
 
 export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "" }: FacturaPrintOptions) => {
   const hasCae = Boolean(venta.cae?.trim());
+  const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const numComprobante = formatNumeroComprobante(venta, afipConfig);
   const fechaVenta = formatDate(venta.fecha_venta);
   const comercioDireccion = [
@@ -455,6 +456,10 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
           const recargo = Number(item.monto_recargo || 0) > 0
             ? ` (Recargo: $ ${formatMoney(item.monto_recargo)})`
             : "";
+          const porcentajeIva = Number(item.porcentaje_iva || 0);
+          const precioUnitarioSinIva = porcentajeIva > 0
+            ? Number(item.precio_unitario || 0) / (1 + porcentajeIva / 100)
+            : Number(item.precio_unitario || 0);
 
           return `
             <tr>
@@ -462,10 +467,11 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               <td>${escapeHtml(`${descripcion}${recargo}`)}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.cantidad))}</td>
               <td class="text-center">unidades</td>
-              <td class="text-right">${escapeHtml(formatMoney(item.precio_unitario))}</td>
+              <td class="text-right">${escapeHtml(formatMoney(discriminaIva ? precioUnitarioSinIva : item.precio_unitario))}</td>
+              ${discriminaIva ? `<td class="text-right">${escapeHtml(formatMoney(porcentajeIva))}%</td>` : ""}
               <td class="text-right">${escapeHtml(formatMoney(item.porcentaje_descuento || 0))}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.monto_descuento || 0))}</td>
-              <td class="text-right">${escapeHtml(formatMoney(item.subtotal))}</td>
+              <td class="text-right">${escapeHtml(formatMoney(item.total))}</td>
             </tr>
           `;
         })
@@ -529,28 +535,33 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 14%">Codigo</th>
-            <th style="width: 30%">Producto / Servicio</th>
-            <th style="width: 9%">Cantidad</th>
-            <th style="width: 11%">U. Medida</th>
-            <th style="width: 12%">Precio Unit.</th>
+            <th style="width: 12%">Codigo</th>
+            <th style="width: 27%">Producto / Servicio</th>
+            <th style="width: 8%">Cantidad</th>
+            <th style="width: 9%">U. Medida</th>
+            <th style="width: 12%">${discriminaIva ? "Precio Unit. s/IVA" : "Precio Unitario"}</th>
+            ${discriminaIva ? `<th style="width: 8%">IVA %</th>` : ""}
             <th style="width: 8%">% Bonif</th>
             <th style="width: 8%">Imp. Bonif.</th>
-            <th style="width: 8%">Subtotal</th>
+            <th style="width: 8%">Total</th>
           </tr>
         </thead>
         <tbody>
           ${rows}
-          <tr class="empty-rows"><td colspan="8"></td></tr>
+          <tr class="empty-rows"><td colspan="${discriminaIva ? "9" : "8"}"></td></tr>
         </tbody>
       </table>
 
       <div class="totales-section">
         <div class="totales-grid">
-          <div class="totales-row">
-            <div class="text-right">Subtotal:</div>
-            <div class="text-right">$ ${escapeHtml(formatMoney(venta.subtotal))}</div>
-          </div>
+          ${
+            discriminaIva
+              ? `<div class="totales-row">
+                   <div class="text-right">Subtotal neto:</div>
+                   <div class="text-right">$ ${escapeHtml(formatMoney(venta.subtotal))}</div>
+                 </div>`
+              : ""
+          }
           ${
             Number(venta.monto_descuento || 0) > 0 || Number(venta.porcentaje_descuento || 0) > 0
               ? `
@@ -575,10 +586,14 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
             <div class="text-right">Importe Otros Tributos:</div>
             <div class="text-right">$ 0,00</div>
           </div>
-          <div class="totales-row">
-            <div class="text-right">IVA:</div>
-            <div class="text-right">$ ${escapeHtml(formatMoney(venta.total_iva))}</div>
-          </div>
+          ${
+            discriminaIva
+              ? `<div class="totales-row">
+                   <div class="text-right">IVA:</div>
+                   <div class="text-right">$ ${escapeHtml(formatMoney(venta.total_iva))}</div>
+                 </div>`
+              : ""
+          }
           <div class="totales-row total-final">
             <div class="text-right">Importe Total:</div>
             <div class="text-right">$ ${escapeHtml(formatMoney(venta.total))}</div>

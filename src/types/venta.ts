@@ -164,3 +164,12 @@ export const TIPOS_COMPROBANTE: { value: TipoComprobante; label: string }[] = [
   { value: 'recibo_c', label: 'Recibo C' },
   { value: 'factura_exportacion', label: 'Factura de Exportación' },
 ];
+
+const COMPROBANTES_CON_IVA_DISCRIMINADO: TipoComprobante[] = [
+  'factura_a',
+  'nota_credito_a',
+  'nota_debito_a',
+];
+
+export const discriminaIvaEnComprobante = (tipo: TipoComprobante | string) =>
+  COMPROBANTES_CON_IVA_DISCRIMINADO.includes(tipo as TipoComprobante);

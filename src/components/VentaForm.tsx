@@ -27,7 +27,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useVentas } from "@/hooks/useVentas"
 import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
-import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, getTotalPagosBase } from "@/types/venta"
+import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
 import { Trash2, Plus, Search } from "lucide-react"
 import { PagosVentaManager } from "@/components/PagosVentaManager"
@@ -77,18 +77,20 @@ const calcularMontoAjuste = (base: number, porcentaje?: number, monto?: number) 
 const calcularItemVenta = (
   item: Pick<VentaItemDraft, "cantidad" | "precio_unitario" | "porcentaje_iva" | "porcentaje_descuento" | "monto_descuento" | "porcentaje_recargo" | "monto_recargo">
 ) => {
-  const bruto = Number(item.precio_unitario || 0) * Number(item.cantidad || 0)
-  const descuento = Math.min(calcularMontoAjuste(bruto, item.porcentaje_descuento, item.monto_descuento), bruto)
-  const recargo = calcularMontoAjuste(bruto, item.porcentaje_recargo, item.monto_recargo)
-  const subtotal = roundMoney(Math.max(bruto - descuento + recargo, 0))
-  const montoIva = roundMoney((subtotal * Number(item.porcentaje_iva || 0)) / 100)
+  const totalConIva = Number(item.precio_unitario || 0) * Number(item.cantidad || 0)
+  const descuento = Math.min(calcularMontoAjuste(totalConIva, item.porcentaje_descuento, item.monto_descuento), totalConIva)
+  const recargo = calcularMontoAjuste(totalConIva, item.porcentaje_recargo, item.monto_recargo)
+  const total = roundMoney(Math.max(totalConIva - descuento + recargo, 0))
+  const alicuotaIva = Number(item.porcentaje_iva || 0)
+  const subtotal = roundMoney(alicuotaIva > 0 ? total / (1 + alicuotaIva / 100) : total)
+  const montoIva = roundMoney(total - subtotal)
 
   return {
     monto_descuento: descuento,
     monto_recargo: recargo,
     subtotal,
     monto_iva: montoIva,
-    total: roundMoney(subtotal + montoIva),
+    total,
   }
 }
 
@@ -100,16 +102,18 @@ const calcularTotalesVenta = (
   montoRecargo = 0
 ) => {
   const subtotalItems = items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
-  const descuentoVenta = Math.min(calcularMontoAjuste(subtotalItems, porcentajeDescuento, montoDescuento), subtotalItems)
-  const recargoVenta = calcularMontoAjuste(subtotalItems, porcentajeRecargo, montoRecargo)
-  const factor = subtotalItems > 0 ? Math.max(subtotalItems - descuentoVenta + recargoVenta, 0) / subtotalItems : 1
-  const subtotal = roundMoney(Math.max(subtotalItems - descuentoVenta + recargoVenta, 0))
-  const totalIva = roundMoney(items.reduce((sum, item) => sum + Number(item.monto_iva || 0) * factor, 0))
+  const totalItems = items.reduce((sum, item) => sum + Number(item.total || 0), 0)
+  const descuentoVenta = Math.min(calcularMontoAjuste(totalItems, porcentajeDescuento, montoDescuento), totalItems)
+  const recargoVenta = calcularMontoAjuste(totalItems, porcentajeRecargo, montoRecargo)
+  const total = roundMoney(Math.max(totalItems - descuentoVenta + recargoVenta, 0))
+  const factor = totalItems > 0 ? total / totalItems : 1
+  const subtotal = roundMoney(subtotalItems * factor)
+  const totalIva = roundMoney(total - subtotal)
 
   return {
     subtotal,
     total_iva: totalIva,
-    total: roundMoney(subtotal + totalIva),
+    total,
   }
 }
 
@@ -162,6 +166,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   })
 
   const watchTipoComprobante = form.watch("tipo_comprobante")
+  const discriminaIva = discriminaIvaEnComprobante(watchTipoComprobante)
   const watchPorcentajeDescuento = form.watch("porcentaje_descuento")
   const watchMontoDescuento = form.watch("monto_descuento")
   const watchPorcentajeRecargo = form.watch("porcentaje_recargo")
@@ -737,7 +742,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                                     <TableRow>
                                       <TableHead>Codigo</TableHead>
                                       <TableHead>Descripcion</TableHead>
-                                      <TableHead className="text-right">Precio</TableHead>
+                                      <TableHead className="text-right">Precio final</TableHead>
                                       <TableHead className="text-right">IVA %</TableHead>
                                       <TableHead className="text-right">Stock</TableHead>
                                       <TableHead className="w-24 text-right">Accion</TableHead>
@@ -798,7 +803,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium">Prec. Un.</label>
+                      <label className="text-sm font-medium">Prec. Un. IVA incl.</label>
                       <Input
                         type="number"
                         min="0"
@@ -875,11 +880,11 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead className="text-right">Cant.</TableHead>
-                          <TableHead className="text-right">Precio Unit.</TableHead>
+                          <TableHead className="text-right">Precio Unit. IVA incl.</TableHead>
                           <TableHead className="text-right">Desc.</TableHead>
                           <TableHead className="text-right">Rec.</TableHead>
-                          <TableHead className="text-right">IVA %</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
+                          {discriminaIva && <TableHead className="text-right">IVA %</TableHead>}
+                          {discriminaIva && <TableHead className="text-right">Subtotal neto</TableHead>}
                           <TableHead className="text-right">Total</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
@@ -895,8 +900,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                               <TableCell className="text-right">${item.precio_unitario.toFixed(2)}</TableCell>
                               <TableCell className="text-right">${Number(item.monto_descuento || 0).toFixed(2)}</TableCell>
                               <TableCell className="text-right">${Number(item.monto_recargo || 0).toFixed(2)}</TableCell>
-                              <TableCell className="text-right">{item.porcentaje_iva}%</TableCell>
-                              <TableCell className="text-right">${item.subtotal.toFixed(2)}</TableCell>
+                              {discriminaIva && <TableCell className="text-right">{item.porcentaje_iva}%</TableCell>}
+                              {discriminaIva && <TableCell className="text-right">${item.subtotal.toFixed(2)}</TableCell>}
                               <TableCell className="text-right font-semibold">${item.total.toFixed(2)}</TableCell>
                               <TableCell>
                                 <Button
@@ -917,26 +922,30 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                 )}
                 
                 {/* Totales */}
-                <div className="grid grid-cols-3 gap-4 pt-4">
-                  <div>
-                    <label className="text-sm font-medium">Subtotal</label>
-                    <Input
-                      type="number"
-                      value={form.watch("subtotal").toFixed(2)}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
+                <div className={`grid gap-4 pt-4 ${discriminaIva ? "grid-cols-3" : "grid-cols-1"}`}>
+                  {discriminaIva && (
+                    <div>
+                      <label className="text-sm font-medium">Subtotal neto</label>
+                      <Input
+                        type="number"
+                        value={form.watch("subtotal").toFixed(2)}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="text-sm font-medium">IVA</label>
-                    <Input
-                      type="number"
-                      value={form.watch("total_iva").toFixed(2)}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
+                  {discriminaIva && (
+                    <div>
+                      <label className="text-sm font-medium">IVA</label>
+                      <Input
+                        type="number"
+                        value={form.watch("total_iva").toFixed(2)}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-sm font-medium">Total</label>

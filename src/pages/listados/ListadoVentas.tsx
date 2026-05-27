@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
-import { TIPOS_COMPROBANTE, getVentaTipoPagoLabel } from '@/types/venta';
+import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel } from '@/types/venta';
 
 const ListadoVentas = () => {
   const { ventas, isLoading } = useVentas();
@@ -335,7 +335,7 @@ const ListadoVentas = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Forma de Pago</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
+                  <TableHead className="text-right">Subtotal neto</TableHead>
                   <TableHead className="text-right">IVA</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
@@ -364,10 +364,14 @@ const ListadoVentas = () => {
                       </TableCell>
                       <TableCell>{getVentaTipoPagoLabel(venta)}</TableCell>
                       <TableCell className="text-right">
-                        ${Number(venta.subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {discriminaIvaEnComprobante(venta.tipo_comprobante)
+                          ? `$${Number(venta.subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${Number(venta.total_iva).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {discriminaIvaEnComprobante(venta.tipo_comprobante)
+                          ? `$${Number(venta.total_iva).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         ${Number(venta.total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

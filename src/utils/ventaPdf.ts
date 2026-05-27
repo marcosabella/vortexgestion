@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
-import { TIPOS_COMPROBANTE, Venta, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -69,6 +69,7 @@ const wrapLine = (line: string, maxLength = 88) => {
 };
 
 const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
+  const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const tipoComprobante =
     TIPOS_COMPROBANTE.find((tipo) => tipo.value === venta.tipo_comprobante)?.label || "Comprobante";
   const comercioDireccion = [
@@ -91,22 +92,33 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
     `Condicion de venta: ${getVentaTipoPagoLabel(venta)}`,
     "",
     "Detalle de la venta",
-    "Cant.  Descripcion                                      P.Unit.      Total",
-    "--------------------------------------------------------------------------",
+    discriminaIva
+      ? "Cant.  Descripcion                       P.Unit.s/IVA   IVA %      Subtotal"
+      : "Cant.  Descripcion                         P.Unitario              Total",
+    "----------------------------------------------------------------------------",
   ].filter((line) => line !== "");
 
   if (venta.venta_items?.length) {
     venta.venta_items.forEach((item) => {
       const descripcion = item.producto?.descripcion || item.descripcion_manual || item.producto?.cod_producto || "Producto";
       const cantidad = Number(item.cantidad || 0).toLocaleString("es-AR");
-      const precio = formatMoney(item.precio_unitario);
-      const total = formatMoney(item.total);
+      const porcentajeIva = Number(item.porcentaje_iva || 0);
+      const precioUnitarioSinIva = porcentajeIva > 0
+        ? Number(item.precio_unitario || 0) / (1 + porcentajeIva / 100)
+        : Number(item.precio_unitario || 0);
+      const precio = formatMoney(discriminaIva ? precioUnitarioSinIva : item.precio_unitario);
+      const iva = `${porcentajeIva.toLocaleString("es-AR")}%`;
+      const subtotalFinal = formatMoney(item.total);
       const ajustes = [
         Number(item.monto_descuento || 0) > 0 ? `desc. ${formatMoney(item.monto_descuento)}` : "",
         Number(item.monto_recargo || 0) > 0 ? `recargo ${formatMoney(item.monto_recargo)}` : "",
       ].filter(Boolean).join(", ");
       const descripcionConAjustes = ajustes ? `${descripcion} (${ajustes})` : descripcion;
-      lines.push(`${cantidad.padEnd(6)} ${descripcionConAjustes}`.slice(0, 52).padEnd(52) + precio.padStart(12) + total.padStart(12));
+      lines.push(
+        discriminaIva
+          ? `${cantidad.padEnd(6)} ${descripcionConAjustes}`.slice(0, 40).padEnd(40) + precio.padStart(14) + iva.padStart(8) + subtotalFinal.padStart(14)
+          : `${cantidad.padEnd(6)} ${descripcionConAjustes}`.slice(0, 42).padEnd(42) + precio.padStart(16) + subtotalFinal.padStart(19)
+      );
     });
   } else {
     lines.push("Sin detalle de items");
@@ -114,14 +126,14 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
 
   lines.push(
     "",
-    `Subtotal: ${formatMoney(venta.subtotal)}`,
+    ...(discriminaIva ? [`Subtotal neto: ${formatMoney(venta.subtotal)}`] : []),
     ...(Number(venta.monto_descuento || 0) > 0 || Number(venta.porcentaje_descuento || 0) > 0
       ? [`Descuento venta: ${Number(venta.porcentaje_descuento || 0).toLocaleString("es-AR")}% + ${formatMoney(venta.monto_descuento)}`]
       : []),
     ...(Number(venta.monto_recargo || 0) > 0 || Number(venta.porcentaje_recargo || 0) > 0
       ? [`Recargo venta: ${Number(venta.porcentaje_recargo || 0).toLocaleString("es-AR")}% + ${formatMoney(venta.monto_recargo)}`]
       : []),
-    `IVA: ${formatMoney(venta.total_iva)}`,
+    ...(discriminaIva ? [`IVA: ${formatMoney(venta.total_iva)}`] : []),
     `Total: ${formatMoney(venta.total)}`,
     "",
     "Pagos"
