@@ -142,7 +142,7 @@ const ListadoVentas = () => {
               Análisis completo de ventas por fecha, cliente y tipo de comprobante
             </p>
           </div>
-          <Button onClick={handlePrint} className="no-print">
+          <Button variant="print" onClick={handlePrint} className="no-print">
             <Printer className="mr-2 h-4 w-4" />
             Imprimir Reporte
           </Button>

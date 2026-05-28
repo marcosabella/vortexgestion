@@ -246,7 +246,7 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
             </Select>
           </div>
         </div>
-        <Button variant="outline" onClick={handlePrint}>
+        <Button variant="print" onClick={handlePrint}>
           <Printer className="h-4 w-4 mr-2" />
           Imprimir
         </Button>

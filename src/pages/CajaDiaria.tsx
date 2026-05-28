@@ -22,9 +22,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ReportPrintHeader } from "@/components/ReportPrintHeader";
+import { useComercio } from "@/hooks/useComercio";
 import { useCajaDiaria } from "@/hooks/useCaja";
+import { useToast } from "@/hooks/use-toast";
 import { buildCajaResumen, CajaMovimiento, CajaMovimientoTipo, esMovimientoManual, getCajaMovimientoLabel, MOVIMIENTOS_CAJA } from "@/types/caja";
 import { getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { buildCajaDiariaPdfFile } from "@/utils/cajaPdf";
 
 const today = () => format(new Date(), "yyyy-MM-dd");
 
@@ -52,6 +55,8 @@ const CajaDiaria = () => {
   const [conceptoEditado, setConceptoEditado] = useState("");
   const [descripcionEditada, setDescripcionEditada] = useState("");
   const [montoMovimientoEditado, setMontoMovimientoEditado] = useState(0);
+  const { comercio } = useComercio();
+  const { toast } = useToast();
 
   const {
     caja,
@@ -181,6 +186,41 @@ const CajaDiaria = () => {
     );
   };
 
+  const handlePrintReport = async () => {
+    if (!caja) {
+      toast({
+        title: "No hay caja para imprimir",
+        description: "Abra o seleccione una caja para generar el reporte.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fechaReporte = format(new Date(`${caja.fecha}T00:00:00`), "dd/MM/yyyy");
+    const file = await buildCajaDiariaPdfFile(
+      { ...caja, ventas },
+      {
+        comercio,
+        rango: fechaReporte,
+      },
+    );
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, "_blank");
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: "No se pudo abrir el PDF",
+        description: "Revise si el navegador bloqueo la ventana emergente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   const diferenciaPrevia = montoCierreReal - resumen.totalSistema;
   const sistemaCierreRegistrado = Number(caja?.monto_cierre_sistema || resumen.totalSistema);
   const diferenciaEditada = montoCierreEditado - sistemaCierreRegistrado;
@@ -192,6 +232,7 @@ const CajaDiaria = () => {
           @media print {
             .no-print { display: none !important; }
             body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            table, thead, tbody, tfoot, tr, th, td { border: 0 !important; }
           }
         `}
       </style>
@@ -210,7 +251,7 @@ const CajaDiaria = () => {
               <Label htmlFor="fecha">Fecha</Label>
               <Input id="fecha" type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} />
             </div>
-            <Button type="button" variant="outline" onClick={() => window.print()}>
+            <Button type="button" variant="print" onClick={handlePrintReport}>
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
             </Button>

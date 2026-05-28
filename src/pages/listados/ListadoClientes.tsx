@@ -150,7 +150,7 @@ const ListadoClientes = () => {
           </div>
           <div className="flex gap-2 print:hidden">
             <Button 
-              variant="outline" 
+              variant="print" 
               onClick={handlePrint} 
               disabled={!filteredClientes || filteredClientes.length === 0}
             >

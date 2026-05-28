@@ -20,9 +20,12 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ReportPrintHeader } from "@/components/ReportPrintHeader";
+import { useComercio } from "@/hooks/useComercio";
 import { useActualizarCierreCaja, useCajasDiarias, useEliminarCaja, useReabrirCaja } from "@/hooks/useCaja";
+import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
 import { getTipoPagoLabel, getVentaTipoPagoLabel, PagoVenta, Venta } from "@/types/venta";
+import { buildCajaDiariaPdfFile, buildCajaPdfFile } from "@/utils/cajaPdf";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -66,6 +69,8 @@ const ListadoCaja = () => {
   const [montoCierreEditado, setMontoCierreEditado] = useState(0);
   const [observacionesCierreEditadas, setObservacionesCierreEditadas] = useState("");
   const { data: cajas = [], isLoading } = useCajasDiarias(fechaDesde, fechaHasta);
+  const { comercio } = useComercio();
+  const { toast } = useToast();
   const actualizarCierreCaja = useActualizarCierreCaja();
   const eliminarCaja = useEliminarCaja();
   const reabrirCaja = useReabrirCaja();
@@ -243,6 +248,61 @@ const ListadoCaja = () => {
     });
   };
 
+  const handlePrintReport = async () => {
+    const file = await buildCajaPdfFile(cajasFiltradas, {
+      comercio,
+      rango: rangoBalance,
+      balance: balanceCaja,
+    });
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, "_blank");
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: "No se pudo abrir el PDF",
+        description: "Revise si el navegador bloqueo la ventana emergente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const handlePrintCajaDetalle = async () => {
+    if (!selectedCaja) {
+      toast({
+        title: "No hay caja para imprimir",
+        description: "Seleccione una caja para generar el reporte.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fechaReporte = format(new Date(`${selectedCaja.fecha}T00:00:00`), "dd/MM/yyyy");
+    const file = await buildCajaDiariaPdfFile(selectedCaja, {
+      comercio,
+      rango: fechaReporte,
+    });
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, "_blank");
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: "No se pudo abrir el PDF",
+        description: "Revise si el navegador bloqueo la ventana emergente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   const sistemaCierreEditado = Number(editingCaja?.monto_cierre_sistema || 0);
   const diferenciaEditada = montoCierreEditado - sistemaCierreEditado;
 
@@ -263,6 +323,7 @@ const ListadoCaja = () => {
           @media print {
             .no-print { display: none !important; }
             body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            table, thead, tbody, tfoot, tr, th, td { border: 0 !important; }
           }
         `}
       </style>
@@ -274,7 +335,7 @@ const ListadoCaja = () => {
             <h1 className="mb-2 text-3xl font-bold text-foreground">Listado de Caja</h1>
             <p className="text-muted-foreground">Consulta historica de aperturas, cierres y arqueos</p>
           </div>
-          <Button type="button" variant="outline" onClick={() => window.print()} className="no-print">
+          <Button type="button" variant="print" onClick={handlePrintReport} className="no-print">
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
           </Button>
@@ -503,8 +564,14 @@ const ListadoCaja = () => {
 
       <Dialog open={Boolean(selectedCaja)} onOpenChange={(open) => !open && setSelectedCaja(null)}>
         <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Detalle de caja</DialogTitle>
+          <DialogHeader className="pr-10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <DialogTitle>Detalle de caja</DialogTitle>
+              <Button type="button" variant="print" size="sm" onClick={handlePrintCajaDetalle}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+            </div>
           </DialogHeader>
           {selectedCaja && (
             <div className="space-y-4">

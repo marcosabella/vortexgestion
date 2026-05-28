@@ -366,7 +366,7 @@ export const CuentaCorrienteList = () => {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
-                    className="bg-sky-600 text-white hover:bg-sky-700"
+                    variant="print"
                     onClick={openResumenPdf}
                     disabled={isLoadingClientMovimientos}
                   >

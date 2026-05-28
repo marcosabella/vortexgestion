@@ -73,7 +73,7 @@ export const FacturaImpresion = ({ venta }: FacturaImpresionProps) => {
       <Button
         onClick={() => openFactura("print")}
         size="sm"
-        className="bg-sky-600 text-white hover:bg-sky-700"
+        variant="print"
         disabled={openingAction !== null}
       >
         <Printer className="h-4 w-4 mr-2" />

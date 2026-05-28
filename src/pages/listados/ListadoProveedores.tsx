@@ -144,7 +144,7 @@ const ListadoProveedores = () => {
           </div>
           <div className="flex gap-2 print:hidden">
             <Button
-              variant="outline"
+              variant="print"
               onClick={handlePrint}
               disabled={!filteredProveedores || filteredProveedores.length === 0}
             >

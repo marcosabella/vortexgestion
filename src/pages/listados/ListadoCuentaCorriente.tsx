@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Search } from 'lucide-react';
+import { FileText, Printer, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useComercio } from '@/hooks/useComercio';
 import { useCuentaCorriente } from '@/hooks/useCuentaCorriente';
 import { useToast } from '@/hooks/use-toast';
-import { buildCuentaCorrientePdfFile } from '@/utils/cuentaCorrientePdf';
+import { buildCuentaCorrientePdfFile, buildListadoCuentaCorrientePdfFile } from '@/utils/cuentaCorrientePdf';
 
 const ListadoCuentaCorriente = () => {
   const { getResumenCuentaCorreinte, movimientos, isLoading: isLoadingMovimientos } = useCuentaCorriente();
@@ -73,6 +73,37 @@ const ListadoCuentaCorriente = () => {
       movimientos.filter((movimiento) => movimiento.cliente_id === clienteId),
       { comercio }
     );
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, '_blank');
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'No se pudo abrir el PDF',
+        description: 'Revise si el navegador bloqueo la ventana emergente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const getRangoLabel = () => {
+    if (fechaDesde && fechaHasta) {
+      return `${format(new Date(`${fechaDesde}T00:00:00`), 'dd/MM/yyyy')} al ${format(new Date(`${fechaHasta}T00:00:00`), 'dd/MM/yyyy')}`;
+    }
+    if (fechaDesde) return `Desde ${format(new Date(`${fechaDesde}T00:00:00`), 'dd/MM/yyyy')}`;
+    if (fechaHasta) return `Hasta ${format(new Date(`${fechaHasta}T00:00:00`), 'dd/MM/yyyy')}`;
+    return 'Todos los clientes con saldo';
+  };
+
+  const handlePrintList = async () => {
+    const file = await buildListadoCuentaCorrientePdfFile(filteredClientes, {
+      comercio,
+      rango: getRangoLabel(),
+    });
     const url = URL.createObjectURL(file);
     const pdfWindow = window.open(url, '_blank');
 
@@ -210,10 +241,18 @@ const ListadoCuentaCorriente = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Clientes con Saldo</CardTitle>
-            <CardDescription>
-              Mostrando {filteredClientes.length} de {clientesConSaldo.length} clientes
-            </CardDescription>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>Clientes con Saldo</CardTitle>
+                <CardDescription>
+                  Mostrando {filteredClientes.length} de {clientesConSaldo.length} clientes
+                </CardDescription>
+              </div>
+              <Button type="button" variant="print" onClick={handlePrintList}>
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir listado
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
@@ -259,7 +298,7 @@ const ListadoCuentaCorriente = () => {
                             : '-'}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button size="sm" variant="outline" onClick={() => handlePrintReport(cliente.cliente_id)}>
+                          <Button size="sm" variant="print" onClick={() => handlePrintReport(cliente.cliente_id)}>
                             <FileText className="h-4 w-4 mr-1" />
                             Reporte
                           </Button>

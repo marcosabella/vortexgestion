@@ -12,6 +12,8 @@ const buttonVariants = cva(
         default: "bg-sky-600 text-white hover:bg-sky-700",
         success: "bg-emerald-600 text-white hover:bg-emerald-700",
         new: "bg-sky-600 text-white hover:bg-sky-700",
+        print:
+          "border border-indigo-700 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700",
         cancel: "bg-red-600 text-white hover:bg-red-700",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",

@@ -13,6 +13,9 @@ const DETAIL_RIGHT = 594;
 const TABLE_TOP = 226;
 const ROW_HEIGHT = 14.75;
 const MAX_ROWS_PER_PAGE = 28;
+const LISTADO_TABLE_TOP = 188;
+const LISTADO_ROW_HEIGHT = 15;
+const LISTADO_MAX_ROWS_PER_PAGE = 26;
 
 const COLUMNS = [
   { key: "fecha", label: "Fecha Comp.", x: 48, width: 72, align: "center" },
@@ -20,6 +23,21 @@ const COLUMNS = [
   { key: "debe", label: "Debe", x: 360, width: 72, align: "right" },
   { key: "haber", label: "Haber", x: 438, width: 69.75, align: "right" },
   { key: "saldo", label: "Saldo", x: 516, width: 72, align: "right" },
+] as const;
+
+const LISTADO_COLUMNS = [
+  { key: "cliente", label: "Cliente", x: 24, width: 174, align: "left" },
+  { key: "cuit", label: "CUIT", x: 198, width: 90, align: "center" },
+  { key: "debitos", label: "Debitos", x: 288, width: 78, align: "right" },
+  { key: "creditos", label: "Creditos", x: 366, width: 78, align: "right" },
+  { key: "saldo", label: "Saldo", x: 444, width: 78, align: "right" },
+  { key: "ultimoMovimiento", label: "Ult. Mov.", x: 522, width: 66, align: "center" },
+] as const;
+
+const LISTADO_RESUMEN_COLUMNS = [
+  { key: "concepto", label: "Concepto", x: 24, width: 330, align: "left" },
+  { key: "cantidad", label: "Cantidad", x: 354, width: 78, align: "right" },
+  { key: "importe", label: "Importe", x: 432, width: 156, align: "right" },
 ] as const;
 
 type PdfFont = "F1" | "F2" | "F3";
@@ -32,6 +50,21 @@ type PdfRow = {
   saldo: string;
 };
 
+type ListadoCuentaCorrienteRow = {
+  cliente: string;
+  cuit: string;
+  debitos: string;
+  creditos: string;
+  saldo: string;
+  ultimoMovimiento: string;
+};
+
+type ListadoResumenRow = {
+  concepto: string;
+  cantidad: string;
+  importe: string;
+};
+
 type PdfImage = {
   bytes: Uint8Array;
   width: number;
@@ -40,6 +73,10 @@ type PdfImage = {
 
 type CuentaCorrientePdfOptions = {
   comercio?: Comercio | null;
+};
+
+type ListadoCuentaCorrientePdfOptions = CuentaCorrientePdfOptions & {
+  rango: string;
 };
 
 const moneyFormatter = new Intl.NumberFormat("es-AR", {
@@ -130,6 +167,44 @@ const buildRows = (movimientos: CuentaCorriente[]) => {
       saldo: formatMoney(saldo),
     };
   });
+};
+
+const buildListadoRows = (clientes: CuentaCorrienteResumen[]): ListadoCuentaCorrienteRow[] => {
+  if (!clientes.length) {
+    return [
+      {
+        cliente: "No hay clientes con saldo",
+        cuit: "",
+        debitos: "",
+        creditos: "",
+        saldo: "",
+        ultimoMovimiento: "",
+      },
+    ];
+  }
+
+  return clientes.map((cliente) => ({
+    cliente: `${cliente.cliente_nombre} ${cliente.cliente_apellido}`.trim() || "Cliente",
+    cuit: cliente.cliente_cuit || "N/A",
+    debitos: formatMoney(cliente.total_debitos),
+    creditos: formatMoney(cliente.total_creditos),
+    saldo: formatMoney(Math.abs(cliente.saldo_actual)),
+    ultimoMovimiento: cliente.ultimo_movimiento ? formatDate(cliente.ultimo_movimiento) : "-",
+  }));
+};
+
+const buildListadoResumenRows = (clientes: CuentaCorrienteResumen[]): ListadoResumenRow[] => {
+  const deudores = clientes.filter((cliente) => cliente.saldo_actual > 0);
+  const acreedores = clientes.filter((cliente) => cliente.saldo_actual < 0);
+  const saldoDeudor = deudores.reduce((sum, cliente) => sum + Number(cliente.saldo_actual || 0), 0);
+  const saldoAcreedor = acreedores.reduce((sum, cliente) => sum + Math.abs(Number(cliente.saldo_actual || 0)), 0);
+
+  return [
+    { concepto: "Clientes con saldo", cantidad: String(clientes.length), importe: "" },
+    { concepto: "Deudores", cantidad: String(deudores.length), importe: formatMoney(saldoDeudor) },
+    { concepto: "Acreedores", cantidad: String(acreedores.length), importe: formatMoney(saldoAcreedor) },
+    { concepto: "Saldo neto", cantidad: "", importe: formatMoney(saldoDeudor - saldoAcreedor) },
+  ];
 };
 
 const opText = (
@@ -321,6 +396,125 @@ const createPageContent = (
   ].join("\n");
 };
 
+const drawListadoHeader = (
+  options: ListadoCuentaCorrientePdfOptions,
+  pageNumber: number,
+  totalPages: number,
+  logoImage?: PdfImage | null
+) => {
+  const comercio = options.comercio;
+  const fechaEmision = formatDate(new Date().toISOString());
+  const comercioDireccion = getComercioDireccionLineas(comercio);
+
+  return [
+    "0 0 0 rg",
+    "0 0 0 RG",
+    "1 w",
+    opLine(18, 28, 594, 28),
+    opLine(18, 142, 594, 142),
+    opLine(18, 28, 18, 142),
+    opLine(594, 28, 594, 142),
+    opLine(347, 28, 347, 142),
+    ...drawComercioIdentity(comercio, logoImage),
+    opText(`Razon Social: ${comercio?.nombre_comercio || "N/A"}`, 34, 96, 8.5, "F1", "left", 296),
+    opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
+    opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
+    opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
+    opText("LISTADO CTA CTE", 363, 56, 14.5, "F2", "left", 206),
+    opText("Fecha de Emision:", 363, 82, 8.5, "F2"),
+    opText(fechaEmision, 452, 82, 8.5, "F1"),
+    opText("CUIT:", 363, 96, 8.5, "F2"),
+    opText(comercio?.cuit || "N/A", 392, 96, 8.5, "F1"),
+    opText("Ingresos Brutos:", 363, 110, 8.5, "F2"),
+    opText(comercio?.ingresos_brutos || "N/A", 442, 110, 8.5, "F1"),
+    opText("Inicio de Actividades:", 363, 124, 8.5, "F2"),
+    opText(formatDate(comercio?.fecha_inicio_actividad) || "N/A", 465, 124, 8.5, "F1"),
+    opText(`Rango: ${options.rango}`, 18, 162, 9, "F2", "left", 440),
+    opText(`Pagina ${pageNumber}/${totalPages}`, RIGHT, PAGE_HEIGHT - 26, 7.5, "F1", "right"),
+  ].filter(Boolean);
+};
+
+const drawListadoTable = <TRow extends Record<string, string>>(
+  title: string,
+  rows: TRow[],
+  columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[],
+  top: number,
+  getRowFont: (row: TRow) => PdfFont = () => "F1"
+) => {
+  const rowCount = Math.max(rows.length, 1);
+  const tableBottom = top + LISTADO_ROW_HEIGHT * (rowCount + 1);
+  const headerTop = top - 0.85;
+  const headerBottom = top + LISTADO_ROW_HEIGHT - 0.85;
+  const ops: string[] = [
+    opText(title, DETAIL_LEFT, top - 11, 9.5, "F2"),
+    "0.851 0.929 0.969 rg",
+    opFillRect(DETAIL_LEFT, headerTop, DETAIL_RIGHT - DETAIL_LEFT, LISTADO_ROW_HEIGHT),
+    "0 0 0 RG",
+    "1 w",
+    opLine(DETAIL_LEFT, headerTop, DETAIL_RIGHT, headerTop),
+    opLine(DETAIL_LEFT, headerBottom, DETAIL_RIGHT, headerBottom),
+    opLine(DETAIL_LEFT, headerTop, DETAIL_LEFT, headerBottom),
+    opLine(DETAIL_RIGHT, headerTop, DETAIL_RIGHT, headerBottom),
+  ];
+
+  columns.forEach((column) => {
+    const headerX =
+      column.align === "center" ? column.x + column.width / 2 : column.align === "right" ? column.x + column.width - 8 : column.x + 6;
+    ops.push(opText(column.label, headerX, top + 9.95, 8.35, "F1", column.align, column.width - 12));
+    if (column.x > DETAIL_LEFT) ops.push(opLine(column.x, headerTop, column.x, headerBottom));
+  });
+
+  rows.forEach((row, index) => {
+    const y = top + LISTADO_ROW_HEIGHT * (index + 1);
+    const rowFont = getRowFont(row);
+
+    columns.forEach((column) => {
+      const x =
+        column.align === "center" ? column.x + column.width / 2 : column.align === "right" ? column.x + column.width - 7 : column.x + 6;
+      ops.push(opText(row[column.key] || "", x, y + 9.95, 8.35, rowFont, column.align, column.width - 12));
+    });
+  });
+
+  return { ops, tableBottom };
+};
+
+const drawListadoFooter = () => [
+  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText("Listado de Cuenta Corriente", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+];
+
+const createListadoPageContent = (
+  options: ListadoCuentaCorrientePdfOptions,
+  rows: ListadoCuentaCorrienteRow[],
+  resumenRows: ListadoResumenRow[],
+  pageNumber: number,
+  totalPages: number,
+  isLastPage: boolean,
+  logoImage?: PdfImage | null
+) => {
+  const clientesTable = drawListadoTable("Clientes con saldo", rows, LISTADO_COLUMNS, LISTADO_TABLE_TOP);
+  const resumenTable = isLastPage
+    ? drawListadoTable(
+        "Resumen de cuenta corriente",
+        resumenRows,
+        LISTADO_RESUMEN_COLUMNS,
+        clientesTable.tableBottom + 38,
+        (row) => (row.concepto === "Saldo neto" ? "F2" : "F1")
+      )
+    : { ops: [], tableBottom: clientesTable.tableBottom };
+
+  return [
+    "q",
+    `${A4_HORIZONTAL_SCALE.toFixed(6)} 0 0 1 0 0 cm`,
+    `18 18 576 ${PAGE_HEIGHT - 36} re W n`,
+    ...drawListadoHeader(options, pageNumber, totalPages, logoImage),
+    ...clientesTable.ops,
+    ...resumenTable.ops,
+    ...drawListadoFooter(),
+    "Q",
+  ].join("\n");
+};
+
 const loadLogoImage = async (logoUrl?: string | null): Promise<PdfImage | null> => {
   const trimmedLogoUrl = logoUrl?.trim();
   if (!trimmedLogoUrl || typeof document === "undefined") return null;
@@ -468,6 +662,31 @@ export const buildCuentaCorrientePdfFile = (
     const blob = createPdfBlob(contents(logoImage), logoImage);
     const clienteFilename = sanitizeFilename(`${resumen.cliente_nombre}-${resumen.cliente_apellido}`) || "cliente";
     const filename = `resumen-cta-cte-${clienteFilename}.pdf`;
+
+    return new File([blob], filename, { type: "application/pdf" });
+  });
+};
+
+export const buildListadoCuentaCorrientePdfFile = (
+  clientes: CuentaCorrienteResumen[],
+  options: ListadoCuentaCorrientePdfOptions
+) => {
+  const rows = buildListadoRows(clientes);
+  const resumenRows = buildListadoResumenRows(clientes);
+  const pageRows: ListadoCuentaCorrienteRow[][] = [];
+
+  for (let index = 0; index < rows.length; index += LISTADO_MAX_ROWS_PER_PAGE) {
+    pageRows.push(rows.slice(index, index + LISTADO_MAX_ROWS_PER_PAGE));
+  }
+
+  const pages = pageRows.length ? pageRows : [buildListadoRows([])];
+
+  return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
+    const contents = pages.map((rowsForPage, index, allPages) =>
+      createListadoPageContent(options, rowsForPage, resumenRows, index + 1, allPages.length, index === allPages.length - 1, logoImage)
+    );
+    const blob = createPdfBlob(contents, logoImage);
+    const filename = `listado-cta-cte-${sanitizeFilename(options.rango) || "reporte"}.pdf`;
 
     return new File([blob], filename, { type: "application/pdf" });
   });

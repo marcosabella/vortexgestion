@@ -116,7 +116,7 @@ const ListadoProductos = () => {
             Análisis completo del inventario y ventas
           </p>
         </div>
-        <Button onClick={handlePrint} className="gap-2">
+        <Button variant="print" onClick={handlePrint} className="gap-2">
           <Printer className="h-4 w-4" />
           Imprimir Reporte
         </Button>
