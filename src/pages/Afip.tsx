@@ -178,10 +178,10 @@ const Afip = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
             <FileKey className="h-8 w-8" />
-            Configuración AFIP
+            Configuración ARCA
           </h1>
           <p className="text-muted-foreground">
-            Configure los parámetros de conexión con AFIP para facturación electrónica
+            Configure los parámetros de conexión con ARCA para facturación electrónica
           </p>
         </div>
 
@@ -189,7 +189,7 @@ const Afip = () => {
           <CardHeader>
             <CardTitle>Datos de Configuración</CardTitle>
             <CardDescription>
-              Ingrese los datos necesarios para la integración con AFIP
+              Ingrese los datos necesarios para la integración con ARCA
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -205,7 +205,7 @@ const Afip = () => {
                     onChange={(e) => setPuntoVenta(parseInt(e.target.value))}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">Número asignado por AFIP (1-9999)</p>
+                  <p className="text-xs text-muted-foreground">Número asignado por ARCA (1-9999)</p>
                 </div>
 
                 <div className="space-y-2">
@@ -254,7 +254,7 @@ const Afip = () => {
                 <Alert className="mb-4">
                   <FileKey className="h-4 w-4" />
                   <AlertDescription>
-                    Cargue los archivos de certificado (.crt) y clave privada (.key) obtenidos de AFIP
+                    Cargue los archivos de certificado (.crt) y clave privada (.key) obtenidos de ARCA
                   </AlertDescription>
                 </Alert>
 
@@ -387,7 +387,7 @@ const Afip = () => {
             <CardHeader>
               <CardTitle>Consultar Último Comprobante</CardTitle>
               <CardDescription>
-                Obtenga el último número de comprobante autorizado por AFIP según punto de venta y tipo
+                Obtenga el último número de comprobante autorizado por ARCA según punto de venta y tipo
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
 import VentaForm from "./VentaForm"
-import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
 import { useComercio } from "@/hooks/useComercio";
@@ -78,6 +78,8 @@ export const VentasList = () => {
 
   const buildWhatsAppMessage = (venta: Venta) => {
     const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
+    const totalFinal = getVentaTotalFinal(venta);
+    const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
     const tipoComprobante =
       TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label ||
       "Comprobante";
@@ -106,7 +108,7 @@ export const VentasList = () => {
             return `- ${metodo}: ${formatCurrency(getPagoMontoBase(pago))}${recargo}`;
           })
           .join("\n")
-      : `- ${tipoPago}: ${formatCurrency(venta.total)}`;
+      : `- ${tipoPago}: ${formatCurrency(totalFinal)}`;
 
     return [
       `${tipoComprobante} ${venta.numero_comprobante}`,
@@ -123,8 +125,9 @@ export const VentasList = () => {
       ...(Number(venta.monto_recargo || 0) > 0 || Number(venta.porcentaje_recargo || 0) > 0
         ? [`Recargo venta: ${venta.porcentaje_recargo || 0}% + ${formatCurrency(Number(venta.monto_recargo || 0))}`]
         : []),
+      ...(recargoPagos > 0 ? [`Recargo medio de pago: ${formatCurrency(recargoPagos)}`] : []),
       ...(discriminaIva ? [`IVA: ${formatCurrency(venta.total_iva)}`] : []),
-      `Total: ${formatCurrency(venta.total)}`,
+      `Total: ${formatCurrency(totalFinal)}`,
       "",
       "Pago:",
       pagos,
@@ -169,7 +172,7 @@ export const VentasList = () => {
           puntoVenta: afipConfig.punto_venta,
           tipoComprobante: venta.tipo_comprobante,
           numeroComprobante: venta.numero_comprobante,
-          importe: venta.total,
+          importe: getVentaTotalFinal(venta),
           cae: venta.cae,
         });
       } catch (error) {
@@ -284,7 +287,7 @@ export const VentasList = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold">
-                      ${venta.total.toFixed(2)}
+                      ${getVentaTotalFinal(venta).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -446,7 +449,10 @@ export const VentasList = () => {
                       <TableRow>
                         <TableHead>Método</TableHead>
                         <TableHead>Detalle</TableHead>
-                        <TableHead>Monto</TableHead>
+                        <TableHead>Monto base</TableHead>
+                        <TableHead>Recargo</TableHead>
+                        <TableHead>Descuento</TableHead>
+                        <TableHead>Total pago</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -468,12 +474,10 @@ export const VentasList = () => {
                               <span>N° {pago.cheque.numero_cheque} - {pago.cheque.banco_emisor}</span>
                             )}
                           </TableCell>
-                          <TableCell className="font-semibold">
-                            ${getPagoMontoBase(pago).toFixed(2)}
-                            {pago.recargo_cuotas && pago.recargo_cuotas > 0 && (
-                              <span className="text-xs text-muted-foreground"> + recargo ${pago.recargo_cuotas.toFixed(2)}</span>
-                            )}
-                          </TableCell>
+                          <TableCell>${getPagoMontoBase(pago).toFixed(2)}</TableCell>
+                          <TableCell>${Number(pago.recargo_cuotas || 0).toFixed(2)}</TableCell>
+                          <TableCell>$0.00</TableCell>
+                          <TableCell className="font-semibold">${Number(pago.monto || 0).toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -496,7 +500,7 @@ export const VentasList = () => {
                     )}
                   </div>
                   <div>
-                    <p className="text-lg"><strong>Total:</strong> ${selectedVenta.total.toFixed(2)}</p>
+                    <p className="text-lg"><strong>Total:</strong> ${getVentaTotalFinal(selectedVenta).toFixed(2)}</p>
                   </div>
                 </div>
               </div>

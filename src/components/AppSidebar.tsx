@@ -35,7 +35,7 @@ const configuracionItems = [
   { title: "Mi Comercio", url: "/comercio", icon: Store },
   { title: "Bancos", url: "/bancos", icon: Building2 },
   { title: "Tarjetas", url: "/tarjetas", icon: CreditCard },
-  { title: "AFIP", url: "/afip", icon: FileKey },
+  { title: "ARCA", url: "/afip", icon: FileKey },
   { title: "Seguridad", url: "/seguridad", icon: KeyRound },
 ]
 

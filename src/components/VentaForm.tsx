@@ -451,17 +451,22 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       return
     }
 
-    const totalPagos = getTotalPagosBase(pagosVenta)
-    if (Math.abs(totalPagos - data.total) > 0.01) {
+    const totalPagosBase = getTotalPagosBase(pagosVenta)
+    if (Math.abs(totalPagosBase - data.total) > 0.01) {
       toast({
         title: "Error",
-        description: `El total de pagos ($${totalPagos.toFixed(2)}) debe coincidir con el total de la venta ($${data.total.toFixed(2)})`,
+        description: `El total de pagos ($${totalPagosBase.toFixed(2)}) debe coincidir con el total de la venta ($${data.total.toFixed(2)})`,
         variant: "destructive",
       })
       return
     }
 
     try {
+      const totalFinal = roundMoney(pagosVenta.reduce((sum, pago) => sum + Number(pago.monto || 0), 0))
+      const factorTotalFinal = data.total > 0 ? totalFinal / data.total : 1
+      const subtotalFinal = roundMoney(data.subtotal * factorTotalFinal)
+      const totalIvaFinal = roundMoney(totalFinal - subtotalFinal)
+
       const ventaData: Omit<Venta, "id" | "created_at" | "updated_at"> = {
         numero_comprobante: data.numero_comprobante,
         fecha_venta: new Date(data.fecha_venta).toISOString(),
@@ -472,9 +477,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         monto_descuento: data.monto_descuento,
         porcentaje_recargo: data.porcentaje_recargo,
         monto_recargo: data.monto_recargo,
-        subtotal: data.subtotal,
-        total_iva: data.total_iva,
-        total: data.total,
+        subtotal: subtotalFinal,
+        total_iva: totalIvaFinal,
+        total: totalFinal,
         cliente_id: data.cliente_id || undefined,
         observaciones: data.observaciones,
       }

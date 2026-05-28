@@ -138,6 +138,18 @@ export const getPagoMontoBase = (pago: Pick<PagoVenta, "monto" | "recargo_cuotas
 export const getTotalPagosBase = (pagos: Pick<PagoVenta, "monto" | "recargo_cuotas">[]) =>
   pagos.reduce((sum, pago) => sum + getPagoMontoBase(pago), 0);
 
+export const getTotalPagos = (pagos: Pick<PagoVenta, "monto">[]) =>
+  pagos.reduce((sum, pago) => sum + Number(pago.monto || 0), 0);
+
+export const getTotalRecargoPagos = (pagos: Pick<PagoVenta, "recargo_cuotas">[] = []) =>
+  pagos.reduce((sum, pago) => sum + Number(pago.recargo_cuotas || 0), 0);
+
+export const getVentaTotalFinal = (venta: Pick<Venta, "total" | "pagos_venta">) => {
+  if (venta.pagos_venta?.length) return getTotalPagos(venta.pagos_venta);
+
+  return Number(venta.total || 0);
+};
+
 export const getVentaMontoContado = (venta: Pick<Venta, "tipo_pago" | "total" | "pagos_venta">) => {
   if (venta.pagos_venta?.length) {
     return venta.pagos_venta

@@ -105,6 +105,12 @@ All colors MUST be HSL.
   }
 }
 
+@layer components {
+  table tbody td button:not([class*="bg-destructive"]):not([class*="bg-red-"]):not([class*="bg-sky-"]):not([class*="bg-emerald-"]) {
+    @apply border-sky-600 bg-sky-600 text-white hover:bg-sky-700 hover:text-white;
+  }
+}
+
 /* Print styles for reports */
 @media print {
   @page {

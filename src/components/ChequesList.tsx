@@ -41,11 +41,11 @@ export const ChequesList = () => {
 
   const getEstadoBadgeVariant = (estado: string) => {
     switch (estado) {
-      case 'en_cartera': return 'default';
-      case 'depositado': return 'default';
+      case 'en_cartera': return 'success';
+      case 'depositado': return 'success';
       case 'rechazado': return 'destructive';
       case 'endosado': return 'secondary';
-      default: return 'default';
+      default: return 'success';
     }
   };
 

@@ -338,7 +338,7 @@ const CajaDiaria = () => {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Estado</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Badge variant={caja.estado === "abierta" ? "default" : "secondary"}>
+                  <Badge variant={caja.estado === "abierta" ? "success" : "secondary"}>
                     {caja.estado === "abierta" ? "Abierta" : "Cerrada"}
                   </Badge>
                   <p className="mt-2 text-sm text-muted-foreground">

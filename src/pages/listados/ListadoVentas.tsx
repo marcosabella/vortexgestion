@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
-import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel } from '@/types/venta';
+import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel, getVentaTotalFinal } from '@/types/venta';
 
 const ListadoVentas = () => {
   const { ventas, isLoading } = useVentas();
@@ -47,7 +47,7 @@ const ListadoVentas = () => {
 
   // Resumen general
   const resumenGeneral = useMemo(() => {
-    const totalVentas = ventasFiltradas.reduce((sum, v) => sum + Number(v.total), 0);
+    const totalVentas = ventasFiltradas.reduce((sum, v) => sum + getVentaTotalFinal(v), 0);
     const cantidadVentas = ventasFiltradas.length;
     const ticketPromedio = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
     
@@ -66,12 +66,12 @@ const ListadoVentas = () => {
       
       if (clientesMap.has(clienteId)) {
         const cliente = clientesMap.get(clienteId)!;
-        cliente.total += Number(venta.total);
+        cliente.total += getVentaTotalFinal(venta);
         cliente.cantidad += 1;
       } else {
         clientesMap.set(clienteId, {
           nombre: clienteNombre,
-          total: Number(venta.total),
+          total: getVentaTotalFinal(venta),
           cantidad: 1
         });
       }
@@ -91,12 +91,12 @@ const ListadoVentas = () => {
       
       if (comprobantesMap.has(tipo)) {
         const comp = comprobantesMap.get(tipo)!;
-        comp.total += Number(venta.total);
+        comp.total += getVentaTotalFinal(venta);
         comp.cantidad += 1;
       } else {
         comprobantesMap.set(tipo, {
           label: tipoLabel,
-          total: Number(venta.total),
+          total: getVentaTotalFinal(venta),
           cantidad: 1
         });
       }
@@ -376,7 +376,7 @@ const ListadoVentas = () => {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        ${Number(venta.total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${getVentaTotalFinal(venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))

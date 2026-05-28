@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
-import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -72,6 +72,8 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
   const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const tipoComprobante =
     TIPOS_COMPROBANTE.find((tipo) => tipo.value === venta.tipo_comprobante)?.label || "Comprobante";
+  const totalFinal = getVentaTotalFinal(venta);
+  const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
   const comercioDireccion = [
     comercio?.calle,
     comercio?.numero,
@@ -133,8 +135,9 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
     ...(Number(venta.monto_recargo || 0) > 0 || Number(venta.porcentaje_recargo || 0) > 0
       ? [`Recargo venta: ${Number(venta.porcentaje_recargo || 0).toLocaleString("es-AR")}% + ${formatMoney(venta.monto_recargo)}`]
       : []),
+    ...(recargoPagos > 0 ? [`Recargo medio de pago: ${formatMoney(recargoPagos)}`] : []),
     ...(discriminaIva ? [`IVA: ${formatMoney(venta.total_iva)}`] : []),
-    `Total: ${formatMoney(venta.total)}`,
+    `Total: ${formatMoney(totalFinal)}`,
     "",
     "Pagos"
   );
@@ -147,7 +150,7 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
       lines.push(`${getTipoPagoLabel(pago.tipo_pago)}: ${formatMoney(getPagoMontoBase(pago))}${recargo}`);
     });
   } else {
-    lines.push(`${getVentaTipoPagoLabel(venta)}: ${formatMoney(venta.total)}`);
+    lines.push(`${getVentaTipoPagoLabel(venta)}: ${formatMoney(totalFinal)}`);
   }
 
   if (venta.cae) {

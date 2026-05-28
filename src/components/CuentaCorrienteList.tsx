@@ -357,7 +357,7 @@ export const CuentaCorrienteList = () => {
       {/* Client Detail Dialog */}
       <Dialog open={showClientDetail} onOpenChange={setShowClientDetail}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogHeader className="pr-10">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <DialogTitle>
                 Detalle de Cuenta Corriente - {selectedClientData?.cliente_nombre} {selectedClientData?.cliente_apellido}
@@ -365,8 +365,8 @@ export const CuentaCorrienteList = () => {
               {selectedClientData && (
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    variant="outline"
                     size="sm"
+                    className="bg-sky-600 text-white hover:bg-sky-700"
                     onClick={openResumenPdf}
                     disabled={isLoadingClientMovimientos}
                   >
@@ -374,22 +374,22 @@ export const CuentaCorrienteList = () => {
                     Imprimir
                   </Button>
                   <Button
-                    variant="outline"
                     size="sm"
-                    onClick={sendResumenWhatsApp}
-                    disabled={isLoadingClientMovimientos}
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    WhatsApp
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    className="bg-red-600 text-white hover:bg-red-700"
                     onClick={exportResumenPdf}
                     disabled={isLoadingClientMovimientos}
                   >
                     <FileDown className="mr-2 h-4 w-4" />
                     PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-[#25D366] text-white hover:bg-[#1DA851]"
+                    onClick={sendResumenWhatsApp}
+                    disabled={isLoadingClientMovimientos}
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    WhatsApp
                   </Button>
                 </div>
               )}

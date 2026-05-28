@@ -457,7 +457,7 @@ const ListadoCaja = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={caja.estado === "abierta" ? "default" : "secondary"}>
+                        <Badge variant={caja.estado === "abierta" ? "success" : "secondary"}>
                           {caja.estado === "abierta" ? "Abierta" : "Cerrada"}
                         </Badge>
                       </TableCell>

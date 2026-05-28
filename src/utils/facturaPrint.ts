@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
-import { discriminaIvaEnComprobante, getVentaTipoPagoLabel, Venta } from "@/types/venta";
+import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
 
 interface FacturaPrintOptions {
   venta: Venta;
@@ -427,6 +427,8 @@ const getTipoPagoLabel = (venta: Venta) => {
 export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "" }: FacturaPrintOptions) => {
   const hasCae = Boolean(venta.cae?.trim());
   const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
+  const totalFinal = getVentaTotalFinal(venta);
+  const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
   const numComprobante = formatNumeroComprobante(venta, afipConfig);
   const fechaVenta = formatDate(venta.fecha_venta);
   const comercioDireccion = [
@@ -572,6 +574,16 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               `
               : ""
           }
+          ${
+            recargoPagos > 0
+              ? `
+                <div class="totales-row">
+                  <div class="text-right">Recargo medio de pago:</div>
+                  <div class="text-right">$ ${escapeHtml(formatMoney(recargoPagos))}</div>
+                </div>
+              `
+              : ""
+          }
           <div class="totales-row">
             <div class="text-right">Importe Otros Tributos:</div>
             <div class="text-right">$ 0,00</div>
@@ -586,7 +598,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
           }
           <div class="totales-row total-final">
             <div class="text-right">Importe Total:</div>
-            <div class="text-right">$ ${escapeHtml(formatMoney(venta.total))}</div>
+            <div class="text-right">$ ${escapeHtml(formatMoney(totalFinal))}</div>
           </div>
         </div>
       </div>

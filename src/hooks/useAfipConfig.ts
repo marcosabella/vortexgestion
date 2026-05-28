@@ -38,8 +38,8 @@ export function useCreateAfipConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['afip-config'] });
       toast({
-        title: "Configuración AFIP creada",
-        description: "La configuración de AFIP se ha guardado correctamente.",
+        title: "Configuración ARCA creada",
+        description: "La configuración de ARCA se ha guardado correctamente.",
       });
     },
     onError: (error: Error) => {

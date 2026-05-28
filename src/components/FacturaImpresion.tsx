@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
-import { Venta } from "@/types/venta";
+import { getVentaTotalFinal, Venta } from "@/types/venta";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaHtmlFile } from "@/utils/facturaPrint";
 
@@ -31,7 +31,7 @@ export const FacturaImpresion = ({ venta }: FacturaImpresionProps) => {
           puntoVenta: afipConfig.punto_venta,
           tipoComprobante: venta.tipo_comprobante,
           numeroComprobante: venta.numero_comprobante,
-          importe: venta.total,
+          importe: getVentaTotalFinal(venta),
           cae: venta.cae,
         });
       } catch (error) {
