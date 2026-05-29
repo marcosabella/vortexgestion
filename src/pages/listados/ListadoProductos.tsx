@@ -11,9 +11,14 @@ import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { Printer, Search, Package, AlertCircle, TrendingUp, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useComercio } from "@/hooks/useComercio";
+import { useToast } from "@/hooks/use-toast";
+import { buildListadoProductosPdfFile } from "@/utils/listadoProductosPdf";
 
 const ListadoProductos = () => {
   const { productos, estadisticas, isLoading } = useProductosReport();
+  const { comercio } = useComercio();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "out-of-stock">("all");
   const [sortBy, setSortBy] = useState<"descripcion" | "mas-vendido" | "valor-stock-costo" | "valor-stock-venta">("descripcion");
@@ -57,8 +62,36 @@ const ListadoProductos = () => {
     return filtered;
   }, [productos, searchTerm, stockFilter, sortBy]);
 
-  const handlePrint = () => {
-    window.print();
+  const getRangoLabel = () => {
+    const filtros = [];
+
+    if (searchTerm.trim()) filtros.push(`Busqueda: ${searchTerm.trim()}`);
+    if (stockFilter === "in-stock") filtros.push("Con stock");
+    if (stockFilter === "out-of-stock") filtros.push("Sin stock");
+
+    return filtros.length ? filtros.join(" - ") : "Todos los productos";
+  };
+
+  const handlePrint = async () => {
+    const file = await buildListadoProductosPdfFile(productosFiltrados, {
+      comercio,
+      rango: getRangoLabel(),
+    });
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, "_blank");
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: "No se pudo abrir el PDF",
+        description: "Revise si el navegador bloqueo la ventana emergente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   if (isLoading) {

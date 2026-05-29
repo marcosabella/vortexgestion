@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ComercioFormData } from "@/types/comercio";
 import { useToast } from "@/hooks/use-toast";
+import { ComercioParametrizacion, normalizeParametrizacion } from "@/config/parametrizacion";
 
 export interface AdminComercio {
   id: string;
@@ -172,5 +173,40 @@ export function useAdminComercios() {
     setAccess,
     createOrUpdateAccess,
     resetPassword,
+  };
+}
+
+export function useAdminComercioParametrizacion(comercioId?: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const parametrizacionQuery = useQuery({
+    queryKey: ["admin-comercio-parametrizacion", comercioId],
+    enabled: Boolean(comercioId),
+    queryFn: async () => {
+      const data = await invokeAdmin<{ parametros: ComercioParametrizacion }>({
+        action: "getParametrizacion",
+        comercioId,
+      });
+      return normalizeParametrizacion(data.parametros);
+    },
+  });
+
+  const updateParametrizacion = useMutation({
+    mutationFn: async (parametros: ComercioParametrizacion) =>
+      invokeAdmin({ action: "updateParametrizacion", comercioId, parametros }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-comercio-parametrizacion", comercioId] });
+      queryClient.invalidateQueries({ queryKey: ["comercio-parametrizacion"] });
+      toast({ title: "Parametrizacion guardada", description: "Los cambios quedaron aplicados para el comercio." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return {
+    parametrizacionQuery,
+    updateParametrizacion,
   };
 }

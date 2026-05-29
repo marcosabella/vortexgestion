@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, CajaMovimiento, CajaMovimientoTipo } from "@/types/caja";
-import { Venta } from "@/types/venta";
+import { getVentaTotalFinal, Venta } from "@/types/venta";
 
 const db = supabase as any;
 
@@ -221,7 +221,7 @@ export const useCajaDiaria = (fecha: string) => {
 
       return ventasDelDia.filter((venta) => {
         if (!venta.id || movimientosVentaIds.has(venta.id)) return false;
-        if (Number(venta.total || 0) <= 0) return false;
+        if (getVentaTotalFinal(venta) <= 0) return false;
 
         const fechaVenta = new Date(venta.fecha_venta).getTime();
         const incluidaEnCaja = cajasDelDia.some((cajaDelDia) => {
@@ -371,7 +371,7 @@ export const useCajaDiaria = (fecha: string) => {
           tipo: "ingreso" as CajaMovimientoTipo,
           concepto: `Venta ${venta.numero_comprobante}`,
           descripcion: `Comprobante anterior a la apertura de caja (${venta.cliente_nombre || "Consumidor Final"})`,
-          monto: Number(venta.total || 0),
+          monto: getVentaTotalFinal(venta),
           fecha_movimiento: venta.fecha_venta,
         }))
         .filter((movimiento) => movimiento.venta_id && movimiento.monto > 0);

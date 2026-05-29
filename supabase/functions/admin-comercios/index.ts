@@ -19,6 +19,30 @@ type ComercioPayload = {
   logo_url?: string;
 };
 
+const defaultParametrizacion = {
+  modulos: {
+    caja: true,
+    clientes: true,
+    proveedores: true,
+    productos: true,
+    ventas: true,
+    cuenta_corriente: true,
+    cheques: true,
+    bancos: true,
+    tarjetas: true,
+    afip: true,
+    seguridad: true,
+    listados: true,
+  },
+  funciones: {
+    venta_items_manuales: true,
+    descuentos_recargos: true,
+    facturacion_afip: true,
+    impresion_comprobantes: true,
+    exportacion_pdf: true,
+  },
+};
+
 async function getAdminUserId(req: Request, supabase: any): Promise<string> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '');
@@ -157,6 +181,17 @@ async function createComercio(supabase: any, comercio: ComercioPayload, userEmai
 
     if (membershipError) {
       throw membershipError;
+    }
+
+    const { error: parametrizacionError } = await supabase
+      .from('comercio_parametrizacion')
+      .upsert(
+        { comercio_id: createdComercio.id, parametros: defaultParametrizacion },
+        { onConflict: 'comercio_id' },
+      );
+
+    if (parametrizacionError) {
+      throw parametrizacionError;
     }
 
     return { comercio: createdComercio, user_id: authUser.id, email: normalizedEmail };
@@ -363,6 +398,72 @@ async function resetPassword(supabase: any, userId: string, password: string) {
   if (error) throw error;
 }
 
+function mergeParametrizacion(parametros: any) {
+  return {
+    modulos: {
+      ...defaultParametrizacion.modulos,
+      ...(parametros?.modulos || {}),
+    },
+    funciones: {
+      ...defaultParametrizacion.funciones,
+      ...(parametros?.funciones || {}),
+    },
+  };
+}
+
+async function getParametrizacion(supabase: any, comercioId: string) {
+  if (!comercioId) {
+    throw new Error('Comercio requerido');
+  }
+
+  const { data, error } = await supabase
+    .from('comercio_parametrizacion')
+    .select('parametros')
+    .eq('comercio_id', comercioId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) {
+    const { data: created, error: createError } = await supabase
+      .from('comercio_parametrizacion')
+      .insert({ comercio_id: comercioId, parametros: defaultParametrizacion })
+      .select('parametros')
+      .single();
+
+    if (createError || !created) {
+      throw new Error(createError?.message || 'No se pudo crear la parametrizacion');
+    }
+
+    return { parametros: mergeParametrizacion(created.parametros) };
+  }
+
+  return { parametros: mergeParametrizacion(data.parametros) };
+}
+
+async function updateParametrizacion(supabase: any, comercioId: string, parametros: any) {
+  if (!comercioId) {
+    throw new Error('Comercio requerido');
+  }
+
+  const normalized = mergeParametrizacion(parametros);
+
+  const { data, error } = await supabase
+    .from('comercio_parametrizacion')
+    .upsert(
+      { comercio_id: comercioId, parametros: normalized },
+      { onConflict: 'comercio_id' },
+    )
+    .select('parametros')
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || 'No se pudo guardar la parametrizacion');
+  }
+
+  return { parametros: mergeParametrizacion(data.parametros) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -416,6 +517,20 @@ Deno.serve(async (req) => {
     if (action === 'resetPassword') {
       await resetPassword(supabase, body.userId, body.password);
       return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'getParametrizacion') {
+      const result = await getParametrizacion(supabase, body.comercioId);
+      return new Response(JSON.stringify({ success: true, ...result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'updateParametrizacion') {
+      const result = await updateParametrizacion(supabase, body.comercioId, body.parametros);
+      return new Response(JSON.stringify({ success: true, ...result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

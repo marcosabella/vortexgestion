@@ -110,6 +110,11 @@ const formatDate = (value?: string | null) => {
 
 const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
+const isPrintableComercioValue = (value?: string | null) => {
+  const trimmed = value?.trim() || "";
+  return trimmed.length > 0 && !/^[.\s]+$/.test(trimmed);
+};
+
 const resolveAssetUrl = (url: string) => {
   if (typeof window === "undefined") return url;
 
@@ -252,8 +257,8 @@ const drawComercioIdentity = (comercio?: Comercio | null, logoImage?: PdfImage |
 };
 
 const getComercioDireccionLineas = (comercio?: Comercio | null) => ({
-  calle: [comercio?.calle, comercio?.numero].filter(Boolean).join(" ") || "N/A",
-  localidad: [comercio?.localidad, comercio?.provincia].filter(Boolean).join(" ") || "N/A",
+  calle: [comercio?.calle, comercio?.numero].filter(isPrintableComercioValue).join(" "),
+  localidad: [comercio?.localidad, comercio?.provincia].filter(isPrintableComercioValue).join(" "),
 });
 
 const drawHeader = (
@@ -267,6 +272,7 @@ const drawHeader = (
   const fechaEmision = formatDate(new Date().toISOString());
   const ultimoMovimiento = resumen.ultimo_movimiento ? formatDate(resumen.ultimo_movimiento) : fechaEmision;
   const comercioDireccion = getComercioDireccionLineas(comercio);
+  const razonSocial = logoImage ? `Razon Social: ${comercio?.nombre_comercio || "N/A"}` : "";
 
   return [
     "0 0 0 rg",
@@ -278,9 +284,9 @@ const drawHeader = (
     opLine(594, 28, 594, 142),
     opLine(347, 28, 347, 142),
     ...drawComercioIdentity(comercio, logoImage),
-    opText(`Razon Social: ${comercio?.nombre_comercio || "N/A"}`, 34, 96, 8.5, "F1", "left", 296),
-    opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
-    opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
+    razonSocial && opText(razonSocial, 34, 96, 8.5, "F1", "left", 296),
+    comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
+    comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
     opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
     opText("RESUMEN CTA CTE", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),
@@ -405,6 +411,7 @@ const drawListadoHeader = (
   const comercio = options.comercio;
   const fechaEmision = formatDate(new Date().toISOString());
   const comercioDireccion = getComercioDireccionLineas(comercio);
+  const razonSocial = logoImage ? `Razon Social: ${comercio?.nombre_comercio || "N/A"}` : "";
 
   return [
     "0 0 0 rg",
@@ -416,9 +423,9 @@ const drawListadoHeader = (
     opLine(594, 28, 594, 142),
     opLine(347, 28, 347, 142),
     ...drawComercioIdentity(comercio, logoImage),
-    opText(`Razon Social: ${comercio?.nombre_comercio || "N/A"}`, 34, 96, 8.5, "F1", "left", 296),
-    opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
-    opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
+    razonSocial && opText(razonSocial, 34, 96, 8.5, "F1", "left", 296),
+    comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
+    comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
     opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
     opText("LISTADO CTA CTE", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),

@@ -431,13 +431,17 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
   const numComprobante = formatNumeroComprobante(venta, afipConfig);
   const fechaVenta = formatDate(venta.fecha_venta);
+  const isPrintableComercioValue = (value?: string | null) => {
+    const trimmed = value?.trim() || "";
+    return trimmed.length > 0 && !/^[.\s]+$/.test(trimmed);
+  };
   const comercioDireccion = [
     comercio?.calle,
     comercio?.numero,
     comercio?.localidad,
     comercio?.provincia,
   ]
-    .filter(Boolean)
+    .filter(isPrintableComercioValue)
     .join(" ");
   const logoUrl = getLogoUrl(comercio);
 
@@ -482,8 +486,8 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               : `<div class="comercio-nombre">${escapeHtml(comercio?.nombre_comercio || "COMERCIO")}</div>`
           }
           <div class="comercio-datos">
-            <div class="info-line">${escapeHtml(comercio?.nombre_comercio || "N/A")}</div>
-            <div class="info-line">${escapeHtml(comercioDireccion || "N/A")}</div>
+            ${logoUrl ? `<div class="info-line">${escapeHtml(comercio?.nombre_comercio || "N/A")}</div>` : ""}
+            ${comercioDireccion ? `<div class="info-line">${escapeHtml(comercioDireccion)}</div>` : ""}
             <div class="info-line">Responsable Inscripto</div>
           </div>
         </div>

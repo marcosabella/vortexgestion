@@ -1,7 +1,6 @@
 import { format } from "date-fns";
-import { buildCajaResumen, CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
 import { Comercio } from "@/types/comercio";
-import { getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta, Venta } from "@/types/venta";
+import { ProductoReporte } from "@/hooks/useProductosReport";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -11,153 +10,47 @@ const DETAIL_LEFT = 18;
 const DETAIL_RIGHT = 594;
 const TABLE_TOP = 188;
 const ROW_HEIGHT = 15;
-const MAX_ROWS_PER_PAGE = 26;
 const CONTENT_BOTTOM = 790;
 const SECTION_GAP = 28;
 
-const CAJA_COLUMNS = [
-  { key: "fecha", label: "Fecha", x: 24, width: 72, align: "center" },
-  { key: "estado", label: "Estado", x: 96, width: 66, align: "center" },
-  { key: "apertura", label: "Apertura", x: 162, width: 78, align: "right" },
-  { key: "sistema", label: "Sistema", x: 240, width: 78, align: "right" },
-  { key: "real", label: "Real", x: 318, width: 78, align: "right" },
-  { key: "diferencia", label: "Diferencia", x: 396, width: 78, align: "right" },
-  { key: "cierre", label: "Cierre", x: 474, width: 114, align: "center" },
+const DETALLE_COLUMNS = [
+  { key: "codigo", label: "Codigo", x: 24, width: 54, align: "left" },
+  { key: "descripcion", label: "Descripcion", x: 78, width: 144, align: "left" },
+  { key: "marca", label: "Marca", x: 222, width: 66, align: "left" },
+  { key: "rubro", label: "Rubro", x: 288, width: 66, align: "left" },
+  { key: "stock", label: "Stock", x: 354, width: 48, align: "right" },
+  { key: "costo", label: "P. Costo", x: 402, width: 60, align: "right" },
+  { key: "venta", label: "P. Venta", x: 462, width: 60, align: "right" },
+  { key: "vendidas", label: "Vend.", x: 522, width: 66, align: "right" },
 ] as const;
 
 const RESUMEN_COLUMNS = [
-  { key: "cuenta", label: "Cuenta", x: 24, width: 330, align: "left" },
-  { key: "debe", label: "Debe", x: 354, width: 114, align: "right" },
-  { key: "haber", label: "Haber", x: 468, width: 120, align: "right" },
-] as const;
-
-const INFO_COLUMNS = [
-  { key: "campo", label: "Campo", x: 24, width: 156, align: "left" },
-  { key: "valor", label: "Valor", x: 180, width: 408, align: "left" },
-] as const;
-
-const ARQUEO_COLUMNS = [
-  { key: "formaPago", label: "Forma de pago", x: 24, width: 258, align: "left" },
-  { key: "cantidad", label: "Cant.", x: 282, width: 84, align: "right" },
-  { key: "monto", label: "Monto", x: 366, width: 222, align: "right" },
-] as const;
-
-const EFECTIVO_COLUMNS = [
-  { key: "concepto", label: "Concepto", x: 24, width: 372, align: "left" },
-  { key: "importe", label: "Importe", x: 396, width: 192, align: "right" },
-] as const;
-
-const MOVIMIENTOS_COLUMNS = [
-  { key: "fecha", label: "Fecha", x: 24, width: 84, align: "center" },
-  { key: "tipo", label: "Tipo", x: 108, width: 66, align: "center" },
-  { key: "concepto", label: "Concepto", x: 174, width: 126, align: "left" },
-  { key: "descripcion", label: "Descripcion", x: 300, width: 168, align: "left" },
-  { key: "monto", label: "Monto", x: 468, width: 120, align: "right" },
-] as const;
-
-const VENTAS_COLUMNS = [
-  { key: "hora", label: "Hora", x: 24, width: 54, align: "center" },
-  { key: "comprobante", label: "Comprobante", x: 78, width: 108, align: "left" },
-  { key: "cliente", label: "Cliente", x: 186, width: 150, align: "left" },
-  { key: "formaPago", label: "Forma de pago", x: 336, width: 132, align: "left" },
-  { key: "total", label: "Total", x: 468, width: 120, align: "right" },
+  { key: "concepto", label: "Concepto", x: 24, width: 318, align: "left" },
+  { key: "valor", label: "Valor", x: 342, width: 246, align: "right" },
 ] as const;
 
 type PdfFont = "F1" | "F2" | "F3";
-
-type CajaPdfRow = {
-  fecha: string;
-  estado: string;
-  apertura: string;
-  sistema: string;
-  real: string;
-  diferencia: string;
-  cierre: string;
-};
-
-type ResumenPdfRow = {
-  cuenta: string;
-  debe: string;
-  haber: string;
-};
-
-type InfoPdfRow = {
-  campo: string;
-  valor: string;
-};
-
-type ArqueoPdfRow = {
-  formaPago: string;
-  cantidad: string;
-  monto: string;
-};
-
-type EfectivoPdfRow = {
-  concepto: string;
-  importe: string;
-};
-
-type MovimientoPdfRow = {
-  fecha: string;
-  tipo: string;
-  concepto: string;
-  descripcion: string;
-  monto: string;
-};
-
-type VentaPdfRow = {
-  hora: string;
-  comprobante: string;
-  cliente: string;
-  formaPago: string;
-  total: string;
-};
-
 type PrintableRow = Record<string, string>;
-
 type PrintableSection<TRow extends PrintableRow = PrintableRow> = {
   title: string;
   rows: TRow[];
   columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[];
   getRowFont?: (row: TRow) => PdfFont;
 };
-
-type DetailPage = {
-  sections: PrintableSection[];
-};
-
-type CajaBalanceFila = {
-  cuenta: string;
-  debe: number;
-  haber: number;
-};
-
-type CajaBalance = {
-  filas: CajaBalanceFila[];
-  totalDebe: number;
-  totalHaber: number;
-  saldoPeriodo: number;
-  totalVentas: number;
-  cierreSistema: number;
-  cierreReal: number;
-  diferencia: number;
-};
-
-type PdfImage = {
-  bytes: Uint8Array;
-  width: number;
-  height: number;
-};
-
-type CajaPdfOptions = {
+type DetailPage = { sections: PrintableSection[] };
+type PdfImage = { bytes: Uint8Array; width: number; height: number };
+type ListadoProductosPdfOptions = {
   comercio?: Comercio | null;
   rango: string;
-  balance: CajaBalance;
-  reportTitle?: string;
 };
 
 const moneyFormatter = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const numberFormatter = new Intl.NumberFormat("es-AR", {
+  minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
 
@@ -177,6 +70,7 @@ const sanitizeFilename = (value: string) =>
     .slice(0, 80);
 
 const formatMoney = (value?: number | null) => `$${moneyFormatter.format(Number(value || 0))}`;
+const formatNumber = (value?: number | null) => numberFormatter.format(Number(value || 0));
 
 const formatDate = (value?: string | null, pattern = "dd/MM/yyyy") => {
   if (!value) return "";
@@ -184,10 +78,6 @@ const formatDate = (value?: string | null, pattern = "dd/MM/yyyy") => {
   if (Number.isNaN(date.getTime())) return "";
   return format(date, pattern);
 };
-
-const formatCajaDate = (value?: string | null) => (value ? formatDate(`${value}T00:00:00`) : "");
-
-const formatDateTime = (value?: string | null) => formatDate(value, "dd/MM/yyyy HH:mm") || "-";
 
 const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
@@ -267,7 +157,7 @@ const getComercioDireccionLineas = (comercio?: Comercio | null) => ({
 });
 
 const drawHeader = (
-  options: CajaPdfOptions,
+  options: ListadoProductosPdfOptions,
   pageNumber: number,
   totalPages: number,
   logoImage?: PdfImage | null,
@@ -291,7 +181,7 @@ const drawHeader = (
     comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
     comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
     opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
-    opText(options.reportTitle || "LISTADO DE CAJA", 363, 56, 14.5, "F2", "left", 206),
+    opText("REPORTE DE PRODUCTOS", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),
     opText(fechaEmision, 452, 82, 8.5, "F1"),
     opText("CUIT:", 363, 96, 8.5, "F2"),
@@ -305,152 +195,53 @@ const drawHeader = (
   ].filter(Boolean);
 };
 
-const buildCajaRows = (cajas: CajaDiaria[]): CajaPdfRow[] => {
-  if (!cajas.length) {
-    return [{ fecha: "", estado: "Sin cajas registradas", apertura: "", sistema: "", real: "", diferencia: "", cierre: "" }];
+const buildDetalleRows = (productos: ProductoReporte[]) => {
+  if (!productos.length) {
+    return [
+      {
+        codigo: "",
+        descripcion: "Sin productos para los filtros seleccionados",
+        marca: "",
+        rubro: "",
+        stock: "",
+        costo: "",
+        venta: "",
+        vendidas: "",
+      },
+    ];
   }
 
-  return cajas.map((caja) => ({
-    fecha: formatCajaDate(caja.fecha),
-    estado: caja.estado === "abierta" ? "Abierta" : "Cerrada",
-    apertura: formatMoney(caja.monto_apertura),
-    sistema: formatMoney(caja.monto_cierre_sistema),
-    real: formatMoney(caja.monto_cierre_real),
-    diferencia: formatMoney(caja.diferencia),
-    cierre: caja.cerrado_at ? formatDate(caja.cerrado_at, "dd/MM/yyyy HH:mm") : "-",
+  return productos.map((producto) => ({
+    codigo: producto.cod_producto || "-",
+    descripcion: producto.descripcion || "-",
+    marca: producto.marca?.nombre || "-",
+    rubro: producto.rubro?.nombre || "-",
+    stock: formatNumber(producto.stock),
+    costo: formatMoney(producto.precio_costo),
+    venta: formatMoney(producto.precio_venta),
+    vendidas: formatNumber(producto.unidades_vendidas),
   }));
 };
 
-const buildResumenRows = (balance: CajaBalance): ResumenPdfRow[] => {
-  const rows = balance.filas.length
-    ? balance.filas.map((fila) => ({
-        cuenta: fila.cuenta,
-        debe: fila.debe ? formatMoney(fila.debe) : "-",
-        haber: fila.haber ? formatMoney(fila.haber) : "-",
-      }))
-    : [{ cuenta: "No hay movimientos para el rango seleccionado", debe: "-", haber: "-" }];
+const buildResumenRows = (productos: ProductoReporte[]) => {
+  const totalProductos = productos.length;
+  const productosSinStock = productos.filter((producto) => Number(producto.stock || 0) === 0).length;
+  const valorStockCosto = productos.reduce((sum, producto) => sum + Number(producto.valor_stock_costo || 0), 0);
+  const valorStockVenta = productos.reduce((sum, producto) => sum + Number(producto.valor_stock_venta || 0), 0);
+  const unidadesVendidas = productos.reduce((sum, producto) => sum + Number(producto.unidades_vendidas || 0), 0);
 
   return [
-    ...rows,
-    { cuenta: "Total", debe: formatMoney(balance.totalDebe), haber: formatMoney(balance.totalHaber) },
-    { cuenta: "Saldo del periodo", debe: formatMoney(balance.saldoPeriodo), haber: "" },
-  ];
-};
-
-const getPagosVenta = (venta: Venta): PagoVenta[] => {
-  if (venta.pagos_venta?.length) return venta.pagos_venta;
-
-  return [
-    {
-      tipo_pago: venta.tipo_pago,
-      monto: getVentaTotalFinal(venta),
-      banco_id: venta.banco_id,
-      tarjeta_id: venta.tarjeta_id,
-      cuotas: venta.cuotas,
-      recargo_cuotas: venta.recargo_cuotas || 0,
-    },
-  ];
-};
-
-const getClienteVenta = (venta: Venta) => {
-  const clienteRelacion = [venta.cliente?.nombre, venta.cliente?.apellido].filter(Boolean).join(" ").trim();
-  return clienteRelacion || venta.cliente_nombre || "Consumidor Final";
-};
-
-const buildInfoRows = (caja: CajaDiaria): InfoPdfRow[] => [
-  { campo: "Fecha", valor: formatCajaDate(caja.fecha) || "-" },
-  { campo: "Estado", valor: caja.estado === "abierta" ? "Abierta" : "Cerrada" },
-  { campo: "Apertura", valor: caja.abierto_at ? formatDate(caja.abierto_at, "dd/MM/yyyy HH:mm") : "-" },
-  { campo: "Monto apertura", valor: formatMoney(caja.monto_apertura) },
-  { campo: "Observacion apertura", valor: caja.observaciones_apertura || "-" },
-];
-
-const buildArqueoRows = (caja: CajaDiaria): ArqueoPdfRow[] => {
-  const resumen = buildCajaResumen(caja, caja.ventas || []);
-  const rows = resumen.pagosPorTipo.map((pago) => ({
-    formaPago: getTipoPagoLabel(pago.tipo),
-    cantidad: String(pago.cantidad),
-    monto: formatMoney(pago.monto),
-  }));
-
-  if (!rows.length) {
-    return [{ formaPago: "Sin pagos registrados", cantidad: "-", monto: "-" }];
-  }
-
-  return [
-    ...rows,
-    { formaPago: "Total ventas", cantidad: String(resumen.cantidadVentas), monto: formatMoney(resumen.totalVentas) },
-  ];
-};
-
-const buildEfectivoRows = (caja: CajaDiaria): EfectivoPdfRow[] => {
-  const resumen = buildCajaResumen(caja, caja.ventas || []);
-
-  return [
-    { concepto: "Monto de apertura", importe: formatMoney(caja.monto_apertura) },
-    { concepto: "Ventas en efectivo", importe: formatMoney(resumen.totalContado) },
-    { concepto: "Ingresos manuales", importe: formatMoney(resumen.ingresosManuales) },
-    { concepto: "Egresos manuales", importe: formatMoney(resumen.egresosManuales) },
-    { concepto: "Total efectivo sistema", importe: formatMoney(resumen.totalSistema) },
-  ];
-};
-
-const buildMovimientoRows = (caja: CajaDiaria): MovimientoPdfRow[] => {
-  const movimientos = (caja.caja_movimientos || []).filter(esMovimientoManual);
-
-  if (!movimientos.length) {
-    return [{ fecha: "", tipo: "Sin movimientos manuales", concepto: "", descripcion: "", monto: "" }];
-  }
-
-  return movimientos.map((movimiento) => ({
-    fecha: formatDateTime(movimiento.fecha_movimiento || movimiento.created_at || caja.fecha),
-    tipo: getCajaMovimientoLabel(movimiento.tipo),
-    concepto: movimiento.concepto || "-",
-    descripcion: movimiento.descripcion || "-",
-    monto: formatMoney(movimiento.monto),
-  }));
-};
-
-const buildVentaRows = (caja: CajaDiaria): VentaPdfRow[] => {
-  const ventas = caja.ventas || [];
-
-  if (!ventas.length) {
-    return [{ hora: "", comprobante: "Sin ventas para esta caja", cliente: "", formaPago: "", total: "" }];
-  }
-
-  return ventas.map((venta) => ({
-    hora: formatDate(venta.fecha_venta, "HH:mm") || "-",
-    comprobante: venta.numero_comprobante || "-",
-    cliente: getClienteVenta(venta),
-    formaPago: getVentaTipoPagoLabel({ tipo_pago: venta.tipo_pago, pagos_venta: getPagosVenta(venta) }),
-    total: formatMoney(getVentaTotalFinal(venta)),
-  }));
-};
-
-const buildCierreRows = (caja: CajaDiaria): EfectivoPdfRow[] => [
-  { concepto: "Cierre sistema", importe: caja.monto_cierre_sistema == null ? "-" : formatMoney(caja.monto_cierre_sistema) },
-  { concepto: "Cierre real", importe: caja.monto_cierre_real == null ? "-" : formatMoney(caja.monto_cierre_real) },
-  { concepto: "Diferencia", importe: caja.diferencia == null ? "-" : formatMoney(caja.diferencia) },
-  { concepto: "Fecha de cierre", importe: caja.cerrado_at ? formatDate(caja.cerrado_at, "dd/MM/yyyy HH:mm") : "-" },
-  { concepto: "Observacion cierre", importe: caja.observaciones_cierre || "-" },
-];
-
-const buildCajaDetailSections = (caja: CajaDiaria): PrintableSection[] => {
-  const fecha = formatCajaDate(caja.fecha) || "-";
-
-  return [
-    { title: `Caja diaria - ${fecha}`, rows: buildInfoRows(caja), columns: INFO_COLUMNS },
-    { title: "Arqueo por forma de pago", rows: buildArqueoRows(caja), columns: ARQUEO_COLUMNS, getRowFont: (row) => (row.formaPago === "Total ventas" ? "F2" : "F1") },
-    { title: "Resumen de efectivo", rows: buildEfectivoRows(caja), columns: EFECTIVO_COLUMNS, getRowFont: (row) => (row.concepto === "Total efectivo sistema" ? "F2" : "F1") },
-    { title: "Movimientos manuales", rows: buildMovimientoRows(caja), columns: MOVIMIENTOS_COLUMNS },
-    { title: "Ventas de la caja", rows: buildVentaRows(caja), columns: VENTAS_COLUMNS },
-    { title: "Cierre registrado", rows: buildCierreRows(caja), columns: EFECTIVO_COLUMNS },
+    { concepto: "Total productos", valor: formatNumber(totalProductos) },
+    { concepto: "Productos sin stock", valor: formatNumber(productosSinStock) },
+    { concepto: "Valor stock a costo", valor: formatMoney(valorStockCosto) },
+    { concepto: "Valor stock a venta", valor: formatMoney(valorStockVenta) },
+    { concepto: "Unidades vendidas", valor: formatNumber(unidadesVendidas) },
   ];
 };
 
 const getSectionHeight = (rowCount: number) => ROW_HEIGHT * (Math.max(rowCount, 1) + 1) + 18;
 
-const paginateDetailSections = (cajas: CajaDiaria[]): DetailPage[] => {
+const paginateSections = (sections: PrintableSection[]): DetailPage[] => {
   const pages: DetailPage[] = [];
   let currentPage: DetailPage = { sections: [] };
   let currentTop = TABLE_TOP;
@@ -474,33 +265,28 @@ const paginateDetailSections = (cajas: CajaDiaria[]): DetailPage[] => {
         continue;
       }
 
-      const takeRows = Math.min(remainingRows.length, maxRows);
-      const rows = remainingRows.slice(0, takeRows);
+      const rows = remainingRows.slice(0, maxRows);
       const height = getSectionHeight(rows.length);
-
       currentPage.sections.push({ ...section, title, rows });
       currentTop += height + SECTION_GAP;
-      remainingRows = remainingRows.slice(takeRows);
+      remainingRows = remainingRows.slice(maxRows);
       title = `${section.title} (cont.)`;
 
       if (remainingRows.length) pushPage();
     }
   };
 
-  cajas.forEach((caja, cajaIndex) => {
-    if (cajaIndex > 0) pushPage();
-    buildCajaDetailSections(caja).forEach((section) => {
-      const height = getSectionHeight(section.rows.length);
-      if (currentPage.sections.length && currentTop + height > CONTENT_BOTTOM) pushPage();
-      addSection(section);
-    });
+  sections.forEach((section) => {
+    const height = getSectionHeight(section.rows.length);
+    if (currentPage.sections.length && currentTop + height > CONTENT_BOTTOM) pushPage();
+    addSection(section);
   });
 
   pushPage();
   return pages;
 };
 
-const drawTable = <TRow extends Record<string, string>>(
+const drawTable = <TRow extends PrintableRow>(
   title: string,
   rows: TRow[],
   columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[],
@@ -550,46 +336,18 @@ const drawTable = <TRow extends Record<string, string>>(
 
 const drawFooter = () => [
   opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Listado de Caja", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText("Reporte de Productos", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
 ];
 
 const createPageContent = (
-  options: CajaPdfOptions,
-  cajaRows: CajaPdfRow[],
-  resumenRows: ResumenPdfRow[],
-  pageNumber: number,
-  totalPages: number,
-  isLastPage: boolean,
-  logoImage?: PdfImage | null,
-) => {
-  const cajaTable = drawTable("Cajas registradas", cajaRows, CAJA_COLUMNS, TABLE_TOP);
-  const resumenTable = isLastPage
-    ? drawTable("Resumen de caja por rango", resumenRows, RESUMEN_COLUMNS, cajaTable.tableBottom + 38, (row) =>
-        row.cuenta === "Total" || row.cuenta === "Saldo del periodo" ? "F2" : "F1",
-      )
-    : { ops: [], tableBottom: cajaTable.tableBottom };
-
-  return [
-    "q",
-    `${A4_HORIZONTAL_SCALE.toFixed(6)} 0 0 1 0 0 cm`,
-    `18 18 576 ${PAGE_HEIGHT - 36} re W n`,
-    ...drawHeader(options, pageNumber, totalPages, logoImage),
-    ...cajaTable.ops,
-    ...resumenTable.ops,
-    ...drawFooter(),
-    "Q",
-  ].join("\n");
-};
-
-const createDetailPageContent = (
-  options: CajaPdfOptions,
-  detailPage: DetailPage,
+  options: ListadoProductosPdfOptions,
+  page: DetailPage,
   pageNumber: number,
   totalPages: number,
   logoImage?: PdfImage | null,
 ) => {
   let currentTop = TABLE_TOP;
-  const sectionOps = detailPage.sections.flatMap((section) => {
+  const sectionOps = page.sections.flatMap((section) => {
     const table = drawTable(section.title, section.rows, section.columns, currentTop, section.getRowFont);
     currentTop = table.tableBottom + SECTION_GAP;
     return table.ops;
@@ -656,7 +414,7 @@ const loadLogoImage = async (logoUrl?: string | null): Promise<PdfImage | null> 
 
     return { bytes, width: canvas.width, height: canvas.height };
   } catch (error) {
-    console.error("No se pudo cargar el logo para el PDF de caja:", error);
+    console.error("No se pudo cargar el logo para el PDF de productos:", error);
     return null;
   }
 };
@@ -726,48 +484,19 @@ const createPdfBlob = (contents: string[], logoImage?: PdfImage | null) => {
   return new Blob(pdfParts, { type: "application/pdf" });
 };
 
-export const buildCajaPdfFile = (cajas: CajaDiaria[], options: CajaPdfOptions) => {
-  const rows = buildCajaRows(cajas);
-  const resumenRows = buildResumenRows(options.balance);
-  const listingPages = [rows.slice(0, MAX_ROWS_PER_PAGE)];
-  return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
-    const totalPages = listingPages.length;
-    const listadoContents = listingPages.map((rowsForPage, index) =>
-      createPageContent(options, rowsForPage, resumenRows, index + 1, totalPages, index === listingPages.length - 1, logoImage),
-    );
-    const blob = createPdfBlob(listadoContents, logoImage);
-    const filename = `listado-caja-${sanitizeFilename(options.rango) || "reporte"}.pdf`;
+export const buildListadoProductosPdfFile = (productos: ProductoReporte[], options: ListadoProductosPdfOptions) => {
+  const sections: PrintableSection[] = [
+    { title: "Resumen de productos", rows: buildResumenRows(productos), columns: RESUMEN_COLUMNS },
+    { title: "Detalle de productos", rows: buildDetalleRows(productos), columns: DETALLE_COLUMNS },
+  ];
+  const pages = paginateSections(sections);
 
-    return new File([blob], filename, { type: "application/pdf" });
-  });
-};
-
-export const buildCajaDiariaPdfFile = (
-  caja: CajaDiaria,
-  options: Omit<CajaPdfOptions, "balance" | "reportTitle"> & { reportTitle?: string },
-) => {
   return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
-    const detailPages = paginateDetailSections([caja]);
-    const totalPages = detailPages.length || 1;
-    const detailOptions: CajaPdfOptions = {
-      ...options,
-      reportTitle: options.reportTitle || "CAJA DIARIA",
-      balance: {
-        filas: [],
-        totalDebe: 0,
-        totalHaber: 0,
-        saldoPeriodo: 0,
-        totalVentas: 0,
-        cierreSistema: 0,
-        cierreReal: 0,
-        diferencia: 0,
-      },
-    };
-    const contents = detailPages.map((detailPage, index) =>
-      createDetailPageContent(detailOptions, detailPage, index + 1, totalPages, logoImage),
+    const contents = pages.map((page, index) =>
+      createPageContent(options, page, index + 1, pages.length || 1, logoImage),
     );
-    const blob = createPdfBlob(contents, logoImage);
-    const filename = `caja-diaria-${sanitizeFilename(options.rango) || "reporte"}.pdf`;
+    const blob = createPdfBlob(contents.length ? contents : [createPageContent(options, { sections }, 1, 1, logoImage)], logoImage);
+    const filename = `reporte-productos-${sanitizeFilename(options.rango) || "reporte"}.pdf`;
 
     return new File([blob], filename, { type: "application/pdf" });
   });

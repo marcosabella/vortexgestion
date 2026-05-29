@@ -26,7 +26,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useCajaDiaria } from "@/hooks/useCaja";
 import { useToast } from "@/hooks/use-toast";
 import { buildCajaResumen, CajaMovimiento, CajaMovimientoTipo, esMovimientoManual, getCajaMovimientoLabel, MOVIMIENTOS_CAJA } from "@/types/caja";
-import { getTipoPagoLabel, getVentaTipoPagoLabel } from "@/types/venta";
+import { getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { buildCajaDiariaPdfFile } from "@/utils/cajaPdf";
 
 const today = () => format(new Date(), "yyyy-MM-dd");
@@ -89,7 +89,7 @@ const CajaDiaria = () => {
   );
   const cajaAbierta = caja?.estado === "abierta";
   const totalVentasPreviasPendientes = useMemo(
-    () => ventasPreviasPendientes.reduce((sum, venta) => sum + Number(venta.total || 0), 0),
+    () => ventasPreviasPendientes.reduce((sum, venta) => sum + getVentaTotalFinal(venta), 0),
     [ventasPreviasPendientes],
   );
 
@@ -620,7 +620,7 @@ const CajaDiaria = () => {
                           <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
                           <TableCell>{venta.cliente_nombre || "Consumidor Final"}</TableCell>
                           <TableCell>{getVentaTipoPagoLabel(venta)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(venta.total)}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(getVentaTotalFinal(venta))}</TableCell>
                         </TableRow>
                       ))
                     )}

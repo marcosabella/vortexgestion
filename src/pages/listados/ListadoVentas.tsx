@@ -12,10 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
 import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel, getVentaTotalFinal } from '@/types/venta';
+import { useComercio } from '@/hooks/useComercio';
+import { useToast } from '@/hooks/use-toast';
+import { buildListadoVentasPdfFile } from '@/utils/listadoVentasPdf';
 
 const ListadoVentas = () => {
   const { ventas, isLoading } = useVentas();
   const { data: clientes } = useClientes();
+  const { comercio } = useComercio();
+  const { toast } = useToast();
   
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
@@ -107,8 +112,35 @@ const ListadoVentas = () => {
       .sort((a, b) => b.total - a.total);
   }, [ventasFiltradas]);
 
-  const handlePrint = () => {
-    window.print();
+  const getRangoLabel = () => {
+    if (fechaDesde && fechaHasta) {
+      return `${format(new Date(`${fechaDesde}T00:00:00`), 'dd/MM/yyyy')} al ${format(new Date(`${fechaHasta}T00:00:00`), 'dd/MM/yyyy')}`;
+    }
+    if (fechaDesde) return `Desde ${format(new Date(`${fechaDesde}T00:00:00`), 'dd/MM/yyyy')}`;
+    if (fechaHasta) return `Hasta ${format(new Date(`${fechaHasta}T00:00:00`), 'dd/MM/yyyy')}`;
+    return 'Todos los periodos';
+  };
+
+  const handlePrint = async () => {
+    const file = await buildListadoVentasPdfFile(ventasFiltradas, {
+      comercio,
+      rango: getRangoLabel(),
+    });
+    const url = URL.createObjectURL(file);
+    const pdfWindow = window.open(url, '_blank');
+
+    if (!pdfWindow) {
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'No se pudo abrir el PDF',
+        description: 'Revise si el navegador bloqueo la ventana emergente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    pdfWindow.opener = null;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   if (isLoading) {

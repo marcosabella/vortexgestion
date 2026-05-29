@@ -8,6 +8,8 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { ModuloSistema } from "@/config/parametrizacion";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Clientes from "./pages/Clientes";
@@ -30,6 +32,7 @@ import NuevoBanco from "./pages/NuevoBanco";
 import NuevaTarjeta from "./pages/NuevaTarjeta";
 import NuevoCheque from "./pages/NuevoCheque";
 import AdminComercios from "./pages/AdminComercios";
+import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import Seguridad from "./pages/Seguridad";
 import NotFound from "./pages/NotFound";
 import ListadoClientes from "./pages/listados/ListadoClientes";
@@ -40,6 +43,27 @@ import ListadoCuentaCorriente from "./pages/listados/ListadoCuentaCorriente";
 import ListadoCaja from "./pages/listados/ListadoCaja";
 
 const queryClient = new QueryClient();
+
+function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; children: JSX.Element }) {
+  const { data: parametrizacion, isLoading } = useComercioParametrizacion();
+
+  if (isLoading) {
+    return <div className="p-8">Cargando...</div>;
+  }
+
+  if (!parametrizacion.modulos[modulo]) {
+    return (
+      <div className="container mx-auto p-8">
+        <h1 className="text-2xl font-bold">Modulo no habilitado</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Este comercio no tiene habilitado el acceso a esta funcion.
+        </p>
+      </div>
+    );
+  }
+
+  return children;
+}
 
 function AuthenticatedLayout() {
   const { session, isLoading, signOut, user } = useAuth();
@@ -84,33 +108,34 @@ function AuthenticatedLayout() {
           <main className="flex-1 bg-background">
             <Routes>
               <Route path="/" element={<Navigate to="/caja" replace />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/clientes/nuevo" element={<NuevoCliente />} />
-              <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/proveedores/nuevo" element={<NuevoProveedor />} />
-              <Route path="/productos" element={<Productos />} />
-              <Route path="/productos/nuevo" element={<NuevoProducto />} />
-              <Route path="/ventas" element={<Ventas />} />
-              <Route path="/ventas/nueva" element={<NuevaVenta />} />
-              <Route path="/caja" element={<CajaDiaria />} />
-              <Route path="/cuenta-corriente" element={<CuentaCorriente />} />
-              <Route path="/cuenta-corriente/nuevo" element={<NuevoMovimientoCuentaCorriente />} />
+              <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
+              <Route path="/clientes/nuevo" element={<ParametrizedRoute modulo="clientes"><NuevoCliente /></ParametrizedRoute>} />
+              <Route path="/proveedores" element={<ParametrizedRoute modulo="proveedores"><Proveedores /></ParametrizedRoute>} />
+              <Route path="/proveedores/nuevo" element={<ParametrizedRoute modulo="proveedores"><NuevoProveedor /></ParametrizedRoute>} />
+              <Route path="/productos" element={<ParametrizedRoute modulo="productos"><Productos /></ParametrizedRoute>} />
+              <Route path="/productos/nuevo" element={<ParametrizedRoute modulo="productos"><NuevoProducto /></ParametrizedRoute>} />
+              <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
+              <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />
+              <Route path="/caja" element={<ParametrizedRoute modulo="caja"><CajaDiaria /></ParametrizedRoute>} />
+              <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
+              <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="/comercio" element={<Comercio />} />
-              <Route path="/bancos" element={<Bancos />} />
-              <Route path="/bancos/nuevo" element={<NuevoBanco />} />
-              <Route path="/tarjetas" element={<Tarjetas />} />
-              <Route path="/tarjetas/nueva" element={<NuevaTarjeta />} />
-              <Route path="/afip" element={<Afip />} />
-              <Route path="/seguridad" element={<Seguridad />} />
+              <Route path="/bancos" element={<ParametrizedRoute modulo="bancos"><Bancos /></ParametrizedRoute>} />
+              <Route path="/bancos/nuevo" element={<ParametrizedRoute modulo="bancos"><NuevoBanco /></ParametrizedRoute>} />
+              <Route path="/tarjetas" element={<ParametrizedRoute modulo="tarjetas"><Tarjetas /></ParametrizedRoute>} />
+              <Route path="/tarjetas/nueva" element={<ParametrizedRoute modulo="tarjetas"><NuevaTarjeta /></ParametrizedRoute>} />
+              <Route path="/afip" element={<ParametrizedRoute modulo="afip"><Afip /></ParametrizedRoute>} />
+              <Route path="/seguridad" element={<ParametrizedRoute modulo="seguridad"><Seguridad /></ParametrizedRoute>} />
               <Route path="/admin" element={<AdminComercios />} />
-              <Route path="/cheques" element={<Cheques />} />
-              <Route path="/cheques/nuevo" element={<NuevoCheque />} />
-              <Route path="/listados/clientes" element={<ListadoClientes />} />
-              <Route path="/listados/proveedores" element={<ListadoProveedores />} />
-              <Route path="/listados/productos" element={<ListadoProductos />} />
-              <Route path="/listados/ventas" element={<ListadoVentas />} />
-              <Route path="/listados/caja" element={<ListadoCaja />} />
-              <Route path="/listados/cuenta-corriente" element={<ListadoCuentaCorriente />} />
+              <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
+              <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
+              <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
+              <Route path="/listados/clientes" element={<ParametrizedRoute modulo="listados"><ListadoClientes /></ParametrizedRoute>} />
+              <Route path="/listados/proveedores" element={<ParametrizedRoute modulo="listados"><ListadoProveedores /></ParametrizedRoute>} />
+              <Route path="/listados/productos" element={<ParametrizedRoute modulo="listados"><ListadoProductos /></ParametrizedRoute>} />
+              <Route path="/listados/ventas" element={<ParametrizedRoute modulo="listados"><ListadoVentas /></ParametrizedRoute>} />
+              <Route path="/listados/caja" element={<ParametrizedRoute modulo="listados"><ListadoCaja /></ParametrizedRoute>} />
+              <Route path="/listados/cuenta-corriente" element={<ParametrizedRoute modulo="listados"><ListadoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useVentas } from "@/hooks/useVentas"
 import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
 import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
 import { Trash2, Plus, Search } from "lucide-react"
@@ -122,6 +123,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const { createVenta, updateVenta } = useVentas()
   const { data: clientes = [] } = useClientes()
   const { productos } = useProductos()
+  const { data: parametrizacion } = useComercioParametrizacion()
+  const permiteItemsManuales = parametrizacion.funciones.venta_items_manuales
+  const permiteAjustes = parametrizacion.funciones.descuentos_recargos
   
   // Estado para items de venta
   const [ventaItems, setVentaItems] = useState<VentaItemDraft[]>([])
@@ -171,6 +175,19 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const watchMontoDescuento = form.watch("monto_descuento")
   const watchPorcentajeRecargo = form.watch("porcentaje_recargo")
   const watchMontoRecargo = form.watch("monto_recargo")
+
+  useEffect(() => {
+    if (permiteAjustes) return
+
+    form.setValue("porcentaje_descuento", 0)
+    form.setValue("monto_descuento", 0)
+    form.setValue("porcentaje_recargo", 0)
+    form.setValue("monto_recargo", 0)
+    setItemPorcentajeDescuento(0)
+    setItemMontoDescuento(0)
+    setItemPorcentajeRecargo(0)
+    setItemMontoRecargo(0)
+  }, [form, permiteAjustes])
 
   // Generar número de comprobante automático cuando cambia el tipo
   useEffect(() => {
@@ -331,10 +348,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     const cantidadItem = Number(itemCantidad)
     const precioUnitario = Number(itemPrecioUnitario)
     const porcentajeIva = Number(itemPorcentajeIva || 0)
-    const porcentajeDescuento = Number(itemPorcentajeDescuento || 0)
-    const montoDescuento = Number(itemMontoDescuento || 0)
-    const porcentajeRecargo = Number(itemPorcentajeRecargo || 0)
-    const montoRecargo = Number(itemMontoRecargo || 0)
+    const porcentajeDescuento = permiteAjustes ? Number(itemPorcentajeDescuento || 0) : 0
+    const montoDescuento = permiteAjustes ? Number(itemMontoDescuento || 0) : 0
+    const porcentajeRecargo = permiteAjustes ? Number(itemPorcentajeRecargo || 0) : 0
+    const montoRecargo = permiteAjustes ? Number(itemMontoRecargo || 0) : 0
 
     if (
       !descripcion ||
@@ -349,6 +366,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       toast({
         title: "Error",
         description: "Ingrese descripcion, cantidad, precio, IVA y ajustes validos",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!selectedProductoId && !permiteItemsManuales) {
+      toast({
+        title: "Funcion no habilitada",
+        description: "Este comercio no tiene habilitada la carga de items manuales.",
         variant: "destructive",
       })
       return
@@ -716,7 +742,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                               setSelectedProducto(null)
                             }
                           }}
-                          placeholder="Buscar producto o ingresar item manual..."
+                          placeholder={permiteItemsManuales ? "Buscar producto o ingresar item manual..." : "Buscar producto..."}
                         />
                         <Dialog open={productSearchOpen} onOpenChange={setProductSearchOpen}>
                           <Button
@@ -829,6 +855,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                       />
                     </div>
 
+                    {permiteAjustes && (
+                      <>
                     <div>
                       <label className="text-sm font-medium">Desc. %</label>
                       <Input
@@ -869,6 +897,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                         onChange={(e) => setItemMontoRecargo(Number(e.target.value))}
                       />
                     </div>
+                      </>
+                    )}
                     <div className="col-span-2 flex items-end md:col-span-1 xl:pt-5">
                       <Button type="button" variant="new" onClick={agregarItemVenta} className="w-full">
                         <Plus className="mr-2 h-4 w-4" />
@@ -997,6 +1027,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                 </DialogHeader>
 
                 <div className="space-y-6">
+                  {permiteAjustes && (
                   <div className="rounded-md border bg-background p-4">
                     <div className="mb-3 text-sm font-medium">Descuentos y recargos sobre el total</div>
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -1078,6 +1109,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                       />
                     </div>
                   </div>
+                  )}
 
                   <PagosVentaManager
                     totalVenta={form.watch("total")}

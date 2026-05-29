@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Building2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, UserPlus } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
+import { Building2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, UserPlus } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin, AdminComercio } from "@/hooks/useAdminComercios";
 import { ComercioFormData } from "@/types/comercio";
 import { Button } from "@/components/ui/button";
@@ -416,6 +416,11 @@ export default function AdminComercios() {
                             <AccessUserButton comercio={comercio} createOrUpdateAccess={createOrUpdateAccess} />
                           )}
                           <EditComercioButton comercio={comercio} updateComercio={updateComercio} />
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/admin/comercios/${comercio.id}/parametrizacion`}>
+                              <SlidersHorizontal className="h-4 w-4" />
+                            </Link>
+                          </Button>
                           <Switch
                             checked={enabled}
                             disabled={setAccess.isPending || !comercio.usuario}
