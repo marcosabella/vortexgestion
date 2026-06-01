@@ -162,40 +162,40 @@ const ListadoProveedores = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
-          <Card>
+          <Card className="border-blue-200 bg-blue-50 text-blue-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Proveedores</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-blue-800">Total Proveedores</CardTitle>
+              <Truck className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-blue-700">
                 Proveedores registrados
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Personas Físicas</CardTitle>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-emerald-800">Personas Físicas</CardTitle>
+              <UserCheck className="h-4 w-4 text-emerald-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.fisicas}</div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-emerald-700">
                 {stats.total > 0 ? `${((stats.fisicas / stats.total) * 100).toFixed(1)}% del total` : '0%'}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-violet-200 bg-violet-50 text-violet-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Personas Jurídicas</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-violet-800">Personas Jurídicas</CardTitle>
+              <Building2 className="h-4 w-4 text-violet-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.juridicas}</div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-violet-700">
                 {stats.total > 0 ? `${((stats.juridicas / stats.total) * 100).toFixed(1)}% del total` : '0%'}
               </p>
             </CardContent>

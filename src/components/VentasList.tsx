@@ -382,7 +382,7 @@ export const VentasList = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {!selectedVenta.cae && selectedVenta.tipo_comprobante !== 'ticket_fiscal' && hasAfipCertificates && (
+                  {!selectedVenta.cae && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
                       onClick={() => obtenerCAE(selectedVenta.id)}
                       disabled={isObteniendoCAE}

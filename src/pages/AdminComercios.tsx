@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SITUACIONES_AFIP } from "@/types/cliente";
 
 const emptyComercio: ComercioFormData = {
   nombre_comercio: "",
@@ -21,6 +23,7 @@ const emptyComercio: ComercioFormData = {
   provincia: "",
   telefono: "",
   cuit: "",
+  situacion_afip: "",
   ingresos_brutos: "",
   fecha_inicio_actividad: "",
   logo_url: "",
@@ -77,6 +80,21 @@ function AdminComercioForm({
         <div className="space-y-2">
           <Label htmlFor="cuit">CUIT</Label>
           <Input id="cuit" value={comercio.cuit} onChange={(event) => updateField("cuit", event.target.value)} required minLength={11} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="situacion_afip">Condicion frente a ARCA</Label>
+          <Select value={comercio.situacion_afip || ""} onValueChange={(value) => updateField("situacion_afip", value)}>
+            <SelectTrigger id="situacion_afip">
+              <SelectValue placeholder="Seleccionar condicion" />
+            </SelectTrigger>
+            <SelectContent>
+              {SITUACIONES_AFIP.map((situacion) => (
+                <SelectItem key={situacion} value={situacion}>
+                  {situacion}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="calle">Calle</Label>
@@ -147,6 +165,7 @@ function comercioToForm(comercio: AdminComercio): ComercioFormData {
     provincia: comercio.provincia || "",
     telefono: comercio.telefono || "",
     cuit: comercio.cuit || "",
+    situacion_afip: comercio.situacion_afip || "",
     ingresos_brutos: comercio.ingresos_brutos || "",
     fecha_inicio_actividad: comercio.fecha_inicio_actividad || "",
     logo_url: comercio.logo_url || "",
@@ -373,6 +392,7 @@ export default function AdminComercios() {
                 <TableHead>Usuario</TableHead>
                 <TableHead>Ultimo acceso</TableHead>
                 <TableHead>CUIT</TableHead>
+                <TableHead>ARCA</TableHead>
                 <TableHead>Ubicacion</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acceso</TableHead>
@@ -381,13 +401,13 @@ export default function AdminComercios() {
             <TableBody>
               {comerciosQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Cargando comercios...
                   </TableCell>
                 </TableRow>
               ) : comercios.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay comercios cargados.
                   </TableCell>
                 </TableRow>
@@ -401,6 +421,7 @@ export default function AdminComercios() {
                       <TableCell>{comercio.usuario?.email || "-"}</TableCell>
                       <TableCell>{formatLastAccess(comercio.usuario?.last_sign_in_at)}</TableCell>
                       <TableCell>{comercio.cuit}</TableCell>
+                      <TableCell>{comercio.situacion_afip || "-"}</TableCell>
                       <TableCell>{comercio.localidad}, {comercio.provincia}</TableCell>
                       <TableCell>
                         <Badge variant={enabled ? "default" : "secondary"} className="gap-1">

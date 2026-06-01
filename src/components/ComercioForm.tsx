@@ -6,10 +6,12 @@ import { ImagePlus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ComercioFormData } from "@/types/comercio";
+import { SITUACIONES_AFIP } from "@/types/cliente";
 
 const formSchema = z.object({
   nombre_comercio: z.string().min(1, "El nombre del comercio es requerido"),
@@ -20,6 +22,7 @@ const formSchema = z.object({
   provincia: z.string().min(1, "La provincia es requerida"),
   telefono: z.string().optional(),
   cuit: z.string().min(11, "El CUIT debe tener al menos 11 caracteres"),
+  situacion_afip: z.string().min(1, "Seleccione una condicion frente a ARCA"),
   ingresos_brutos: z.string().optional(),
   fecha_inicio_actividad: z.string().min(1, "La fecha de inicio es requerida"),
   logo_url: z.string().optional(),
@@ -56,6 +59,7 @@ export const ComercioForm = ({ initialData, comercioId, onSubmit, isLoading }: C
       provincia: "",
       telefono: "",
       cuit: "",
+      situacion_afip: "",
       ingresos_brutos: "",
       fecha_inicio_actividad: "",
       logo_url: "",
@@ -135,6 +139,28 @@ export const ComercioForm = ({ initialData, comercioId, onSubmit, isLoading }: C
               <Input id="cuit" {...register("cuit")} />
               {errors.cuit && (
                 <p className="text-sm text-destructive">{errors.cuit.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="situacion_afip">Condicion frente a ARCA *</Label>
+              <Select
+                value={watch("situacion_afip") || ""}
+                onValueChange={(value) => setValue("situacion_afip", value, { shouldDirty: true, shouldValidate: true })}
+              >
+                <SelectTrigger id="situacion_afip">
+                  <SelectValue placeholder="Seleccionar condicion" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SITUACIONES_AFIP.map((situacion) => (
+                    <SelectItem key={situacion} value={situacion}>
+                      {situacion}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.situacion_afip && (
+                <p className="text-sm text-destructive">{errors.situacion_afip.message}</p>
               )}
             </div>
 

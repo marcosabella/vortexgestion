@@ -14,6 +14,7 @@ type ComercioPayload = {
   provincia: string;
   telefono?: string;
   cuit: string;
+  situacion_afip?: string;
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
@@ -39,6 +40,7 @@ const defaultParametrizacion = {
     descuentos_recargos: true,
     facturacion_afip: true,
     impresion_comprobantes: true,
+    impresion_etiquetas_productos: true,
     exportacion_pdf: true,
   },
 };

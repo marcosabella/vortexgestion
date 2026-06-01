@@ -15,7 +15,7 @@ import { Search, Loader2 } from 'lucide-react';
 
 const clienteSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  apellido: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
+  apellido: z.string().optional(),
   cuit: z.string().refine((val) => {
     const limpio = val.replace(/[-\s]/g, '');
     // Aceptar DNI (7-8 dígitos) o CUIT (11 dígitos válido)
@@ -33,6 +33,14 @@ const clienteSchema = z.object({
   situacion_afip: z.string().min(1, 'Seleccione una situación AFIP'),
   ingresos_brutos: z.string().optional(),
   tipo_persona: z.enum(['fisica', 'juridica']),
+}).superRefine((data, ctx) => {
+  if (data.tipo_persona === 'fisica' && (!data.apellido || data.apellido.trim().length < 2)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['apellido'],
+      message: 'El apellido debe tener al menos 2 caracteres',
+    });
+  }
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
@@ -84,8 +92,19 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
     
     if (datos) {
       setValue('tipo_persona', datos.tipoPersona);
-      if (datos.nombre) setValue('nombre', datos.nombre);
-      if (datos.apellido) setValue('apellido', datos.apellido);
+
+      if (datos.tipoPersona === 'juridica') {
+        if (datos.razonSocial) {
+          setValue('nombre', datos.razonSocial);
+        } else if (datos.nombre) {
+          setValue('nombre', datos.nombre);
+        }
+        setValue('apellido', '');
+      } else {
+        if (datos.nombre) setValue('nombre', datos.nombre);
+        if (datos.apellido) setValue('apellido', datos.apellido);
+      }
+
       if (datos.situacionAfip) setValue('situacion_afip', datos.situacionAfip);
       
       // Si se encontró el CUIT desde un DNI, actualizar el campo
@@ -107,7 +126,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
     try {
       const clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'> = {
         nombre: data.nombre,
-        apellido: data.apellido,
+        apellido: data.tipo_persona === 'juridica' ? '' : data.apellido || '',
         cuit: data.cuit,
         calle: data.calle,
         numero: data.numero,
@@ -230,16 +249,16 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
             )}
           </div>
 
-          {/* Situación AFIP - Movido arriba */}
+          {/* Condicion frente a ARCA */}
           <div className="space-y-2">
-            <Label htmlFor="situacion_afip">Situación AFIP</Label>
+            <Label htmlFor="situacion_afip">Condicion frente a ARCA</Label>
             <Select 
               defaultValue={cliente?.situacion_afip}
               value={watch('situacion_afip')}
               onValueChange={(value) => setValue('situacion_afip', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar situación" />
+                <SelectValue placeholder="Seleccionar condicion" />
               </SelectTrigger>
               <SelectContent>
                 {SITUACIONES_AFIP.map((situacion) => (

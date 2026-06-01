@@ -54,7 +54,15 @@ export interface Venta {
   cliente?: {
     nombre: string;
     apellido: string;
+    cuit?: string;
+    calle?: string;
+    numero?: string;
+    codigo_postal?: string;
+    localidad?: string;
+    provincia?: string;
     telefono?: string;
+    situacion_afip?: string;
+    tipo_persona?: string;
   };
   banco?: {
     nombre_banco: string;
@@ -109,6 +117,7 @@ export type TipoComprobante =
   | 'recibo_a'
   | 'recibo_b'
   | 'recibo_c'
+  | 'recibo_x'
   | 'ticket_fiscal'
   | 'factura_exportacion';
 
@@ -161,6 +170,7 @@ export const getVentaMontoContado = (venta: Pick<Venta, "tipo_pago" | "total" | 
 };
 
 export const TIPOS_COMPROBANTE: { value: TipoComprobante; label: string }[] = [
+  { value: 'recibo_x', label: 'Recibo X' },
   { value: 'ticket_fiscal', label: 'Ticket Fiscal' },
   { value: 'factura_a', label: 'Factura A' },
   { value: 'factura_b', label: 'Factura B' },

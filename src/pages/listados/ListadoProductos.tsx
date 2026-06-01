@@ -161,53 +161,53 @@ const ListadoProductos = () => {
 
         {/* Estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card>
+          <Card className="border-blue-200 bg-blue-50 text-blue-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-blue-800">Total Productos</CardTitle>
+              <Package className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{estadisticas?.totalProductos || 0}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-red-200 bg-red-50 text-red-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Sin Stock</CardTitle>
-              <AlertCircle className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium text-red-800">Sin Stock</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-700" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
+              <div className="text-2xl font-bold text-red-950">
                 {estadisticas?.productosSinStock || 0}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Más Vendido</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-emerald-800">Más Vendido</CardTitle>
+              <TrendingUp className="h-4 w-4 text-emerald-700" />
             </CardHeader>
             <CardContent>
               <div className="text-sm font-bold truncate">
                 {estadisticas?.productoMasVendido.descripcion}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-emerald-700 mt-1">
                 {estadisticas?.productoMasVendido.unidades} unidades
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-amber-200 bg-amber-50 text-amber-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Total Stock</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-amber-800">Valor Total Stock</CardTitle>
+              <DollarSign className="h-4 w-4 text-amber-700" />
             </CardHeader>
             <CardContent>
               <div className="text-sm font-bold">
                 Costo: ${estadisticas?.valorTotalStockCosto.toFixed(2)}
               </div>
-              <div className="text-sm font-bold text-primary mt-1">
+              <div className="text-sm font-bold text-amber-800 mt-1">
                 Venta: ${estadisticas?.valorTotalStockVenta.toFixed(2)}
               </div>
             </CardContent>

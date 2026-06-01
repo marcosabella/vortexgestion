@@ -27,6 +27,7 @@ const CODIGOS_COMPROBANTE: Record<string, string> = {
   recibo_a: "004",
   recibo_b: "009",
   recibo_c: "015",
+  recibo_x: "000",
   ticket_fiscal: "083",
   factura_exportacion: "019",
 };
@@ -443,6 +444,22 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   ]
     .filter(isPrintableComercioValue)
     .join(" ");
+  const clienteDireccion = [
+    venta.cliente?.calle,
+    venta.cliente?.numero,
+    venta.cliente?.codigo_postal,
+    venta.cliente?.localidad,
+    venta.cliente?.provincia,
+  ]
+    .filter(isPrintableComercioValue)
+    .join(" ");
+  const clienteCuit = isPrintableComercioValue(venta.cliente?.cuit) ? venta.cliente?.cuit : "N/A";
+  const clienteCondicionIva = isPrintableComercioValue(venta.cliente?.situacion_afip)
+    ? venta.cliente?.situacion_afip
+    : "Consumidor Final";
+  const comercioCondicionIva = isPrintableComercioValue(comercio?.situacion_afip)
+    ? comercio?.situacion_afip
+    : "Responsable Inscripto";
   const logoUrl = getLogoUrl(comercio);
 
   const rows = venta.venta_items?.length
@@ -488,7 +505,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
           <div class="comercio-datos">
             ${logoUrl ? `<div class="info-line">${escapeHtml(comercio?.nombre_comercio || "N/A")}</div>` : ""}
             ${comercioDireccion ? `<div class="info-line">${escapeHtml(comercioDireccion)}</div>` : ""}
-            <div class="info-line">Responsable Inscripto</div>
+            <div class="info-line">${escapeHtml(comercioCondicionIva)}</div>
           </div>
         </div>
 
@@ -516,14 +533,14 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
 
       <div class="cliente-section">
         <div class="cliente-row">
-          <div><strong>CUIT:</strong> N/A</div>
+          <div><strong>CUIT:</strong> ${escapeHtml(clienteCuit || "N/A")}</div>
           <div><strong>Apellido y Nombre / Razon Social:</strong> ${escapeHtml(venta.cliente_nombre || "Consumidor Final")}</div>
         </div>
         <div class="cliente-row full">
-          <div><strong>Domicilio:</strong> N/A</div>
+          <div><strong>Domicilio:</strong> ${escapeHtml(clienteDireccion || "N/A")}</div>
         </div>
         <div class="cliente-row">
-          <div><strong>Condicion frente al IVA:</strong> Consumidor Final</div>
+          <div><strong>Condicion frente al IVA:</strong> ${escapeHtml(clienteCondicionIva || "Consumidor Final")}</div>
           <div><strong>Condicion de venta:</strong> ${escapeHtml(getTipoPagoLabel(venta))}</div>
         </div>
       </div>

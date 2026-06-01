@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.comercio_parametrizacion (
       "descuentos_recargos": true,
       "facturacion_afip": true,
       "impresion_comprobantes": true,
+      "impresion_etiquetas_productos": true,
       "exportacion_pdf": true
     }
   }'::jsonb,
@@ -75,4 +76,3 @@ ON public.comercio_parametrizacion
 FOR DELETE
 TO authenticated
 USING (public.is_app_admin());
-

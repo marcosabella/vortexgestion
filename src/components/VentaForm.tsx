@@ -39,7 +39,7 @@ const ventaSchema = z.object({
   tipo_comprobante: z.enum([
     "factura_a", "factura_b", "factura_c", "nota_credito_a", "nota_credito_b", 
     "nota_credito_c", "nota_debito_a", "nota_debito_b", "nota_debito_c", 
-    "recibo_a", "recibo_b", "recibo_c", "ticket_fiscal", "factura_exportacion"
+    "recibo_a", "recibo_b", "recibo_c", "recibo_x", "ticket_fiscal", "factura_exportacion"
   ]),
   cliente_id: z.string().optional(),
   cliente_nombre: z.string().min(1, "Nombre del cliente requerido"),
@@ -156,7 +156,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     defaultValues: {
       numero_comprobante: "",
       fecha_venta: formatDateTimeLocalInput(),
-      tipo_comprobante: "ticket_fiscal",
+      tipo_comprobante: "recibo_x",
       cliente_nombre: "Consumidor Final",
       porcentaje_descuento: 0,
       monto_descuento: 0,

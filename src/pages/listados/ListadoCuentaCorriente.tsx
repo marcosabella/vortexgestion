@@ -153,35 +153,35 @@ const ListadoCuentaCorriente = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
+          <Card className="border-blue-200 bg-blue-50 text-blue-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Clientes</CardTitle>
+              <CardTitle className="text-sm font-medium text-blue-800">Total Clientes</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{filteredClientes.length}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-red-200 bg-red-50 text-red-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Deudores</CardTitle>
+              <CardTitle className="text-sm font-medium text-red-800">Deudores</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.totalDeudores}</div>
-              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats.totalSaldoDeudor)}</p>
+              <div className="text-2xl font-bold text-red-950">{stats.totalDeudores}</div>
+              <p className="text-xs text-red-700 mt-1">{formatCurrency(stats.totalSaldoDeudor)}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Acreedores</CardTitle>
+              <CardTitle className="text-sm font-medium text-emerald-800">Acreedores</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.totalAcreedores}</div>
-              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats.totalSaldoAcreedor)}</p>
+              <div className="text-2xl font-bold text-emerald-950">{stats.totalAcreedores}</div>
+              <p className="text-xs text-emerald-700 mt-1">{formatCurrency(stats.totalSaldoAcreedor)}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-amber-200 bg-amber-50 text-amber-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Saldo Neto</CardTitle>
+              <CardTitle className="text-sm font-medium text-amber-800">Saldo Neto</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">

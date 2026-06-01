@@ -342,36 +342,36 @@ const ListadoCaja = () => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          <Card className="border-blue-200 bg-blue-50 text-blue-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Cajas</CardTitle>
+              <CardTitle className="text-sm font-medium text-blue-800">Cajas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{resumen.totalCajas}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Abiertas</CardTitle>
+              <CardTitle className="text-sm font-medium text-emerald-800">Abiertas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{resumen.abiertas}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-slate-200 bg-slate-50 text-slate-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Cerradas</CardTitle>
+              <CardTitle className="text-sm font-medium text-slate-700">Cerradas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{resumen.cerradas}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-amber-200 bg-amber-50 text-amber-950 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Diferencia Total</CardTitle>
+              <CardTitle className="text-sm font-medium text-amber-800">Diferencia Total</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={resumen.diferencia !== 0 ? "text-2xl font-bold text-destructive" : "text-2xl font-bold"}>
+              <div className={resumen.diferencia !== 0 ? "text-2xl font-bold text-red-700" : "text-2xl font-bold text-amber-950"}>
                 {formatCurrency(resumen.diferencia)}
               </div>
             </CardContent>

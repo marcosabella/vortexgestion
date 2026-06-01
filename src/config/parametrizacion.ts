@@ -17,6 +17,7 @@ export type FuncionSistema =
   | "descuentos_recargos"
   | "facturacion_afip"
   | "impresion_comprobantes"
+  | "impresion_etiquetas_productos"
   | "exportacion_pdf";
 
 export type ComercioParametrizacion = {
@@ -44,6 +45,7 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
   { key: "descuentos_recargos", label: "Descuentos y recargos", description: "Habilita ajustes por item y sobre el total de la venta." },
   { key: "facturacion_afip", label: "Facturacion ARCA", description: "Permite solicitar CAE y operar con comprobantes fiscales." },
   { key: "impresion_comprobantes", label: "Impresion de comprobantes", description: "Permite imprimir comprobantes desde ventas." },
+  { key: "impresion_etiquetas_productos", label: "Impresion de etiquetas de productos", description: "Permite generar etiquetas A4 con codigo de barras desde productos." },
   { key: "exportacion_pdf", label: "Exportacion PDF", description: "Permite generar PDFs de comprobantes y listados." },
 ];
 
@@ -70,4 +72,3 @@ export function normalizeParametrizacion(value?: Partial<ComercioParametrizacion
     },
   };
 }
-

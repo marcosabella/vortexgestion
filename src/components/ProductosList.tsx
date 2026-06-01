@@ -1,21 +1,38 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { useComercio } from "@/hooks/useComercio";
 import { useProductos } from "@/hooks/useProductos";
+import { useToast } from "@/hooks/use-toast";
 import { ProductoForm } from "@/components/ProductoForm";
 import { Producto } from "@/types/producto";
+import { buildProductoEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
 
 export const ProductosList = () => {
   const { productos, isLoading, deleteProducto } = useProductos();
+  const { data: parametrizacion } = useComercioParametrizacion();
+  const { comercio } = useComercio();
+  const { toast } = useToast();
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
+  const [printingProducto, setPrintingProducto] = useState<Producto | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [labelWidthCm, setLabelWidthCm] = useState("4");
+  const [labelHeightCm, setLabelHeightCm] = useState("2.5");
+  const [includeComercioLogo, setIncludeComercioLogo] = useState(false);
+  const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
+  const permiteImprimirEtiquetas = parametrizacion.funciones.impresion_etiquetas_productos;
+  const comercioLogoUrl = comercio?.logo_url?.trim() || "";
 
   const filteredProductos = productos.filter((producto) =>
     producto.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -33,6 +50,59 @@ export const ProductosList = () => {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingProducto(null);
+  };
+
+  const handleOpenPrintDialog = (producto: Producto) => {
+    setPrintingProducto(producto);
+    setIncludeComercioLogo(false);
+    setIsPrintDialogOpen(true);
+  };
+
+  const handleGenerateLabels = async () => {
+    if (!printingProducto) return;
+
+    const anchoCm = Number(labelWidthCm);
+    const altoCm = Number(labelHeightCm);
+
+    if (!Number.isFinite(anchoCm) || !Number.isFinite(altoCm) || anchoCm <= 0 || altoCm <= 0) {
+      toast({
+        title: "Tamaño inválido",
+        description: "Ingrese ancho y alto de etiqueta mayores a cero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingLabels(true);
+    try {
+      const pdfFile = await buildProductoEtiquetasPdfFile({
+        producto: printingProducto,
+        anchoCm,
+        altoCm,
+        logoUrl: includeComercioLogo ? comercioLogoUrl : undefined,
+      });
+      const url = URL.createObjectURL(pdfFile);
+      const pdfWindow = window.open(url, "_blank");
+
+      if (!pdfWindow) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = pdfFile.name;
+        link.click();
+      } else {
+        pdfWindow.opener = null;
+      }
+
+      setIsPrintDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "No se pudo generar el PDF",
+        description: error instanceof Error ? error.message : "Ocurrió un error al generar las etiquetas.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingLabels(false);
+    }
   };
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -141,6 +211,16 @@ export const ProductosList = () => {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {permiteImprimirEtiquetas && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenPrintDialog(producto)}
+                            title="Imprimir etiquetas"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="sm">
@@ -174,6 +254,72 @@ export const ProductosList = () => {
           </Table>
         </div>
       </CardContent>
+      <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Imprimir etiquetas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border p-3 text-sm">
+              <div className="font-medium">{printingProducto?.descripcion}</div>
+              <div className="text-muted-foreground">
+                Código: {printingProducto?.cod_barras || printingProducto?.cod_producto}
+              </div>
+              <div className="text-muted-foreground">
+                Precio: {printingProducto ? formatCurrency(printingProducto.precio_venta, printingProducto.tipo_moneda) : "-"}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="label-width">Ancho etiqueta (cm)</Label>
+                <Input
+                  id="label-width"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  value={labelWidthCm}
+                  onChange={(event) => setLabelWidthCm(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="label-height">Alto etiqueta (cm)</Label>
+                <Input
+                  id="label-height"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  value={labelHeightCm}
+                  onChange={(event) => setLabelHeightCm(event.target.value)}
+                />
+              </div>
+            </div>
+            {comercioLogoUrl && (
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="include-comercio-logo">Agregar logo del comercio</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Se imprimira el logo cargado en Mi Comercio.
+                  </p>
+                </div>
+                <Switch
+                  id="include-comercio-logo"
+                  checked={includeComercioLogo}
+                  onCheckedChange={setIncludeComercioLogo}
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleGenerateLabels} disabled={isGeneratingLabels}>
+                <Printer className="h-4 w-4 mr-2" />
+                {isGeneratingLabels ? "Generando..." : "Generar PDF"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

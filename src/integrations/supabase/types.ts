@@ -279,6 +279,7 @@ export type Database = {
           nombre_comercio: string
           numero: string
           provincia: string
+          situacion_afip: string | null
           telefono: string | null
           updated_at: string
         }
@@ -296,6 +297,7 @@ export type Database = {
           nombre_comercio: string
           numero: string
           provincia: string
+          situacion_afip?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -313,6 +315,7 @@ export type Database = {
           nombre_comercio?: string
           numero?: string
           provincia?: string
+          situacion_afip?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -1055,6 +1058,7 @@ export type Database = {
         | "recibo_a"
         | "recibo_b"
         | "recibo_c"
+        | "recibo_x"
         | "ticket_fiscal"
         | "factura_exportacion"
       tipo_cuenta_bancaria:
@@ -1207,6 +1211,7 @@ export const Constants = {
         "recibo_a",
         "recibo_b",
         "recibo_c",
+        "recibo_x",
         "ticket_fiscal",
         "factura_exportacion",
       ],

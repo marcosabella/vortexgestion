@@ -227,10 +227,10 @@ const ListadoVentas = () => {
 
         {/* Resumen General */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-emerald-800">Total Ventas</CardTitle>
+              <DollarSign className="h-4 w-4 text-emerald-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -239,20 +239,20 @@ const ListadoVentas = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-blue-200 bg-blue-50 text-blue-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cantidad de Ventas</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-blue-800">Cantidad de Ventas</CardTitle>
+              <FileText className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{resumenGeneral.cantidadVentas}</div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-amber-200 bg-amber-50 text-amber-950 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ticket Promedio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-amber-800">Ticket Promedio</CardTitle>
+              <TrendingUp className="h-4 w-4 text-amber-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">

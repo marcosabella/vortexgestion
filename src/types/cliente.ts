@@ -19,11 +19,15 @@ export interface Cliente {
 
 export const SITUACIONES_AFIP = [
   'Responsable Inscripto',
+  'IVA Responsable Inscripto',
   'Monotributista',
+  'Responsable Monotributo',
   'Exento',
+  'IVA Sujeto Exento',
   'No Responsable',
   'Consumidor Final',
   'Responsable No Inscripto',
+  'Sujeto No Categorizado',
   'Monotributista Social',
   'Pequeño Contribuyente Eventual',
   'Pequeño Contribuyente Eventual Social'

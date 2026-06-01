@@ -18,7 +18,7 @@ export const useVentas = () => {
         .from("ventas")
         .select(`
           *,
-          cliente:clientes(nombre, apellido, telefono),
+          cliente:clientes(nombre, apellido, cuit, calle, numero, codigo_postal, localidad, provincia, telefono, situacion_afip, tipo_persona),
           banco:bancos(nombre_banco, numero_cuenta),
           tarjeta:tarjetas_credito(nombre),
           venta_items(

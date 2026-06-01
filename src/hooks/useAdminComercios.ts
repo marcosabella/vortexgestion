@@ -13,6 +13,7 @@ export interface AdminComercio {
   codigo_postal: string;
   telefono?: string;
   cuit: string;
+  situacion_afip?: string;
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
