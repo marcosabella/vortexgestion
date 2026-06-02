@@ -278,6 +278,34 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     }
   }, [venta, form])
 
+  useEffect(() => {
+    if (!venta?.cliente_id) {
+      setSelectedCliente(null)
+      return
+    }
+
+    const cliente = clientes.find(cliente => cliente.id === venta.cliente_id)
+
+    if (cliente) {
+      setSelectedCliente({
+        id: cliente.id!,
+        nombre: cliente.nombre,
+        apellido: cliente.apellido,
+        cuit: cliente.cuit || "",
+      })
+      return
+    }
+
+    if (venta.cliente) {
+      setSelectedCliente({
+        id: venta.cliente_id,
+        nombre: venta.cliente.nombre,
+        apellido: venta.cliente.apellido,
+        cuit: venta.cliente.cuit || "",
+      })
+    }
+  }, [venta, clientes])
+
   // Calcular totales cuando cambian los items o ajustes generales
   useEffect(() => {
     const totales = calcularTotalesVenta(
@@ -610,7 +638,13 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                     <div className="flex gap-2">
                       <FormControl>
                         <Input
-                          value={selectedCliente ? `${selectedCliente.nombre} ${selectedCliente.apellido} - ${selectedCliente.cuit}` : "Consumidor Final"}
+                          value={
+                            selectedCliente
+                              ? `${selectedCliente.nombre} ${selectedCliente.apellido} - ${selectedCliente.cuit}`
+                              : field.value
+                                ? form.watch("cliente_nombre")
+                                : "Consumidor Final"
+                          }
                           readOnly
                           placeholder="Seleccionar cliente..."
                         />
