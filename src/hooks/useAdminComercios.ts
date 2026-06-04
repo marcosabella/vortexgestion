@@ -137,6 +137,21 @@ export function useAdminComercios() {
     },
   });
 
+  const deleteComercio = useMutation({
+    mutationFn: async (comercioId: string) => invokeAdmin({ action: "delete", comercioId }),
+    onSuccess: (_, comercioId) => {
+      queryClient.setQueryData<AdminComercio[]>(["admin-comercios"], (current) =>
+        current?.filter((comercio) => comercio.id !== comercioId) || [],
+      );
+      queryClient.invalidateQueries({ queryKey: ["admin-comercios"] });
+      queryClient.invalidateQueries({ queryKey: ["comercio"] });
+      toast({ title: "Comercio eliminado", description: "El comercio y sus datos asociados fueron eliminados." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const createOrUpdateAccess = useMutation({
     mutationFn: async ({
       comercioId,
@@ -171,6 +186,7 @@ export function useAdminComercios() {
     comerciosQuery,
     createComercio,
     updateComercio,
+    deleteComercio,
     setAccess,
     createOrUpdateAccess,
     resetPassword,

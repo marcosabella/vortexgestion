@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
-import VentaForm from "./VentaForm"
 import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
@@ -27,8 +26,6 @@ export const VentasList = () => {
     afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
   );
   const { toast } = useToast();
-  const [showForm, setShowForm] = useState(false);
-  const [editingVenta, setEditingVenta] = useState<Venta | null>(null);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -302,14 +299,13 @@ export const VentasList = () => {
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button
+                          asChild
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setEditingVenta(venta);
-                            setShowForm(true);
-                          }}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Link to={`/ventas/${venta.id}/editar`}>
+                            <Edit className="h-4 w-4" />
+                          </Link>
                         </Button>
                         <Button
                           variant="destructive"
@@ -333,25 +329,6 @@ export const VentasList = () => {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={showForm} onOpenChange={(open) => {
-        setShowForm(open);
-        if (!open) setEditingVenta(null);
-      }}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingVenta ? "Editar Venta" : "Nueva Venta"}</DialogTitle>
-          </DialogHeader>
-          <VentaForm 
-            venta={editingVenta} 
-            onSuccess={() => {
-              setShowForm(false);
-              setEditingVenta(null);
-            }} 
-            showTitle={false}
-          />
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-4xl">

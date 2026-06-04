@@ -224,6 +224,76 @@ async function updateComercio(supabase: any, comercioId: string, comercio: Comer
   return { comercio: data };
 }
 
+async function deleteComercio(supabase: any, comercioId: string) {
+  if (!comercioId) {
+    throw new Error('Comercio requerido');
+  }
+
+  const { data: comercio, error: comercioError } = await supabase
+    .from('comercio')
+    .select('id')
+    .eq('id', comercioId)
+    .maybeSingle();
+
+  if (comercioError) throw comercioError;
+  if (!comercio) throw new Error('Comercio no encontrado');
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from('comercio_usuarios')
+    .select('user_id')
+    .eq('comercio_id', comercioId);
+
+  if (membershipError) throw membershipError;
+
+  const userIds = Array.from(new Set((memberships || []).map((membership: any) => membership.user_id)));
+
+  const { data: logoFiles, error: logoListError } = await supabase.storage
+    .from('comercio-logos')
+    .list(comercioId);
+
+  if (logoListError) throw logoListError;
+
+  if (logoFiles?.length) {
+    const { error: logoRemoveError } = await supabase.storage
+      .from('comercio-logos')
+      .remove(logoFiles.map((file: any) => `${comercioId}/${file.name}`));
+
+    if (logoRemoveError) throw logoRemoveError;
+  }
+
+  const { error: deleteError } = await supabase
+    .from('comercio')
+    .delete()
+    .eq('id', comercioId);
+
+  if (deleteError) throw deleteError;
+
+  for (const userId of userIds) {
+    const { data: otherMemberships, error: otherMembershipsError } = await supabase
+      .from('comercio_usuarios')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+
+    if (otherMembershipsError) throw otherMembershipsError;
+    if (otherMemberships?.length) continue;
+
+    const { data: appAdmin, error: appAdminError } = await supabase
+      .from('app_admins')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (appAdminError) throw appAdminError;
+    if (appAdmin) continue;
+
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (authDeleteError) throw authDeleteError;
+  }
+
+  return { comercioId };
+}
+
 async function findUserByEmail(supabase: any, email: string) {
   const normalizedEmail = email.trim().toLowerCase();
   let page = 1;
@@ -497,6 +567,13 @@ Deno.serve(async (req) => {
 
     if (action === 'update') {
       const result = await updateComercio(supabase, body.comercioId, body.comercio);
+      return new Response(JSON.stringify({ success: true, ...result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'delete') {
+      const result = await deleteComercio(supabase, body.comercioId);
       return new Response(JSON.stringify({ success: true, ...result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

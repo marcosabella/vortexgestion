@@ -1,8 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Building2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, UserPlus } from "lucide-react";
+import { Building2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin, AdminComercio } from "@/hooks/useAdminComercios";
 import { ComercioFormData } from "@/types/comercio";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -329,9 +340,44 @@ function AccessUserButton({
   );
 }
 
+function DeleteComercioButton({
+  comercio,
+  deleteComercio,
+}: {
+  comercio: AdminComercio;
+  deleteComercio: ReturnType<typeof useAdminComercios>["deleteComercio"];
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" size="sm" disabled={deleteComercio.isPending}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Eliminar comercio</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminara {comercio.nombre_comercio} de la lista, Supabase y sus datos asociados. Esta accion no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deleteComercio.mutate(comercio.id)}
+          >
+            {deleteComercio.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function AdminComercios() {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAppAdmin();
-  const { comerciosQuery, createComercio, updateComercio, setAccess, createOrUpdateAccess, resetPassword } = useAdminComercios();
+  const { comerciosQuery, createComercio, updateComercio, deleteComercio, setAccess, createOrUpdateAccess, resetPassword } = useAdminComercios();
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   if (isAdminLoading) {
@@ -442,9 +488,11 @@ export default function AdminComercios() {
                               <SlidersHorizontal className="h-4 w-4" />
                             </Link>
                           </Button>
+                          <DeleteComercioButton comercio={comercio} deleteComercio={deleteComercio} />
                           <Switch
                             checked={enabled}
                             disabled={setAccess.isPending || !comercio.usuario}
+                            className="data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-red-600 disabled:opacity-100"
                             onCheckedChange={(checked) => setAccess.mutate({ comercioId: comercio.id, enabled: checked })}
                           />
                         </div>

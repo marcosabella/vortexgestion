@@ -27,6 +27,7 @@ import NuevoCliente from "./pages/NuevoCliente";
 import NuevoProveedor from "./pages/NuevoProveedor";
 import NuevoProducto from "./pages/NuevoProducto";
 import NuevaVenta from "./pages/NuevaVenta";
+import EditarVenta from "./pages/EditarVenta";
 import NuevoMovimientoCuentaCorriente from "./pages/NuevoMovimientoCuentaCorriente";
 import NuevoBanco from "./pages/NuevoBanco";
 import NuevaTarjeta from "./pages/NuevaTarjeta";
@@ -116,6 +117,7 @@ function AuthenticatedLayout() {
               <Route path="/productos/nuevo" element={<ParametrizedRoute modulo="productos"><NuevoProducto /></ParametrizedRoute>} />
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
               <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />
+              <Route path="/ventas/:ventaId/editar" element={<ParametrizedRoute modulo="ventas"><EditarVenta /></ParametrizedRoute>} />
               <Route path="/caja" element={<ParametrizedRoute modulo="caja"><CajaDiaria /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />
