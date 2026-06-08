@@ -7,6 +7,18 @@ type EtiquetaProductoPdfOptions = {
   logoUrl?: string;
 };
 
+export type EtiquetaProductoItem = {
+  producto: Producto;
+  cantidad: number;
+};
+
+type EtiquetasProductosPdfOptions = {
+  items: EtiquetaProductoItem[];
+  anchoCm: number;
+  altoCm: number;
+  logoUrl?: string;
+};
+
 type LogoImage = {
   dataUrl: string;
   format: "PNG" | "JPEG";
@@ -307,12 +319,68 @@ const drawPortraitLabel = (
   drawCenteredText(pdf, renderedCode, x + padding, bottomY - 0.6, innerWidth);
 };
 
-export const buildProductoEtiquetasPdfFile = async ({
-  producto,
+const drawProductLabel = (
+  pdf: import("jspdf").jsPDF,
+  producto: Producto,
+  logoImage: LogoImage | null,
+  x: number,
+  y: number,
+  labelWidth: number,
+  labelHeight: number
+) => {
+  const code = producto.cod_barras?.trim() || producto.cod_producto.trim();
+  const price = formatCurrency(producto.precio_venta, producto.tipo_moneda);
+  const padding = Math.max(1.5, Math.min(3, labelWidth * 0.06));
+  const innerWidth = labelWidth - padding * 2;
+  const isPortraitLabel = labelHeight > labelWidth;
+  const layout = getLabelLayout(labelHeight, padding, Boolean(logoImage));
+  const logoWidth = logoImage ? Math.min(innerWidth * 0.28, Math.max(7, layout.logoHeight * 2)) : 0;
+  const textOffset = logoImage ? logoWidth + 1 : 0;
+  const textWidth = Math.max(innerWidth * 0.45, innerWidth - textOffset);
+
+  pdf.setDrawColor(220, 220, 220);
+  pdf.setLineWidth(0.1);
+  pdf.rect(x, y, labelWidth, labelHeight);
+
+  if (isPortraitLabel) {
+    drawPortraitLabel(pdf, producto, price, code, logoImage, x, y, labelWidth, labelHeight, padding, innerWidth);
+    return;
+  }
+
+  if (logoImage) {
+    drawLogo(pdf, logoImage, x + padding, y + layout.logoTop, logoWidth, layout.logoHeight);
+  }
+
+  pdf.setTextColor(0, 0, 0);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(Math.max(5, Math.min(9, labelHeight * 0.18)));
+  drawCenteredText(pdf, producto.descripcion || "Producto", x + padding + textOffset, y + layout.descriptionY, textWidth);
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(Math.max(6, Math.min(12, labelHeight * 0.2)));
+  drawCenteredText(pdf, price, x + padding + textOffset, y + layout.priceY, textWidth);
+
+  const renderedCode = drawBarcode(pdf, code, x + padding, y + layout.barcodeY, innerWidth, layout.barcodeHeight);
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(Math.max(4.5, Math.min(7, labelHeight * 0.12)));
+  drawCenteredText(pdf, renderedCode, x + padding, y + layout.codeTextY, innerWidth);
+};
+
+export const buildProductosEtiquetasPdfFile = async ({
+  items,
   anchoCm,
   altoCm,
   logoUrl,
-}: EtiquetaProductoPdfOptions) => {
+}: EtiquetasProductosPdfOptions) => {
+  const normalizedItems = items
+    .map((item) => ({ ...item, cantidad: Math.floor(Number(item.cantidad || 0)) }))
+    .filter((item) => item.cantidad > 0);
+
+  if (!normalizedItems.length) {
+    throw new Error("Seleccione al menos un producto con cantidad mayor a cero");
+  }
+
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ format: "a4", orientation: "portrait", unit: "mm" });
   const logoImage = await loadLogoImage(logoUrl);
@@ -327,55 +395,57 @@ export const buildProductoEtiquetasPdfFile = async ({
     throw new Error("El tamano de etiqueta no entra en una hoja A4");
   }
 
-  const code = producto.cod_barras?.trim() || producto.cod_producto.trim();
-  const price = formatCurrency(producto.precio_venta, producto.tipo_moneda);
+  const labelsPerPage = columns * rows;
   const gridWidth = columns * labelWidth;
   const gridHeight = rows * labelHeight;
   const startX = PAGE_MARGIN_MM + (printableWidth - gridWidth) / 2;
   const startY = PAGE_MARGIN_MM + (printableHeight - gridHeight) / 2;
+  const labels = normalizedItems.flatMap((item) => Array.from({ length: item.cantidad }, () => item.producto));
 
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const x = startX + column * labelWidth;
-      const y = startY + row * labelHeight;
-      const padding = Math.max(1.5, Math.min(3, labelWidth * 0.06));
-      const innerWidth = labelWidth - padding * 2;
-      const isPortraitLabel = labelHeight > labelWidth;
-      const layout = getLabelLayout(labelHeight, padding, Boolean(logoImage));
-      const logoWidth = logoImage ? Math.min(innerWidth * 0.28, Math.max(7, layout.logoHeight * 2)) : 0;
-      const textOffset = logoImage ? logoWidth + 1 : 0;
-      const textWidth = Math.max(innerWidth * 0.45, innerWidth - textOffset);
-
-      pdf.setDrawColor(220, 220, 220);
-      pdf.setLineWidth(0.1);
-      pdf.rect(x, y, labelWidth, labelHeight);
-
-      if (isPortraitLabel) {
-        drawPortraitLabel(pdf, producto, price, code, logoImage, x, y, labelWidth, labelHeight, padding, innerWidth);
-        continue;
-      }
-
-      if (logoImage) {
-        drawLogo(pdf, logoImage, x + padding, y + layout.logoTop, logoWidth, layout.logoHeight);
-      }
-
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(Math.max(5, Math.min(9, labelHeight * 0.18)));
-      drawCenteredText(pdf, producto.descripcion || "Producto", x + padding + textOffset, y + layout.descriptionY, textWidth);
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(Math.max(6, Math.min(12, labelHeight * 0.2)));
-      drawCenteredText(pdf, price, x + padding + textOffset, y + layout.priceY, textWidth);
-
-      const renderedCode = drawBarcode(pdf, code, x + padding, y + layout.barcodeY, innerWidth, layout.barcodeHeight);
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(Math.max(4.5, Math.min(7, labelHeight * 0.12)));
-      drawCenteredText(pdf, renderedCode, x + padding, y + layout.codeTextY, innerWidth);
+  labels.forEach((producto, index) => {
+    if (index > 0 && index % labelsPerPage === 0) {
+      pdf.addPage();
     }
+
+    const position = index % labelsPerPage;
+    const row = Math.floor(position / columns);
+    const column = position % columns;
+    const x = startX + column * labelWidth;
+    const y = startY + row * labelHeight;
+
+    drawProductLabel(pdf, producto, logoImage, x, y, labelWidth, labelHeight);
+  });
+
+  const firstProduct = normalizedItems[0].producto;
+  const filename =
+    normalizedItems.length === 1
+      ? `etiquetas-${sanitizeFilename(firstProduct.cod_barras || firstProduct.cod_producto || "producto")}.pdf`
+      : "etiquetas-productos-seleccionados.pdf";
+
+  return new File([pdf.output("blob")], filename, { type: "application/pdf" });
+};
+
+export const buildProductoEtiquetasPdfFile = async ({
+  producto,
+  anchoCm,
+  altoCm,
+  logoUrl,
+}: EtiquetaProductoPdfOptions) => {
+  const labelWidth = Math.max(10, anchoCm * 10);
+  const labelHeight = Math.max(10, altoCm * 10);
+  const printableWidth = A4_WIDTH_MM - PAGE_MARGIN_MM * 2;
+  const printableHeight = A4_HEIGHT_MM - PAGE_MARGIN_MM * 2;
+  const columns = Math.floor(printableWidth / labelWidth);
+  const rows = Math.floor(printableHeight / labelHeight);
+
+  if (columns < 1 || rows < 1) {
+    throw new Error("El tamano de etiqueta no entra en una hoja A4");
   }
 
-  const filename = `etiquetas-${sanitizeFilename(producto.cod_barras || producto.cod_producto || "producto")}.pdf`;
-  return new File([pdf.output("blob")], filename, { type: "application/pdf" });
+  return buildProductosEtiquetasPdfFile({
+    items: [{ producto, cantidad: columns * rows }],
+    anchoCm,
+    altoCm,
+    logoUrl,
+  });
 };

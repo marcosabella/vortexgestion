@@ -303,7 +303,19 @@ export const useObtenerCAE = () => {
 
       if (error) {
         console.error('Error al invocar función:', error);
-        throw new Error(error.message || 'Error al obtener CAE');
+        let errorMessage = error.message || 'Error al obtener CAE';
+        const context = (error as any).context;
+
+        if (context && typeof context.json === "function") {
+          try {
+            const errorBody = await context.json();
+            errorMessage = errorBody?.error || errorMessage;
+          } catch (parseError) {
+            console.error("No se pudo leer el detalle del error CAE:", parseError);
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       if (!data.success) {
@@ -318,14 +330,16 @@ export const useObtenerCAE = () => {
       queryClient.invalidateQueries({ queryKey: ['ventas'] });
       toast({
         title: "CAE obtenido",
-        description: data.mensaje || `CAE: ${data.cae}`,
+        description: data.numero_comprobante
+          ? `${data.mensaje || "CAE obtenido"} - Comprobante ${data.numero_comprobante}`
+          : data.mensaje || `CAE: ${data.cae}`,
       });
     },
     onError: (error: Error) => {
       console.error('Error en mutación:', error);
       toast({
         title: "Error al obtener CAE",
-        description: error.message,
+        description: error.message || "No se pudo obtener el CAE. Revise la configuracion ARCA y vuelva a intentar.",
         variant: "destructive",
       });
     },

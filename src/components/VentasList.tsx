@@ -30,6 +30,26 @@ export const VentasList = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const handleObtenerCAE = (venta: Venta) => {
+    if (!venta.id) return;
+
+    obtenerCAE(venta.id, {
+      onSuccess: (data) => {
+        setSelectedVenta((current) => {
+          if (!current || current.id !== venta.id) return current;
+
+          return {
+            ...current,
+            cae: data.cae,
+            cae_vencimiento: data.cae_vencimiento,
+            numero_comprobante: data.numero_comprobante || current.numero_comprobante,
+            cae_error: undefined,
+          };
+        });
+      },
+    });
+  };
+
   const filteredVentas = ventas.filter(venta =>
     venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venta.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase())
@@ -349,9 +369,6 @@ export const VentasList = () => {
                         <p><strong>Vto. CAE:</strong> {selectedVenta.cae_vencimiento ? format(new Date(selectedVenta.cae_vencimiento), "dd/MM/yyyy") : 'N/A'}</p>
                       </>
                     )}
-                    {selectedVenta.cae_error && (
-                      <p className="text-destructive text-sm"><strong>Error CAE:</strong> {selectedVenta.cae_error}</p>
-                    )}
                   </div>
                   <div>
                     <p><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
@@ -361,7 +378,7 @@ export const VentasList = () => {
                 <div className="flex gap-2">
                   {!selectedVenta.cae && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
-                      onClick={() => obtenerCAE(selectedVenta.id)}
+                      onClick={() => handleObtenerCAE(selectedVenta)}
                       disabled={isObteniendoCAE}
                       variant="outline"
                       size="sm"

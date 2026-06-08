@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AMBIENTES_AFIP, TIPOS_COMPROBANTE } from '@/types/afip';
 import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { extractCertificateExpirationDate } from '@/utils/certificate';
 
 const Afip = () => {
   const { data: config, isLoading } = useAfipConfig();
@@ -28,6 +29,7 @@ const Afip = () => {
   const [certificadoKey, setCertificadoKey] = useState(config?.certificado_key || '');
   const [nombreCertificadoCrt, setNombreCertificadoCrt] = useState(config?.nombre_certificado_crt || '');
   const [nombreCertificadoKey, setNombreCertificadoKey] = useState(config?.nombre_certificado_key || '');
+  const [certificadoVencimiento, setCertificadoVencimiento] = useState(config?.certificado_vencimiento || '');
   const [activo, setActivo] = useState(config?.activo ?? true);
   const [crtError, setCrtError] = useState('');
   const [keyError, setKeyError] = useState('');
@@ -51,12 +53,29 @@ const Afip = () => {
   const inputCrtRef = useRef<HTMLInputElement>(null);
   const inputKeyRef = useRef<HTMLInputElement>(null);
 
+  const updateCertificadoCrt = (content: string) => {
+    setCertificadoCrt(content);
+    setCrtError('');
+
+    if (!content.trim()) {
+      setCertificadoVencimiento('');
+      return;
+    }
+
+    try {
+      setCertificadoVencimiento(extractCertificateExpirationDate(content));
+    } catch (error) {
+      setCertificadoVencimiento('');
+      setCrtError(error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado');
+    }
+  };
+
   useEffect(() => {
     if (config) {
       setPuntoVenta(config.punto_venta);
       setCuitEmisor(config.cuit_emisor);
       setAmbiente(config.ambiente);
-      setCertificadoCrt(config.certificado_crt || '');
+      updateCertificadoCrt(config.certificado_crt || '');
       setCertificadoKey(config.certificado_key || '');
       setNombreCertificadoCrt(config.nombre_certificado_crt || '');
       setNombreCertificadoKey(config.nombre_certificado_key || '');
@@ -83,7 +102,7 @@ const Afip = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      setCertificadoCrt(content);
+      updateCertificadoCrt(content);
       setNombreCertificadoCrt(file.name);
     };
     reader.onerror = () => {
@@ -128,6 +147,18 @@ const Afip = () => {
       return;
     }
 
+    let vencimientoCertificado = '';
+    try {
+      vencimientoCertificado = extractCertificateExpirationDate(certificadoCrt);
+      setCertificadoVencimiento(vencimientoCertificado);
+      setCrtError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado';
+      setCrtError(message);
+      alert(message);
+      return;
+    }
+
     const configData = {
       punto_venta: puntoVenta,
       cuit_emisor: cuitEmisor,
@@ -136,6 +167,8 @@ const Afip = () => {
       certificado_key: certificadoKey,
       nombre_certificado_crt: nombreCertificadoCrt,
       nombre_certificado_key: nombreCertificadoKey,
+      certificado_vencimiento: vencimientoCertificado,
+      certificado_vigente: new Date(`${vencimientoCertificado}T23:59:59`).getTime() >= Date.now(),
       activo,
     };
 
@@ -223,7 +256,10 @@ const Afip = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="ambiente">Ambiente *</Label>
-                  <Select value={ambiente} onValueChange={(value: any) => setAmbiente(value)}>
+                  <Select
+                    value={ambiente}
+                    onValueChange={(value) => setAmbiente(value as 'homologacion' | 'produccion')}
+                  >
                     <SelectTrigger id="ambiente">
                       <SelectValue />
                     </SelectTrigger>
@@ -257,6 +293,31 @@ const Afip = () => {
                     Cargue los archivos de certificado (.crt) y clave privada (.key) obtenidos de ARCA
                   </AlertDescription>
                 </Alert>
+
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="certificadoVencimiento">Vencimiento del certificado</Label>
+                    <Input
+                      id="certificadoVencimiento"
+                      type="date"
+                      value={certificadoVencimiento || ''}
+                      disabled
+                    />
+                    <p className="text-xs text-muted-foreground">Se obtiene automaticamente del archivo .crt cargado</p>
+                  </div>
+                  {certificadoVencimiento && (
+                    <div className="space-y-2">
+                      <Label>Estado del certificado</Label>
+                      <div>
+                        <Badge
+                          variant={new Date(`${certificadoVencimiento}T23:59:59`).getTime() >= Date.now() ? "outline" : "destructive"}
+                        >
+                          {new Date(`${certificadoVencimiento}T23:59:59`).getTime() >= Date.now() ? "Vigente" : "Vencido"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid gap-6">
                   <div className="space-y-3 p-4 border-2 border-dashed rounded-lg">
@@ -300,7 +361,7 @@ const Afip = () => {
                     {certificadoCrt && (
                       <Textarea
                         value={certificadoCrt}
-                        onChange={(e) => setCertificadoCrt(e.target.value)}
+                        onChange={(e) => updateCertificadoCrt(e.target.value)}
                         rows={4}
                         className="font-mono text-xs"
                         placeholder="Contenido del certificado..."

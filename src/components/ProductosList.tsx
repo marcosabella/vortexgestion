@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Edit, Trash2, Plus, Printer } from "lucide-react";
+import { Edit, Trash2, Plus, Printer, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,9 @@ import { useProductos } from "@/hooks/useProductos";
 import { useToast } from "@/hooks/use-toast";
 import { ProductoForm } from "@/components/ProductoForm";
 import { Producto } from "@/types/producto";
-import { buildProductoEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
+import { buildProductoEtiquetasPdfFile, buildProductosEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
+
+type PrintMode = "full-sheet" | "selected-products";
 
 export const ProductosList = () => {
   const { productos, isLoading, deleteProducto } = useProductos();
@@ -29,9 +31,12 @@ export const ProductosList = () => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [labelWidthCm, setLabelWidthCm] = useState("4");
   const [labelHeightCm, setLabelHeightCm] = useState("2.5");
+  const [printMode, setPrintMode] = useState<PrintMode>("full-sheet");
+  const [labelSearchTerm, setLabelSearchTerm] = useState("");
+  const [labelQuantities, setLabelQuantities] = useState<Record<string, string>>({});
   const [includeComercioLogo, setIncludeComercioLogo] = useState(false);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
-  const permiteImprimirEtiquetas = parametrizacion.funciones.impresion_etiquetas_productos;
+  const permiteImprimirEtiquetas = Boolean(parametrizacion?.funciones.impresion_etiquetas_productos);
   const comercioLogoUrl = comercio?.logo_url?.trim() || "";
 
   const filteredProductos = productos.filter((producto) =>
@@ -41,6 +46,33 @@ export const ProductosList = () => {
     (producto.marca?.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (producto.proveedor?.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const selectedLabelProductIds = new Set(
+    Object.entries(labelQuantities)
+      .filter(([, cantidad]) => Math.floor(Number(cantidad || 0)) > 0)
+      .map(([productoId]) => productoId)
+  );
+
+  const labelSearchResults = productos.filter((producto) => {
+    const term = labelSearchTerm.toLowerCase().trim();
+    if (!term || selectedLabelProductIds.has(producto.id)) return false;
+
+    return (
+      producto.descripcion.toLowerCase().includes(term) ||
+      producto.cod_producto.toLowerCase().includes(term) ||
+      (producto.cod_barras && producto.cod_barras.toLowerCase().includes(term)) ||
+      (producto.marca?.nombre.toLowerCase().includes(term))
+    );
+  }).slice(0, 8);
+
+  const selectedLabelItems = productos
+    .map((producto) => ({
+      producto,
+      cantidad: Math.floor(Number(labelQuantities[producto.id] || 0)),
+    }))
+    .filter((item) => item.cantidad > 0);
+
+  const selectedLabelsCount = selectedLabelItems.reduce((total, item) => total + item.cantidad, 0);
 
   const handleEdit = (producto: Producto) => {
     setEditingProducto(producto);
@@ -54,8 +86,34 @@ export const ProductosList = () => {
 
   const handleOpenPrintDialog = (producto: Producto) => {
     setPrintingProducto(producto);
+    setPrintMode("full-sheet");
+    setLabelSearchTerm("");
+    setLabelQuantities({});
     setIncludeComercioLogo(false);
     setIsPrintDialogOpen(true);
+  };
+
+  const handleAddLabelProduct = (producto: Producto) => {
+    setLabelQuantities((current) => ({
+      ...current,
+      [producto.id]: current[producto.id] || "1",
+    }));
+    setLabelSearchTerm("");
+  };
+
+  const handleLabelQuantityChange = (productoId: string, value: string) => {
+    setLabelQuantities((current) => ({
+      ...current,
+      [productoId]: value,
+    }));
+  };
+
+  const handleRemoveLabelProduct = (productoId: string) => {
+    setLabelQuantities((current) => {
+      const next = { ...current };
+      delete next[productoId];
+      return next;
+    });
   };
 
   const handleGenerateLabels = async () => {
@@ -75,12 +133,20 @@ export const ProductosList = () => {
 
     setIsGeneratingLabels(true);
     try {
-      const pdfFile = await buildProductoEtiquetasPdfFile({
-        producto: printingProducto,
-        anchoCm,
-        altoCm,
-        logoUrl: includeComercioLogo ? comercioLogoUrl : undefined,
-      });
+      const pdfFile =
+        printMode === "full-sheet"
+          ? await buildProductoEtiquetasPdfFile({
+              producto: printingProducto,
+              anchoCm,
+              altoCm,
+              logoUrl: includeComercioLogo ? comercioLogoUrl : undefined,
+            })
+          : await buildProductosEtiquetasPdfFile({
+              items: selectedLabelItems,
+              anchoCm,
+              altoCm,
+              logoUrl: includeComercioLogo ? comercioLogoUrl : undefined,
+            });
       const url = URL.createObjectURL(pdfFile);
       const pdfWindow = window.open(url, "_blank");
 
@@ -255,7 +321,7 @@ export const ProductosList = () => {
         </div>
       </CardContent>
       <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Imprimir etiquetas</DialogTitle>
           </DialogHeader>
@@ -268,6 +334,22 @@ export const ProductosList = () => {
               <div className="text-muted-foreground">
                 Precio: {printingProducto ? formatCurrency(printingProducto.precio_venta, printingProducto.tipo_moneda) : "-"}
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-md border p-1">
+              <Button
+                type="button"
+                variant={printMode === "full-sheet" ? "default" : "ghost"}
+                onClick={() => setPrintMode("full-sheet")}
+              >
+                Hoja completa
+              </Button>
+              <Button
+                type="button"
+                variant={printMode === "selected-products" ? "default" : "ghost"}
+                onClick={() => setPrintMode("selected-products")}
+              >
+                Productos y cantidades
+              </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -293,6 +375,115 @@ export const ProductosList = () => {
                 />
               </div>
             </div>
+            {printMode === "selected-products" && (
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="space-y-2">
+                  <Label htmlFor="label-product-search">Buscar producto para agregar</Label>
+                  <Input
+                    id="label-product-search"
+                    placeholder="Buscar por descripcion, codigo o codigo de barras..."
+                    value={labelSearchTerm}
+                    onChange={(event) => setLabelSearchTerm(event.target.value)}
+                  />
+                  {labelSearchTerm.trim() && (
+                    <div className="max-h-52 overflow-y-auto rounded-md border">
+                      <Table>
+                        <TableBody>
+                          {labelSearchResults.length === 0 ? (
+                            <TableRow>
+                              <TableCell className="text-center py-4">
+                                No se encontraron productos para agregar
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            labelSearchResults.map((producto) => (
+                              <TableRow key={producto.id}>
+                                <TableCell>
+                                  <div className="font-medium">{producto.descripcion}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {producto.cod_barras || producto.cod_producto}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleAddLabelProduct(producto)}
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Agregar
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Productos a imprimir</Label>
+                  <span className="text-sm text-muted-foreground">Total a imprimir: {selectedLabelsCount}</span>
+                </div>
+                <div className="max-h-72 overflow-y-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Codigo</TableHead>
+                        <TableHead className="w-28 text-right">Cantidad</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedLabelItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-4">
+                            Busque y agregue productos para imprimir etiquetas
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        selectedLabelItems.map(({ producto }) => (
+                          <TableRow key={producto.id}>
+                            <TableCell>
+                              <div className="font-medium">{producto.descripcion}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {formatCurrency(producto.precio_venta, producto.tipo_moneda)}
+                              </div>
+                            </TableCell>
+                            <TableCell>{producto.cod_barras || producto.cod_producto}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={labelQuantities[producto.id] || ""}
+                                onChange={(event) => handleLabelQuantityChange(producto.id, event.target.value)}
+                                className="text-right"
+                                placeholder="0"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveLabelProduct(producto.id)}
+                                title="Quitar producto"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
             {comercioLogoUrl && (
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="space-y-0.5">
@@ -312,7 +503,10 @@ export const ProductosList = () => {
               <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleGenerateLabels} disabled={isGeneratingLabels}>
+              <Button
+                onClick={handleGenerateLabels}
+                disabled={isGeneratingLabels || (printMode === "selected-products" && selectedLabelsCount === 0)}
+              >
                 <Printer className="h-4 w-4 mr-2" />
                 {isGeneratingLabels ? "Generando..." : "Generar PDF"}
               </Button>

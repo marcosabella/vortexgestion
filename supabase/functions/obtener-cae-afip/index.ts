@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import forge from 'https://esm.sh/node-forge@1.3.1';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
   const date = new Date(value);
@@ -22,6 +23,23 @@ function formatearFechaArgentinaYYYYMMDD(value: string): string {
     : value.split('T')[0].replace(/-/g, '');
 }
 
+function formatearFechaAFIP(fecha: Date): string {
+  const argentinaOffset = -3 * 60 * 60 * 1000;
+  const argentinaTime = new Date(fecha.getTime() + argentinaOffset);
+  const year = argentinaTime.getUTCFullYear();
+  const month = String(argentinaTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(argentinaTime.getUTCDate()).padStart(2, '0');
+  const hours = String(argentinaTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(argentinaTime.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(argentinaTime.getUTCSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-03:00`;
+}
+
+function normalizarCuit(value: string): string {
+  return String(value || '').replace(/\D/g, '');
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -32,70 +50,62 @@ function crearTRA(service: string, ambiente: 'homologacion' | 'produccion'): str
   const ahora = new Date();
   const generationTime = new Date(ahora.getTime() - 10 * 60000); // 10 minutos atrás
   const expirationTime = new Date(ahora.getTime() + 10 * 60000); // 10 minutos adelante
-  
-  const uniqueId = Date.now();
-  
+
+  const uniqueId = Math.floor(Date.now() / 1000);
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
   <header>
     <uniqueId>${uniqueId}</uniqueId>
-    <generationTime>${generationTime.toISOString()}</generationTime>
-    <expirationTime>${expirationTime.toISOString()}</expirationTime>
+    <generationTime>${formatearFechaAFIP(generationTime)}</generationTime>
+    <expirationTime>${formatearFechaAFIP(expirationTime)}</expirationTime>
   </header>
   <service>${service}</service>
 </loginTicketRequest>`;
 }
 
 // Función para firmar el TRA con el certificado
-async function firmarTRA(tra: string, certPem: string, keyPem: string): Promise<string> {
+function firmarTRA(tra: string, certPem: string, keyPem: string): string {
   try {
-    // Importar la clave privada
-    const keyData = keyPem
-      .replace('-----BEGIN PRIVATE KEY-----', '')
-      .replace('-----END PRIVATE KEY-----', '')
-      .replace(/\s/g, '');
-    
-    const keyBytes = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
-    
-    const privateKey = await crypto.subtle.importKey(
-      'pkcs8',
-      keyBytes,
-      {
-        name: 'RSASSA-PKCS1-v1_5',
-        hash: 'SHA-256',
-      },
-      false,
-      ['sign']
-    );
+    console.log('Iniciando firma PKCS#7/CMS del TRA...');
 
-    // Firmar el TRA
-    const encoder = new TextEncoder();
-    const data = encoder.encode(tra);
-    const signature = await crypto.subtle.sign(
-      'RSASSA-PKCS1-v1_5',
-      privateKey,
-      data
-    );
+    const certNormalized = certPem.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const keyNormalized = keyPem.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // Codificar la firma en base64
-    const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    const certificate = forge.pki.certificateFromPem(certNormalized);
+    const privateKey = forge.pki.privateKeyFromPem(keyNormalized);
 
-    // Extraer el certificado sin headers
-    const certData = certPem
-      .replace('-----BEGIN CERTIFICATE-----', '')
-      .replace('-----END CERTIFICATE-----', '')
-      .replace(/\s/g, '');
+    console.log('Certificado CN:', certificate.subject.getField('CN')?.value);
+    console.log('Certificado valido hasta:', certificate.validity.notAfter);
 
-    // Crear el CMS (PKCS#7) manualmente
-    const cms = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <wsaa:loginCms>
-      <wsaa:in0><![CDATA[${btoa(tra)}]]></wsaa:in0>
-    </wsaa:loginCms>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+    const p7 = forge.pkcs7.createSignedData();
+    p7.content = forge.util.createBuffer(tra, 'utf8');
+    p7.addCertificate(certificate);
+    p7.addSigner({
+      key: privateKey,
+      certificate,
+      digestAlgorithm: forge.pki.oids.sha256,
+      authenticatedAttributes: [
+        {
+          type: forge.pki.oids.contentType,
+          value: forge.pki.oids.data,
+        },
+        {
+          type: forge.pki.oids.messageDigest,
+        },
+        {
+          type: forge.pki.oids.signingTime,
+          value: new Date(),
+        },
+      ],
+    });
+    p7.sign();
+
+    const asn1 = p7.toAsn1();
+    const der = forge.asn1.toDer(asn1);
+    const cms = forge.util.encode64(der.getBytes());
+
+    console.log('CMS generado, longitud:', cms.length);
 
     return cms;
   } catch (error: unknown) {
@@ -106,6 +116,25 @@ async function firmarTRA(tra: string, certPem: string, keyPem: string): Promise<
 }
 
 // Función para llamar al WSAA y obtener TA (Token y Sign)
+function extraerXmlWsaa(responseText: string): string {
+  const cdataMatch = responseText.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+  if (cdataMatch) {
+    return cdataMatch[1];
+  }
+
+  const returnMatch = responseText.match(/<loginCmsReturn[^>]*>([\s\S]*?)<\/loginCmsReturn>/);
+  if (returnMatch) {
+    return returnMatch[1]
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .trim();
+  }
+
+  return responseText;
+}
+
 async function obtenerTokenYSign(
   certPem: string,
   keyPem: string,
@@ -115,42 +144,58 @@ async function obtenerTokenYSign(
   try {
     console.log('Creando TRA para servicio:', service);
     const tra = crearTRA(service, ambiente);
-    
+
     console.log('Firmando TRA...');
-    const cms = await firmarTRA(tra, certPem, keyPem);
-    
+    const cms = firmarTRA(tra, certPem, keyPem);
+
     // URL del WSAA según ambiente
     const wsaaUrl = ambiente === 'produccion'
       ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
       : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
-    
+
     console.log('Llamando a WSAA:', wsaaUrl);
-    
+
+    const soapRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <wsaa:loginCms>
+      <wsaa:in0>${cms}</wsaa:in0>
+    </wsaa:loginCms>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+
     const response = await fetch(wsaaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': '',
       },
-      body: cms,
+      body: soapRequest,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Error en WSAA:', response.status, errorText);
-      throw new Error(`Error en WSAA: ${response.status} - ${errorText}`);
+      const mensajes = extraerMensajesArca(errorText);
+      throw new Error(`Error en WSAA: ${mensajes[0] || response.status}`);
     }
 
     const responseText = await response.text();
     console.log('Respuesta WSAA recibida');
+    const xmlContent = extraerXmlWsaa(responseText);
 
     // Parsear la respuesta XML para extraer token, sign y expirationTime
-    const tokenMatch = responseText.match(/<token>(.*?)<\/token>/s);
-    const signMatch = responseText.match(/<sign>(.*?)<\/sign>/s);
-    const expirationMatch = responseText.match(/<expirationTime>(.*?)<\/expirationTime>/s);
+    const tokenMatch = xmlContent.match(/<token>([\s\S]*?)<\/token>/);
+    const signMatch = xmlContent.match(/<sign>([\s\S]*?)<\/sign>/);
+    const expirationMatch = xmlContent.match(/<expirationTime>([\s\S]*?)<\/expirationTime>/);
 
     if (!tokenMatch || !signMatch || !expirationMatch) {
-      console.error('Respuesta WSAA:', responseText);
+      const mensajes = extraerMensajesArca(responseText);
+      console.error('Respuesta WSAA:', responseText.substring(0, 1000));
+      if (mensajes.length > 0) {
+        throw new Error(`Error en WSAA: ${mensajes.join(' | ')}`);
+      }
       throw new Error('No se pudo extraer token, sign o expirationTime de la respuesta WSAA');
     }
 
@@ -166,6 +211,161 @@ async function obtenerTokenYSign(
 }
 
 // Función para llamar a WSFE y solicitar CAE
+function extraerMensajesArca(responseText: string): string[] {
+  const mensajes: string[] = [];
+  const patterns = [
+    /<Err>[\s\S]*?<Msg>([\s\S]*?)<\/Msg>[\s\S]*?<\/Err>/g,
+    /<Obs>[\s\S]*?<Msg>([\s\S]*?)<\/Msg>[\s\S]*?<\/Obs>/g,
+    /<Observaciones>[\s\S]*?<Msg>([\s\S]*?)<\/Msg>[\s\S]*?<\/Observaciones>/g,
+    /<faultstring[^>]*>([\s\S]*?)<\/faultstring>/g,
+    /<soap:Text[^>]*>([\s\S]*?)<\/soap:Text>/g,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(responseText)) !== null) {
+      mensajes.push(
+        match[1]
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .trim()
+      );
+    }
+  }
+
+  return [...new Set(mensajes.filter(Boolean))];
+}
+
+async function consultarUltimoComprobante(
+  token: string,
+  sign: string,
+  cuit: string,
+  puntoVenta: number,
+  tipoComprobante: number,
+  ambiente: 'homologacion' | 'produccion'
+): Promise<number> {
+  const wsfeUrl = ambiente === 'produccion'
+    ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
+    : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
+  const cuitLimpio = normalizarCuit(cuit);
+  const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
+  <soap:Header/>
+  <soap:Body>
+    <ar:FECompUltimoAutorizado>
+      <ar:Auth>
+        <ar:Token>${token}</ar:Token>
+        <ar:Sign>${sign}</ar:Sign>
+        <ar:Cuit>${cuitLimpio}</ar:Cuit>
+      </ar:Auth>
+      <ar:PtoVta>${puntoVenta}</ar:PtoVta>
+      <ar:CbteTipo>${tipoComprobante}</ar:CbteTipo>
+    </ar:FECompUltimoAutorizado>
+  </soap:Body>
+</soap:Envelope>`;
+
+  console.log('Consultando ultimo comprobante autorizado:', {
+    wsfeUrl,
+    cuit: cuitLimpio,
+    puntoVenta,
+    tipoComprobante,
+  });
+
+  const response = await fetch(wsfeUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/soap+xml; charset=utf-8',
+      'SOAPAction': 'http://ar.gov.afip.dif.FEV1/FECompUltimoAutorizado',
+    },
+    body: soapBody,
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    const mensajes = extraerMensajesArca(responseText);
+    throw new Error(`Error ARCA al consultar ultimo comprobante: ${mensajes[0] || `${response.status} - ${responseText}`}`);
+  }
+
+  const cbteNroMatch = responseText.match(/<CbteNro>(\d+)<\/CbteNro>/);
+  if (!cbteNroMatch) {
+    const mensajes = extraerMensajesArca(responseText);
+    if (mensajes.length > 0) {
+      throw new Error(`Error ARCA al consultar ultimo comprobante: ${mensajes.join(' | ')}`);
+    }
+
+    console.error('Respuesta WSFE completa:', responseText);
+    throw new Error('No se pudo extraer el numero de comprobante de la respuesta de ARCA');
+  }
+
+  return parseInt(cbteNroMatch[1], 10);
+}
+
+function formatearNumeroComprobante(puntoVenta: number, numeroComprobante: number): string {
+  return `${String(puntoVenta).padStart(4, '0')}-${String(numeroComprobante).padStart(8, '0')}`;
+}
+
+function formatearImporteAfip(value: number): string {
+  return (Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+
+function esComprobanteClaseA(tipoComprobante: string): boolean {
+  return tipoComprobante.endsWith('_a');
+}
+
+function esComprobanteClaseC(tipoComprobante: string): boolean {
+  return tipoComprobante.endsWith('_c');
+}
+
+function obtenerDocumentoReceptor(venta: Venta): { docTipo: number; docNro: number } {
+  const cuit = venta.cliente?.cuit?.replace(/\D/g, '') || '';
+
+  if (esComprobanteClaseA(venta.tipo_comprobante)) {
+    if (cuit.length !== 11) {
+      throw new Error('Para comprobantes clase A debe seleccionar un cliente con CUIT valido.');
+    }
+
+    return { docTipo: 80, docNro: Number(cuit) };
+  }
+
+  if (cuit.length === 11) {
+    return { docTipo: 80, docNro: Number(cuit) };
+  }
+
+  return { docTipo: 99, docNro: 0 };
+}
+
+function obtenerErrorPublicoCae(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  if (/WSAA|LoginCms|loginCms/i.test(message)) {
+    const cleanWsaaMessage = message.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+    if (/xml\.bad|SCHEMA|interpretar el XML/i.test(message)) {
+      return 'No se pudo autenticar con ARCA: el ticket de acceso fue rechazado por formato invalido. Revise certificado, clave privada y ambiente configurado.';
+    }
+
+    if (cleanWsaaMessage && !/^\d+$/.test(cleanWsaaMessage)) {
+      return cleanWsaaMessage.slice(0, 300);
+    }
+
+    return 'No se pudo autenticar con ARCA. Revise certificado, clave privada, CUIT y ambiente configurado.';
+  }
+
+  const cleanMessage = message.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+  if (/certificado|certificate|private key|clave privada/i.test(cleanMessage)) {
+    return cleanMessage.slice(0, 300);
+  }
+
+  if (/WSFE|CAE|ARCA|AFIP/i.test(cleanMessage)) {
+    return cleanMessage.slice(0, 300);
+  }
+
+  return cleanMessage || 'No se pudo obtener el CAE.';
+}
+
 async function solicitarCAE(
   token: string,
   sign: string,
@@ -178,6 +378,7 @@ async function solicitarCAE(
     const wsfeUrl = ambiente === 'produccion'
       ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
       : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
+    const cuitLimpio = normalizarCuit(cuit);
 
     const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
@@ -187,7 +388,7 @@ async function solicitarCAE(
       <ar:Auth>
         <ar:Token>${token}</ar:Token>
         <ar:Sign>${sign}</ar:Sign>
-        <ar:Cuit>${cuit}</ar:Cuit>
+        <ar:Cuit>${cuitLimpio}</ar:Cuit>
       </ar:Auth>
       <ar:FeCAEReq>
         <ar:FeCabReq>
@@ -203,22 +404,23 @@ async function solicitarCAE(
             <ar:CbteDesde>${solicitud.FeDetReq.FECAEDetRequest.CbteDesde}</ar:CbteDesde>
             <ar:CbteHasta>${solicitud.FeDetReq.FECAEDetRequest.CbteHasta}</ar:CbteHasta>
             <ar:CbteFch>${solicitud.FeDetReq.FECAEDetRequest.CbteFch}</ar:CbteFch>
-            <ar:ImpTotal>${solicitud.FeDetReq.FECAEDetRequest.ImpTotal}</ar:ImpTotal>
-            <ar:ImpTotConc>${solicitud.FeDetReq.FECAEDetRequest.ImpTotConc}</ar:ImpTotConc>
-            <ar:ImpNeto>${solicitud.FeDetReq.FECAEDetRequest.ImpNeto}</ar:ImpNeto>
-            <ar:ImpOpEx>${solicitud.FeDetReq.FECAEDetRequest.ImpOpEx}</ar:ImpOpEx>
-            <ar:ImpIVA>${solicitud.FeDetReq.FECAEDetRequest.ImpIVA}</ar:ImpIVA>
-            <ar:ImpTrib>${solicitud.FeDetReq.FECAEDetRequest.ImpTrib}</ar:ImpTrib>
+            <ar:ImpTotal>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpTotal)}</ar:ImpTotal>
+            <ar:ImpTotConc>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpTotConc)}</ar:ImpTotConc>
+            <ar:ImpNeto>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpNeto)}</ar:ImpNeto>
+            <ar:ImpOpEx>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpOpEx)}</ar:ImpOpEx>
+            <ar:ImpIVA>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpIVA)}</ar:ImpIVA>
+            <ar:ImpTrib>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpTrib)}</ar:ImpTrib>
             <ar:MonId>${solicitud.FeDetReq.FECAEDetRequest.MonId}</ar:MonId>
             <ar:MonCotiz>${solicitud.FeDetReq.FECAEDetRequest.MonCotiz}</ar:MonCotiz>
-            ${solicitud.FeDetReq.FECAEDetRequest.Iva.AlicIva.map((alicuota: any) => `
+            ${solicitud.FeDetReq.FECAEDetRequest.Iva?.AlicIva?.length ? `
             <ar:Iva>
+              ${solicitud.FeDetReq.FECAEDetRequest.Iva.AlicIva.map((alicuota: any) => `
               <ar:AlicIva>
                 <ar:Id>${alicuota.Id}</ar:Id>
-                <ar:BaseImp>${alicuota.BaseImp}</ar:BaseImp>
-                <ar:Importe>${alicuota.Importe}</ar:Importe>
-              </ar:AlicIva>
-            </ar:Iva>`).join('')}
+                <ar:BaseImp>${formatearImporteAfip(alicuota.BaseImp)}</ar:BaseImp>
+                <ar:Importe>${formatearImporteAfip(alicuota.Importe)}</ar:Importe>
+              </ar:AlicIva>`).join('')}
+            </ar:Iva>` : ''}
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
       </ar:FeCAEReq>
@@ -237,29 +439,37 @@ async function solicitarCAE(
       body: soapBody,
     });
 
+    const responseText = await response.text();
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error en WSFE:', response.status, errorText);
-      throw new Error(`Error en WSFE: ${response.status}`);
+      const mensajes = extraerMensajesArca(responseText);
+      console.error('Error en WSFE:', response.status, responseText);
+      throw new Error(`Error ARCA al solicitar CAE: ${mensajes[0] || `${response.status} - ${responseText}`}`);
     }
 
-    const responseText = await response.text();
     console.log('Respuesta WSFE recibida');
 
     // Parsear respuesta SOAP
     const caeMatch = responseText.match(/<CAE>(.*?)<\/CAE>/);
     const caeVencMatch = responseText.match(/<CAEFchVto>(.*?)<\/CAEFchVto>/);
     const resultadoMatch = responseText.match(/<Resultado>([AR])<\/Resultado>/);
-    
+
     // Verificar errores
     const obsMatch = responseText.match(/<Obs>.*?<Msg>(.*?)<\/Msg>.*?<\/Obs>/s);
-    
+    const mensajesArca = extraerMensajesArca(responseText);
+
+    if (resultadoMatch && resultadoMatch[1] === 'R' && mensajesArca.length > 0) {
+      throw new Error(`ARCA rechazo la solicitud: ${mensajesArca.join(' | ')}`);
+    }
+
     if (resultadoMatch && resultadoMatch[1] === 'R') {
       const errorMsg = obsMatch ? obsMatch[1] : 'Error desconocido en WSFE';
       throw new Error(`AFIP rechazó la solicitud: ${errorMsg}`);
     }
 
     if (!caeMatch || !caeVencMatch) {
+      if (mensajesArca.length > 0) {
+        throw new Error(`ARCA no devolvio CAE: ${mensajesArca.join(' | ')}`);
+      }
       console.error('Respuesta WSFE completa:', responseText);
       throw new Error('No se pudo extraer CAE de la respuesta WSFE');
     }
@@ -300,6 +510,9 @@ interface Venta {
     subtotal: number;
     total: number;
   }>;
+  cliente?: {
+    cuit?: string | null;
+  } | null;
 }
 
 async function getAuthenticatedUserId(req: Request, supabase: any): Promise<string> {
@@ -388,10 +601,15 @@ Deno.serve(async (req) => {
       throw new Error('Los certificados digitales no están cargados. Debe cargar el certificado (.crt) y la clave privada (.key) en la configuración AFIP.');
     }
 
+    const cuitEmisor = normalizarCuit(afipConfig.cuit_emisor);
+    if (cuitEmisor.length !== 11) {
+      throw new Error('El CUIT emisor configurado debe tener 11 digitos.');
+    }
+
     console.log('Configuración AFIP:', {
       punto_venta: afipConfig.punto_venta,
       ambiente: afipConfig.ambiente,
-      cuit: afipConfig.cuit_emisor,
+      cuit: cuitEmisor,
     });
 
     // Obtener datos de la venta
@@ -406,7 +624,8 @@ Deno.serve(async (req) => {
           monto_iva,
           subtotal,
           total
-        )
+        ),
+        cliente:clientes(cuit)
       `)
       .eq('id', ventaId)
       .eq('comercio_id', ventaPre.comercio_id)
@@ -452,19 +671,19 @@ Deno.serve(async (req) => {
       throw new Error(`Tipo de comprobante ${venta.tipo_comprobante} no válido para AFIP`);
     }
 
-    // Extraer número de comprobante (formato: 0001-00000123)
-    const partes = venta.numero_comprobante.split('-');
-    const numeroComprobante = parseInt(partes[1] || '1', 10);
-
     // Preparar fecha en formato YYYYMMDD
     const fechaFormateada = formatearFechaArgentinaYYYYMMDD(venta.fecha_venta);
+    const documentoReceptor = obtenerDocumentoReceptor(venta);
+    const comprobanteClaseC = esComprobanteClaseC(venta.tipo_comprobante);
 
     // Calcular importes por alícuota de IVA
     const ivaMap = new Map<number, { baseImponible: number; importe: number }>();
-    
-    if (venta.venta_items && venta.venta_items.length > 0) {
+
+    if (!comprobanteClaseC && venta.venta_items && venta.venta_items.length > 0) {
       for (const item of venta.venta_items) {
         const alicuota = item.porcentaje_iva;
+        if (alicuota <= 0) continue;
+
         const actual = ivaMap.get(alicuota) || { baseImponible: 0, importe: 0 };
         ivaMap.set(alicuota, {
           baseImponible: actual.baseImponible + Number(item.subtotal),
@@ -488,7 +707,7 @@ Deno.serve(async (req) => {
     }));
 
     // Si no hay items de IVA, agregar uno por defecto
-    if (ivaArray.length === 0) {
+    if (!comprobanteClaseC && Number(venta.total_iva) > 0 && ivaArray.length === 0) {
       ivaArray.push({
         Id: 5, // IVA 21%
         BaseImp: Number(venta.subtotal),
@@ -496,12 +715,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    const importeTotal = Number(venta.total);
+    const importeIva = comprobanteClaseC ? 0 : Number(venta.total_iva);
+    const importeNeto = comprobanteClaseC ? importeTotal : Number(venta.subtotal);
+
     // Estructura de la solicitud AFIP
     const solicitudAfip = {
       Auth: {
         Token: '', // Se llenará después de la autenticación
         Sign: '',
-        Cuit: afipConfig.cuit_emisor,
+        Cuit: cuitEmisor,
       },
       FeCAEReq: {
         FeCabReq: {
@@ -512,22 +735,20 @@ Deno.serve(async (req) => {
         FeDetReq: {
           FECAEDetRequest: {
             Concepto: 1, // Productos
-            DocTipo: 99, // Consumidor Final
-            DocNro: 0,
-            CbteDesde: numeroComprobante,
-            CbteHasta: numeroComprobante,
+            DocTipo: documentoReceptor.docTipo,
+            DocNro: documentoReceptor.docNro,
+            CbteDesde: 0,
+            CbteHasta: 0,
             CbteFch: fechaFormateada,
-            ImpTotal: Number(venta.total),
+            ImpTotal: importeTotal,
             ImpTotConc: 0, // No gravado
-            ImpNeto: Number(venta.subtotal),
+            ImpNeto: importeNeto,
             ImpOpEx: 0, // Exento
-            ImpIVA: Number(venta.total_iva),
+            ImpIVA: importeIva,
             ImpTrib: 0, // Otros tributos
             MonId: 'PES', // Pesos
             MonCotiz: 1,
-            Iva: {
-              AlicIva: ivaArray,
-            },
+            Iva: ivaArray.length > 0 ? { AlicIva: ivaArray } : undefined,
           },
         },
       },
@@ -545,17 +766,40 @@ Deno.serve(async (req) => {
     );
     console.log('Token y Sign obtenidos exitosamente');
 
+    const ultimoNumeroAutorizado = await consultarUltimoComprobante(
+      token,
+      sign,
+      cuitEmisor,
+      afipConfig.punto_venta,
+      codigoComprobante,
+      afipConfig.ambiente
+    );
+    const numeroComprobante = ultimoNumeroAutorizado + 1;
+    const numeroComprobanteFormateado = formatearNumeroComprobante(
+      afipConfig.punto_venta,
+      numeroComprobante
+    );
+
+    solicitudAfip.FeCAEReq.FeDetReq.FECAEDetRequest.CbteDesde = numeroComprobante;
+    solicitudAfip.FeCAEReq.FeDetReq.FECAEDetRequest.CbteHasta = numeroComprobante;
+
+    console.log('Numero de comprobante a solicitar:', {
+      ultimoNumeroAutorizado,
+      numeroComprobante,
+      numeroComprobanteFormateado,
+    });
+
     // Solicitar CAE a WSFE
     console.log('Solicitando CAE a WSFE...');
     const { cae, caeVencimiento } = await solicitarCAE(
       token,
       sign,
-      afipConfig.cuit_emisor,
+      cuitEmisor,
       afipConfig.punto_venta,
       solicitudAfip.FeCAEReq,
       afipConfig.ambiente
     );
-    
+
     // Formatear fecha de vencimiento (viene en formato YYYYMMDD)
     const fechaVencimientoStr = `${caeVencimiento.substring(0, 4)}-${caeVencimiento.substring(4, 6)}-${caeVencimiento.substring(6, 8)}`;
 
@@ -567,6 +811,7 @@ Deno.serve(async (req) => {
       .update({
         cae: cae,
         cae_vencimiento: fechaVencimientoStr,
+        numero_comprobante: numeroComprobanteFormateado,
         cae_solicitado_at: new Date().toISOString(),
         cae_error: null, // Limpiar error previo si existía
       })
@@ -584,7 +829,9 @@ Deno.serve(async (req) => {
         success: true,
         cae: cae,
         cae_vencimiento: fechaVencimientoStr,
-        mensaje: afipConfig.ambiente === 'homologacion' 
+        numero_comprobante: numeroComprobanteFormateado,
+        ultimo_numero_autorizado: ultimoNumeroAutorizado,
+        mensaje: afipConfig.ambiente === 'homologacion'
           ? 'CAE obtenido en ambiente de homologación (testing)'
           : 'CAE obtenido exitosamente en producción',
       }),
@@ -594,6 +841,7 @@ Deno.serve(async (req) => {
     );
   } catch (error: any) {
     console.error('Error al obtener CAE:', error);
+    const publicError = obtenerErrorPublicoCae(error);
 
     // Si es un error con ventaId, intentar guardar el error en la base de datos
     try {
@@ -606,7 +854,7 @@ Deno.serve(async (req) => {
         await supabase
           .from('ventas')
           .update({
-            cae_error: error.message,
+            cae_error: publicError,
             cae_solicitado_at: new Date().toISOString(),
           })
           .eq('id', ventaId)
@@ -619,7 +867,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: publicError,
       }),
       {
         status: 400,

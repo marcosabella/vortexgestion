@@ -7,6 +7,8 @@ export interface AfipConfig {
   certificado_key?: string;
   nombre_certificado_crt?: string;
   nombre_certificado_key?: string;
+  certificado_vencimiento?: string | null;
+  certificado_vigente?: boolean | null;
   activo: boolean;
   created_at?: string;
   updated_at?: string;
