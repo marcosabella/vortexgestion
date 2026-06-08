@@ -102,6 +102,12 @@ export interface VentaItem {
   };
 }
 
+export const getVentaItemCodigo = (item: Pick<VentaItem, "producto" | "codigo_manual">) => {
+  const codigo = item.producto?.cod_producto || item.codigo_manual?.trim() || "";
+
+  return codigo.toUpperCase() === "MANUAL" ? "" : codigo;
+};
+
 export type TipoPago = 'contado' | 'transferencia' | 'tarjeta' | 'cheque' | 'cta_cte';
 
 export type TipoComprobante = 

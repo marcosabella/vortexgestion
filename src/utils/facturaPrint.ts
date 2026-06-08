@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
-import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
+import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
 
 interface FacturaPrintOptions {
   venta: Venta;
@@ -476,7 +476,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
 
           return `
             <tr>
-              <td>${escapeHtml(item.producto?.cod_producto || item.codigo_manual || "-")}</td>
+              <td>${escapeHtml(getVentaItemCodigo(item))}</td>
               <td>${escapeHtml(`${descripcion}${recargo}`)}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.cantidad))}</td>
               <td class="text-center">unidades</td>

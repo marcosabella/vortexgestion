@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
-import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
+import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
 import { useComercio } from "@/hooks/useComercio";
@@ -363,12 +363,6 @@ export const VentasList = () => {
                     <p><strong>N° Comprobante:</strong> {selectedVenta.numero_comprobante}</p>
                     <p><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
                     <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
-                    {selectedVenta.cae && (
-                      <>
-                        <p><strong>CAE:</strong> {selectedVenta.cae}</p>
-                        <p><strong>Vto. CAE:</strong> {selectedVenta.cae_vencimiento ? format(new Date(selectedVenta.cae_vencimiento), "dd/MM/yyyy") : 'N/A'}</p>
-                      </>
-                    )}
                   </div>
                   <div>
                     <p><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
@@ -419,7 +413,7 @@ export const VentasList = () => {
                     <TableBody>
                       {selectedVenta.venta_items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell>{item.producto?.cod_producto || item.codigo_manual || "-"}</TableCell>
+                          <TableCell>{getVentaItemCodigo(item) || "-"}</TableCell>
                           <TableCell>{item.producto?.descripcion || item.descripcion_manual || "Item manual"}</TableCell>
                           <TableCell>{item.cantidad}</TableCell>
                           <TableCell>${item.precio_unitario.toFixed(2)}</TableCell>
@@ -480,21 +474,31 @@ export const VentasList = () => {
               )}
 
               <div className="border-t pt-4">
-                <div className="grid grid-cols-3 gap-4 text-right">
-                  <div>
-                    {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>Subtotal neto:</strong> ${selectedVenta.subtotal.toFixed(2)}</p>}
-                    {(Number(selectedVenta.monto_descuento || 0) > 0 || Number(selectedVenta.porcentaje_descuento || 0) > 0) && (
-                      <p><strong>Desc. venta:</strong> {selectedVenta.porcentaje_descuento || 0}% + ${Number(selectedVenta.monto_descuento || 0).toFixed(2)}</p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="text-left">
+                    {selectedVenta.cae && (
+                      <>
+                        <p><strong>CAE:</strong> {selectedVenta.cae}</p>
+                        <p><strong>Vto. CAE:</strong> {selectedVenta.cae_vencimiento ? format(new Date(selectedVenta.cae_vencimiento), "dd/MM/yyyy") : 'N/A'}</p>
+                      </>
                     )}
                   </div>
-                  <div>
-                    {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>IVA:</strong> ${selectedVenta.total_iva.toFixed(2)}</p>}
-                    {(Number(selectedVenta.monto_recargo || 0) > 0 || Number(selectedVenta.porcentaje_recargo || 0) > 0) && (
-                      <p><strong>Recargo venta:</strong> {selectedVenta.porcentaje_recargo || 0}% + ${Number(selectedVenta.monto_recargo || 0).toFixed(2)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-lg"><strong>Total:</strong> ${getVentaTotalFinal(selectedVenta).toFixed(2)}</p>
+                  <div className="grid gap-4 text-right sm:grid-cols-3">
+                    <div>
+                      {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>Subtotal neto:</strong> ${selectedVenta.subtotal.toFixed(2)}</p>}
+                      {(Number(selectedVenta.monto_descuento || 0) > 0 || Number(selectedVenta.porcentaje_descuento || 0) > 0) && (
+                        <p><strong>Desc. venta:</strong> {selectedVenta.porcentaje_descuento || 0}% + ${Number(selectedVenta.monto_descuento || 0).toFixed(2)}</p>
+                      )}
+                    </div>
+                    <div>
+                      {discriminaIvaEnComprobante(selectedVenta.tipo_comprobante) && <p><strong>IVA:</strong> ${selectedVenta.total_iva.toFixed(2)}</p>}
+                      {(Number(selectedVenta.monto_recargo || 0) > 0 || Number(selectedVenta.porcentaje_recargo || 0) > 0) && (
+                        <p><strong>Recargo venta:</strong> {selectedVenta.porcentaje_recargo || 0}% + ${Number(selectedVenta.monto_recargo || 0).toFixed(2)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-lg"><strong>Total:</strong> ${getVentaTotalFinal(selectedVenta).toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
               </div>

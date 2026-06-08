@@ -1,5 +1,6 @@
 export interface AfipConfig {
   id?: string;
+  comercio_id?: string | null;
   punto_venta: number;
   cuit_emisor: string;
   ambiente: 'homologacion' | 'produccion';

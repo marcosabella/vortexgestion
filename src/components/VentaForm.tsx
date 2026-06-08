@@ -440,7 +440,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     const nuevoItem: VentaItemDraft = {
       producto_id: selectedProductoId || null,
       descripcion_manual: selectedProductoId ? null : descripcion,
-      codigo_manual: selectedProductoId ? null : "MANUAL",
+      codigo_manual: null,
       cantidad: cantidadItem,
       precio_unitario: precioUnitario,
       porcentaje_iva: porcentajeIva,

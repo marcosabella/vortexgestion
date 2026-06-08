@@ -549,6 +549,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        comercioId: authorizedComercioId,
         ultimoNumero,
         puntoVenta: afipConfig.punto_venta,
         tipoComprobante,

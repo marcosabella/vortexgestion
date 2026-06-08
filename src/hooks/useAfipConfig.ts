@@ -4,16 +4,24 @@ import { toast } from '@/hooks/use-toast';
 import { AfipConfig, AfipConfigInsert, AfipConfigUpdate } from '@/types/afip';
 
 export function useAfipConfig() {
+  const comercioId = localStorage.getItem('selectedComercioId');
+
   return useQuery({
-    queryKey: ['afip-config'],
+    queryKey: ['afip-config', comercioId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!comercioId) {
+        return null;
+      }
+
+      const query = supabase
         .from('afip_config')
         .select('*')
         .eq('activo', true)
+        .eq('comercio_id', comercioId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      const { data, error } = await query.maybeSingle();
       
       if (error) throw error;
       return data as AfipConfig | null;
@@ -26,9 +34,12 @@ export function useCreateAfipConfig() {
   
   return useMutation({
     mutationFn: async (config: AfipConfigInsert) => {
+      const comercioId = localStorage.getItem('selectedComercioId');
+      const configWithComercio = comercioId ? { ...config, comercio_id: comercioId } : config;
+
       const { data, error } = await supabase
         .from('afip_config')
-        .insert([config])
+        .insert([configWithComercio])
         .select()
         .single();
       
@@ -57,9 +68,12 @@ export function useUpdateAfipConfig() {
   
   return useMutation({
     mutationFn: async ({ id, ...config }: AfipConfig) => {
+      const comercioId = localStorage.getItem('selectedComercioId');
+      const configWithComercio = comercioId ? { ...config, comercio_id: comercioId } : config;
+
       const { data, error } = await supabase
         .from('afip_config')
-        .update(config)
+        .update(configWithComercio)
         .eq('id', id)
         .select()
         .single();

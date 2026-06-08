@@ -72,6 +72,7 @@ export default function Login() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
+    localStorage.removeItem("selectedComercioId");
 
     const { error } = await supabase.auth.signInWithPassword({
       email,

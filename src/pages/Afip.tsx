@@ -15,12 +15,15 @@ import { AMBIENTES_AFIP, TIPOS_COMPROBANTE } from '@/types/afip';
 import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractCertificateExpirationDate } from '@/utils/certificate';
+import { useComercio } from '@/hooks/useComercio';
 
 const Afip = () => {
   const { data: config, isLoading } = useAfipConfig();
   const createConfig = useCreateAfipConfig();
   const updateConfig = useUpdateAfipConfig();
   const consultarUltimo = useConsultarUltimoComprobante();
+  const { comercio } = useComercio();
+  const { reset: resetConsultarUltimo } = consultarUltimo;
 
   const [puntoVenta, setPuntoVenta] = useState(config?.punto_venta || 1);
   const [cuitEmisor, setCuitEmisor] = useState(config?.cuit_emisor || '');
@@ -36,6 +39,7 @@ const Afip = () => {
   const [tipoComprobanteConsulta, setTipoComprobanteConsulta] = useState('factura_b');
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [resultadoConsulta, setResultadoConsulta] = useState<{
+    comercioId?: string;
     ultimoNumero?: number;
     puntoVenta?: number;
     tipoComprobante?: string;
@@ -52,6 +56,7 @@ const Afip = () => {
 
   const inputCrtRef = useRef<HTMLInputElement>(null);
   const inputKeyRef = useRef<HTMLInputElement>(null);
+  const currentComercioIdRef = useRef<string | null>(comercio?.id ?? null);
 
   const updateCertificadoCrt = (content: string) => {
     setCertificadoCrt(content);
@@ -80,8 +85,28 @@ const Afip = () => {
       setNombreCertificadoCrt(config.nombre_certificado_crt || '');
       setNombreCertificadoKey(config.nombre_certificado_key || '');
       setActivo(config.activo ?? true);
+      return;
     }
+
+    setPuntoVenta(1);
+    setCuitEmisor('');
+    setAmbiente('homologacion');
+    setCertificadoCrt('');
+    setCertificadoKey('');
+    setNombreCertificadoCrt('');
+    setNombreCertificadoKey('');
+    setCertificadoVencimiento('');
+    setActivo(true);
+    setCrtError('');
+    setKeyError('');
   }, [config]);
+
+  useEffect(() => {
+    currentComercioIdRef.current = comercio?.id ?? null;
+    setResultadoConsulta(null);
+    setShowResultDialog(false);
+    resetConsultarUltimo();
+  }, [comercio?.id, resetConsultarUltimo]);
 
   const handleCrtFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,14 +205,31 @@ const Afip = () => {
   };
 
   const handleConsultarUltimo = () => {
+    setResultadoConsulta(null);
+    setShowResultDialog(false);
+
+    if (!comercio?.id) {
+      toast.error('Debe seleccionar un comercio antes de consultar');
+      return;
+    }
+
     if (!config?.id || !certificadoCrt || !certificadoKey) {
       toast.error('Debe guardar la configuración antes de consultar');
       return;
     }
+    const requestedComercioId = comercio.id;
+
     consultarUltimo.mutate(
-      { tipoComprobante: tipoComprobanteConsulta },
+      { tipoComprobante: tipoComprobanteConsulta, comercioId: requestedComercioId },
       {
         onSuccess: (data) => {
+          const activeComercioId = currentComercioIdRef.current;
+
+          if (activeComercioId !== requestedComercioId || (data.comercioId && data.comercioId !== requestedComercioId)) {
+            toast.error('La respuesta no corresponde al comercio seleccionado');
+            return;
+          }
+
           setResultadoConsulta(data);
           setShowResultDialog(true);
         },
