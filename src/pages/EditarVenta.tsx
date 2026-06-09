@@ -33,6 +33,24 @@ const EditarVenta = () => {
     );
   }
 
+  if (venta.cae?.trim()) {
+    return (
+      <div className="p-6">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Venta autorizada</h1>
+            <p className="text-muted-foreground">
+              Esta venta tiene CAE y ya no puede editarse ni eliminarse.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/ventas")}>
+            Volver al listado
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="mx-auto max-w-6xl space-y-6">

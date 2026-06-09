@@ -20,7 +20,7 @@ export const useCuentaCorriente = () => {
         .select(`
           *,
           cliente:clientes(nombre, apellido, cuit, telefono),
-          venta:ventas(numero_comprobante)
+          venta:ventas(numero_comprobante, cae)
         `)
         .order("fecha_movimiento", { ascending: false });
 
@@ -41,7 +41,7 @@ export const useCuentaCorriente = () => {
           .select(`
             *,
             cliente:clientes(nombre, apellido, cuit, telefono),
-            venta:ventas(numero_comprobante)
+            venta:ventas(numero_comprobante, cae)
           `)
           .eq("cliente_id", clienteId)
           .order("fecha_movimiento", { ascending: false });
@@ -159,6 +159,18 @@ export const useCuentaCorriente = () => {
 
   const deleteVentaFromCuentaMutation = useMutation({
     mutationFn: async (ventaId: string) => {
+      const { data: venta, error: ventaConsultaError } = await supabase
+        .from("ventas")
+        .select("cae")
+        .eq("id", ventaId)
+        .single();
+
+      if (ventaConsultaError) throw ventaConsultaError;
+
+      if (venta.cae?.trim()) {
+        throw new Error("La venta tiene CAE y no puede eliminarse");
+      }
+
       // First delete current account movements related to the sale
       const { error: cuentaError } = await supabase
         .from("cuenta_corriente")
@@ -178,6 +190,7 @@ export const useCuentaCorriente = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
       queryClient.invalidateQueries({ queryKey: ["ventas"] });
+      queryClient.invalidateQueries({ queryKey: ["presupuestos"] });
       toast({
         title: "Éxito",
         description: "Venta eliminada correctamente desde cuenta corriente",

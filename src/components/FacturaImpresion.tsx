@@ -10,9 +10,10 @@ import { buildFacturaHtmlFile } from "@/utils/facturaPrint";
 
 interface FacturaImpresionProps {
   venta: Venta;
+  documentType?: "venta" | "presupuesto";
 }
 
-export const FacturaImpresion = ({ venta }: FacturaImpresionProps) => {
+export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpresionProps) => {
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
   const { toast } = useToast();
@@ -40,7 +41,7 @@ export const FacturaImpresion = ({ venta }: FacturaImpresionProps) => {
     }
 
     const comprobanteFile = buildFacturaHtmlFile(
-      { venta, comercio, afipConfig, qrDataUrl },
+      { venta, comercio, afipConfig, qrDataUrl, documentType },
       { autoPrint: action === "pdf" }
     );
     const url = URL.createObjectURL(comprobanteFile);
@@ -77,7 +78,7 @@ export const FacturaImpresion = ({ venta }: FacturaImpresionProps) => {
         disabled={openingAction !== null}
       >
         <Printer className="h-4 w-4 mr-2" />
-        {openingAction === "print" ? "Abriendo..." : "Imprimir Factura"}
+        {openingAction === "print" ? "Abriendo..." : documentType === "presupuesto" ? "Imprimir" : "Imprimir Factura"}
       </Button>
       <Button
         onClick={() => openFactura("pdf")}

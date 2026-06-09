@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { supabase } from "@/integrations/supabase/client"
 import { useVentas } from "@/hooks/useVentas"
+import { usePresupuestos } from "@/hooks/usePresupuestos"
 import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
@@ -59,6 +60,7 @@ type VentaFormProps = {
   venta?: Venta | null
   onSuccess: () => void
   showTitle?: boolean
+  modo?: "venta" | "presupuesto"
 }
 
 type VentaItemDraft = Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">;
@@ -118,13 +120,16 @@ const calcularTotalesVenta = (
   }
 }
 
-const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true }) => {
+const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta" }) => {
   const { toast } = useToast()
   const { createVenta, updateVenta } = useVentas()
+  const { createPresupuesto, updatePresupuesto } = usePresupuestos()
+  const esPresupuesto = modo === "presupuesto"
+  const nombreDocumento = esPresupuesto ? "presupuesto" : "venta"
   const { data: clientes = [] } = useClientes()
   const { productos } = useProductos()
   const { data: parametrizacion } = useComercioParametrizacion()
-  const permiteItemsManuales = parametrizacion.funciones.venta_items_manuales
+  const permiteItemsManuales = esPresupuesto || parametrizacion.funciones.venta_items_manuales
   const permiteAjustes = parametrizacion.funciones.descuentos_recargos
   
   // Estado para items de venta
@@ -198,12 +203,19 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       if (!tipoComprobante) return;
 
       try {
-        const puntoVenta = "0001";
+        const puntoVenta = esPresupuesto ? "P" : "0001";
         
-        const { data, error } = await supabase
-          .from("ventas")
-          .select("numero_comprobante")
-          .eq("tipo_comprobante", tipoComprobante)
+        // La tabla se incorpora en la migracion de presupuestos y aun no forma parte del tipo generado.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let numeroRequest = (supabase as any)
+          .from(esPresupuesto ? "presupuestos" : "ventas")
+          .select("numero_comprobante");
+
+        if (!esPresupuesto) {
+          numeroRequest = numeroRequest.eq("tipo_comprobante", tipoComprobante);
+        }
+
+        const { data, error } = await numeroRequest
           .like("numero_comprobante", `${puntoVenta}-%`)
           .order("numero_comprobante", { ascending: false })
           .limit(1);
@@ -226,7 +238,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     };
 
     generarNumeroComprobante();
-  }, [watchTipoComprobante, venta, form]);
+  }, [watchTipoComprobante, venta, form, esPresupuesto]);
 
   useEffect(() => {
     if (venta) {
@@ -417,7 +429,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         .reduce((sum, item) => sum + item.cantidad, 0)
       const cantidadDisponible = Number(producto.stock) - cantidadYaAgregada
 
-      if (cantidadItem > cantidadDisponible) {
+      if (!esPresupuesto && cantidadItem > cantidadDisponible) {
         toast({
           title: "Stock insuficiente",
           description: `Stock disponible para este producto: ${Math.max(cantidadDisponible, 0)}`,
@@ -468,7 +480,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     if (ventaItems.length === 0) {
       toast({
         title: "Error",
-        description: "Debe agregar al menos un producto a la venta",
+        description: `Debe agregar al menos un producto al ${nombreDocumento}`,
         variant: "destructive",
       })
       return
@@ -481,7 +493,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     if (ventaItems.length === 0) {
       toast({
         title: "Error",
-        description: "Debe agregar al menos un producto a la venta",
+        description: `Debe agregar al menos un producto al ${nombreDocumento}`,
         variant: "destructive",
       })
       return
@@ -509,7 +521,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     if (Math.abs(totalPagosBase - data.total) > 0.01) {
       toast({
         title: "Error",
-        description: `El total de pagos ($${totalPagosBase.toFixed(2)}) debe coincidir con el total de la venta ($${data.total.toFixed(2)})`,
+        description: `El total de pagos ($${totalPagosBase.toFixed(2)}) debe coincidir con el total del ${nombreDocumento} ($${data.total.toFixed(2)})`,
         variant: "destructive",
       })
       return
@@ -538,7 +550,16 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         observaciones: data.observaciones,
       }
 
-      if (venta?.id) {
+      if (esPresupuesto && venta?.id) {
+        await updatePresupuesto({
+          presupuestoId: venta.id,
+          venta: ventaData,
+          items: ventaItems,
+          pagos: pagosVenta,
+        })
+      } else if (esPresupuesto) {
+        await createPresupuesto({ venta: ventaData, items: ventaItems, pagos: pagosVenta })
+      } else if (venta?.id) {
         await updateVenta({
           ventaId: venta.id,
           venta: ventaData,
@@ -555,9 +576,12 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       
       onSuccess()
     } catch (error) {
+      console.error(`Error al guardar el ${nombreDocumento}:`, error)
       toast({
         title: "Error",
-        description: "Ocurrió un error al guardar la venta.",
+        description: error instanceof Error
+          ? `No se pudo guardar el ${nombreDocumento}: ${error.message}`
+          : `Ocurrio un error al guardar el ${nombreDocumento}.`,
         variant: "destructive",
       })
     }
@@ -567,7 +591,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     <Card>
       {showTitle && (
         <CardHeader>
-          <CardTitle>{venta ? "Editar Venta" : "Nueva Venta"}</CardTitle>
+          <CardTitle>{venta ? `Editar ${esPresupuesto ? "Presupuesto" : "Venta"}` : `Nueva ${esPresupuesto ? "Presupuesto" : "Venta"}`}</CardTitle>
         </CardHeader>
       )}
       <CardContent className={showTitle ? undefined : "pt-6"}>
@@ -758,7 +782,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
             {/* Selección de Productos */}
             <Card className="bg-muted">
               <CardHeader>
-                <CardTitle className="text-lg">Productos de la Venta</CardTitle>
+                <CardTitle className="text-lg">Productos de la {esPresupuesto ? "cotizacion" : "venta"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-md border bg-background p-4">
@@ -1050,14 +1074,14 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                 Cancelar
               </Button>
               <Button type="button" variant="success" onClick={abrirFinalizacion}>
-                {venta ? "Actualizar Venta" : "Registrar Venta"}
+                {venta ? `Actualizar ${esPresupuesto ? "Presupuesto" : "Venta"}` : esPresupuesto ? "Guardar Presupuesto" : "Registrar Venta"}
               </Button>
             </div>
 
             <Dialog open={finalizarDialogOpen} onOpenChange={setFinalizarDialogOpen}>
               <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{venta ? "Finalizar actualizacion de venta" : "Finalizar venta"}</DialogTitle>
+                  <DialogTitle>{venta ? `Finalizar actualizacion de ${nombreDocumento}` : `Finalizar ${nombreDocumento}`}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6">
@@ -1158,7 +1182,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                     Volver
                   </Button>
                   <Button type="button" variant="success" onClick={form.handleSubmit(onSubmit)}>
-                    {venta ? "Confirmar actualizacion" : "Confirmar venta"}
+                    {venta ? "Confirmar actualizacion" : esPresupuesto ? "Guardar presupuesto" : "Confirmar venta"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

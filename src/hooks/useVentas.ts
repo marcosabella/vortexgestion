@@ -3,6 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Venta, VentaItem } from "@/types/venta";
 import { useToast } from "@/hooks/use-toast";
 
+const assertVentaSinCAE = async (ventaId: string) => {
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("cae")
+    .eq("id", ventaId)
+    .single();
+
+  if (error) throw error;
+
+  if (data.cae?.trim()) {
+    throw new Error("La venta tiene CAE y no puede editarse ni eliminarse");
+  }
+};
+
 export const useVentas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -130,6 +144,8 @@ export const useVentas = () => {
       items: Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">[]; 
       pagos?: any[]
     }) => {
+      await assertVentaSinCAE(ventaId);
+
       // First, delete any existing cuenta corriente movements for this sale
       const { error: deleteCuentaError } = await supabase
         .from("cuenta_corriente")
@@ -235,6 +251,8 @@ export const useVentas = () => {
 
   const deleteVentaMutation = useMutation({
     mutationFn: async (id: string) => {
+      await assertVentaSinCAE(id);
+
       // First delete related cuenta corriente movements
       const { error: cuentaError } = await supabase
         .from("cuenta_corriente")
@@ -262,6 +280,7 @@ export const useVentas = () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
       queryClient.invalidateQueries({ queryKey: ["productos-report"] });
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["presupuestos"] });
       toast({
         title: "Éxito",
         description: "Venta eliminada correctamente",

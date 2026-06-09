@@ -305,6 +305,8 @@ export const CuentaCorrienteList = () => {
                               <Button
                                 variant="destructive"
                                 size="sm"
+                                disabled={Boolean(movimiento.venta?.cae?.trim())}
+                                title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : undefined}
                                 onClick={() => {
                                   if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) {
                                     deleteVentaFromCuenta(movimiento.venta_id);
@@ -479,6 +481,8 @@ export const CuentaCorrienteList = () => {
                                   <Button
                                     variant="destructive"
                                     size="sm"
+                                    disabled={Boolean(movimiento.venta?.cae?.trim())}
+                                    title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : undefined}
                                     onClick={() => {
                                       if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) {
                                         deleteVentaFromCuenta(movimiento.venta_id);

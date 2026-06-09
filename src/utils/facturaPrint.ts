@@ -8,6 +8,7 @@ interface FacturaPrintOptions {
   comercio?: Comercio | null;
   afipConfig?: AfipConfig | null;
   qrDataUrl?: string;
+  documentType?: "venta" | "presupuesto";
 }
 
 interface FacturaHtmlOptions {
@@ -189,6 +190,12 @@ export const getFacturaPrintStyles = () => `
     font-weight: 700;
     margin-right: 16px;
     padding: 15px;
+  }
+
+  .numero-line .presupuesto-numero {
+    font-size: 16px;
+    padding: 10px 0;
+    white-space: nowrap;
   }
 
   .periodo-section {
@@ -425,12 +432,15 @@ const getTipoPagoLabel = (venta: Venta) => {
   return pagoLabel;
 };
 
-export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "" }: FacturaPrintOptions) => {
-  const hasCae = Boolean(venta.cae?.trim());
+export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "", documentType = "venta" }: FacturaPrintOptions) => {
+  const isPresupuesto = documentType === "presupuesto";
+  const hasCae = !isPresupuesto && Boolean(venta.cae?.trim());
   const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const totalFinal = getVentaTotalFinal(venta);
   const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
-  const numComprobante = formatNumeroComprobante(venta, afipConfig);
+  const numComprobante = isPresupuesto
+    ? { puntoVenta: "PRESUPUESTO", numero: venta.numero_comprobante.replace(/^P-/, "") }
+    : formatNumeroComprobante(venta, afipConfig);
   const fechaVenta = formatDate(venta.fecha_venta);
   const isPrintableComercioValue = (value?: string | null) => {
     const trimmed = value?.trim() || "";
@@ -510,14 +520,14 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
         </div>
 
         <div class="header-center">
-          <div class="tipo-letra">${escapeHtml(getTipoComprobanteLetra(venta.tipo_comprobante))}</div>
-          <div class="tipo-codigo">COD. ${escapeHtml(CODIGOS_COMPROBANTE[venta.tipo_comprobante] || "000")}</div>
+          <div class="tipo-letra">${isPresupuesto ? "P" : escapeHtml(getTipoComprobanteLetra(venta.tipo_comprobante))}</div>
+          <div class="tipo-codigo">${isPresupuesto ? "NO FISCAL" : `COD. ${escapeHtml(CODIGOS_COMPROBANTE[venta.tipo_comprobante] || "000")}`}</div>
         </div>
 
         <div class="header-right">
-          <div class="factura-titulo">${escapeHtml(getTipoComprobanteNombre(venta.tipo_comprobante))}</div>
+          <div class="factura-titulo">${isPresupuesto ? "PRESUPUESTO" : escapeHtml(getTipoComprobanteNombre(venta.tipo_comprobante))}</div>
           <div class="factura-info">
-            <div class="numero-line"><strong><span>${escapeHtml(numComprobante.puntoVenta)} - ${escapeHtml(numComprobante.numero)}</span></strong></div>
+            <div class="numero-line"><strong><span class="${isPresupuesto ? "presupuesto-numero" : ""}">${escapeHtml(numComprobante.puntoVenta)} - ${escapeHtml(numComprobante.numero)}</span></strong></div>
             <div><strong>Fecha de Emision:</strong> ${escapeHtml(fechaVenta)}</div>
             <div><strong>CUIT:</strong> ${escapeHtml(comercio?.cuit || "N/A")}</div>
             <div><strong>Ingresos Brutos:</strong> ${escapeHtml(comercio?.ingresos_brutos || "N/A")}</div>
@@ -645,7 +655,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
           `
           : `
             <div class="disclaimer-full">
-              Comprobante sin CAE informado. La seccion de autorizacion ARCA se omite hasta obtener CAE.
+              ${isPresupuesto ? "Presupuesto no fiscal. No genera movimientos de stock hasta su confirmacion como venta." : "Comprobante sin CAE informado. La seccion de autorizacion ARCA se omite hasta obtener CAE."}
             </div>
           `
       }
@@ -659,7 +669,7 @@ export const buildFacturaPrintHtml = (options: FacturaPrintOptions, htmlOptions:
   <html>
     <head>
       <meta charset="utf-8" />
-      <title>Comprobante ${escapeHtml(options.venta.numero_comprobante)}</title>
+      <title>${options.documentType === "presupuesto" ? "Presupuesto" : "Comprobante"} ${escapeHtml(options.venta.numero_comprobante)}</title>
       <style>${getFacturaPrintStyles()}</style>
     </head>
     <body>
@@ -679,7 +689,7 @@ export const buildFacturaPrintHtml = (options: FacturaPrintOptions, htmlOptions:
 
 export const buildFacturaHtmlFile = (options: FacturaPrintOptions, htmlOptions: FacturaHtmlOptions = {}) => {
   const html = buildFacturaPrintHtml(options, htmlOptions);
-  const filename = `comprobante-${sanitizeFilename(options.venta.numero_comprobante || "venta")}.html`;
+  const filename = `${options.documentType === "presupuesto" ? "presupuesto" : "comprobante"}-${sanitizeFilename(options.venta.numero_comprobante || "venta")}.html`;
 
   return new File([html], filename, { type: "text/html" });
 };

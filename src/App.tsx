@@ -16,6 +16,7 @@ import Clientes from "./pages/Clientes";
 import Proveedores from "./pages/Proveedores";
 import Productos from "./pages/Productos";
 import Ventas from "./pages/Ventas";
+import Presupuestos from "./pages/Presupuestos";
 import CuentaCorriente from "./pages/CuentaCorriente";
 import Bancos from "./pages/Bancos";
 import Tarjetas from "./pages/Tarjetas";
@@ -28,6 +29,8 @@ import NuevoProveedor from "./pages/NuevoProveedor";
 import NuevoProducto from "./pages/NuevoProducto";
 import NuevaVenta from "./pages/NuevaVenta";
 import EditarVenta from "./pages/EditarVenta";
+import NuevoPresupuesto from "./pages/NuevoPresupuesto";
+import EditarPresupuesto from "./pages/EditarPresupuesto";
 import NuevoMovimientoCuentaCorriente from "./pages/NuevoMovimientoCuentaCorriente";
 import NuevoBanco from "./pages/NuevoBanco";
 import NuevaTarjeta from "./pages/NuevaTarjeta";
@@ -118,6 +121,9 @@ function AuthenticatedLayout() {
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
               <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />
               <Route path="/ventas/:ventaId/editar" element={<ParametrizedRoute modulo="ventas"><EditarVenta /></ParametrizedRoute>} />
+              <Route path="/presupuestos" element={<ParametrizedRoute modulo="presupuestos"><Presupuestos /></ParametrizedRoute>} />
+              <Route path="/presupuestos/nuevo" element={<ParametrizedRoute modulo="presupuestos"><NuevoPresupuesto /></ParametrizedRoute>} />
+              <Route path="/presupuestos/:presupuestoId/editar" element={<ParametrizedRoute modulo="presupuestos"><EditarPresupuesto /></ParametrizedRoute>} />
               <Route path="/caja" element={<ParametrizedRoute modulo="caja"><CajaDiaria /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />

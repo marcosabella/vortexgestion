@@ -19,6 +19,7 @@ export interface CuentaCorriente {
   };
   venta?: {
     numero_comprobante: string;
+    cae?: string;
   };
   tarjeta?: {
     nombre: string;

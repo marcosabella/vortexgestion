@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
@@ -29,6 +30,26 @@ export const VentasList = () => {
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const ventaId = searchParams.get("detalle");
+    if (!ventaId || isLoading) return;
+
+    const venta = ventas.find((item) => item.id === ventaId);
+    if (venta) {
+      setSelectedVenta(venta);
+      setShowDetails(true);
+    }
+  }, [isLoading, searchParams, ventas]);
+
+  const handleDetailsOpenChange = (open: boolean) => {
+    setShowDetails(open);
+    if (!open && searchParams.has("detalle")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("detalle");
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
 
   const handleObtenerCAE = (venta: Venta) => {
     if (!venta.id) return;
@@ -318,18 +339,27 @@ export const VentasList = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Link to={`/ventas/${venta.id}/editar`}>
+                        {venta.cae?.trim() ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            title="La venta tiene CAE y no puede editarse"
+                          >
                             <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/ventas/${venta.id}/editar`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                         <Button
                           variant="destructive"
                           size="sm"
+                          disabled={Boolean(venta.cae?.trim())}
+                          title={venta.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : undefined}
                           onClick={() => deleteVenta(venta.id!)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -350,26 +380,22 @@ export const VentasList = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+      <Dialog open={showDetails} onOpenChange={handleDetailsOpenChange}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Detalle de Venta</DialogTitle>
           </DialogHeader>
           {selectedVenta && (
             <div className="space-y-4">
-              <div className="flex justify-between items-start mb-4">
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  <div>
-                    <p><strong>N° Comprobante:</strong> {selectedVenta.numero_comprobante}</p>
-                    <p><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
-                    <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
-                  </div>
-                  <div>
-                    <p><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
-                    <p><strong>Comprobante:</strong> {TIPOS_COMPROBANTE.find(t => t.value === selectedVenta.tipo_comprobante)?.label}</p>
-                  </div>
+              <div className="mb-4 space-y-3">
+                <div className="grid grid-cols-1 gap-x-10 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <p className="whitespace-nowrap"><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
+                  <p className="whitespace-nowrap"><strong>Comprobante:</strong> {TIPOS_COMPROBANTE.find(t => t.value === selectedVenta.tipo_comprobante)?.label}</p>
+                  <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {selectedVenta.numero_comprobante}</p>
+                  <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
-                <div className="flex gap-2">
+                <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
+                <div className="flex justify-end gap-2">
                   {!selectedVenta.cae && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
                       onClick={() => handleObtenerCAE(selectedVenta)}

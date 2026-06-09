@@ -4,6 +4,7 @@ export type ModuloSistema =
   | "proveedores"
   | "productos"
   | "ventas"
+  | "presupuestos"
   | "cuenta_corriente"
   | "cheques"
   | "bancos"
@@ -31,6 +32,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "proveedores", label: "Proveedores", description: "Gestion de proveedores." },
   { key: "productos", label: "Productos", description: "Catalogo, stock, marcas, rubros y subrubros." },
   { key: "ventas", label: "Ventas", description: "Registro y consulta de ventas." },
+  { key: "presupuestos", label: "Presupuestos", description: "Emision de presupuestos y conversion a ventas." },
   { key: "cuenta_corriente", label: "Cuenta corriente", description: "Movimientos e informes de cuenta corriente." },
   { key: "cheques", label: "Cartera de cheques", description: "Carga y seguimiento de cheques." },
   { key: "bancos", label: "Bancos", description: "Cuentas bancarias para pagos y transferencias." },

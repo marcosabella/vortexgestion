@@ -8,6 +8,7 @@ interface FacturaWhatsAppPdfOptions {
   comercio?: Comercio | null;
   afipConfig?: AfipConfig | null;
   qrDataUrl?: string;
+  documentType?: "venta" | "presupuesto";
 }
 
 const PDF_MARGIN_MM = 8;
@@ -84,7 +85,7 @@ export const buildFacturaWhatsAppPdfFile = async (options: FacturaWhatsAppPdfOpt
 
     pdf.addImage(canvas, "PNG", PDF_MARGIN_MM, PDF_MARGIN_MM, contentWidth, contentHeight, undefined, "FAST");
 
-    const filename = `comprobante-${sanitizeFilename(options.venta.numero_comprobante || "venta")}.pdf`;
+    const filename = `${options.documentType === "presupuesto" ? "presupuesto" : "comprobante"}-${sanitizeFilename(options.venta.numero_comprobante || "venta")}.pdf`;
 
     return new File([pdf.output("blob")], filename, { type: "application/pdf" });
   } finally {
