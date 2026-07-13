@@ -78,12 +78,13 @@ export function useIsAppAdmin() {
   });
 }
 
-export function useAdminComercios() {
+export function useAdminComercios(enabled = true) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const comerciosQuery = useQuery({
     queryKey: ["admin-comercios"],
+    enabled,
     queryFn: async () => {
       const data = await invokeAdmin<{ comercios: AdminComercio[] }>({ action: "list" });
       return data.comercios;

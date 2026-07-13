@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
 import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
@@ -16,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
+import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
+import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
@@ -27,8 +31,13 @@ export const VentasList = () => {
     afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
   );
   const { toast } = useToast();
+  const { data: isAppAdmin = false } = useIsAppAdmin();
+  const { comerciosQuery } = useAdminComercios(isAppAdmin);
+  const { crearNotificacion } = useAdminNotificaciones(isAppAdmin);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showNotificationDialog, setShowNotificationDialog] = useState(false);
+  const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -69,6 +78,47 @@ export const VentasList = () => {
         });
       },
     });
+  };
+
+  const toggleNotificationComercio = (comercioId: string, checked: boolean) => {
+    setNotificationComercioIds((current) =>
+      checked
+        ? Array.from(new Set([...current, comercioId]))
+        : current.filter((id) => id !== comercioId),
+    );
+  };
+
+  const handleSendNotification = () => {
+    if (!selectedVenta || notificationComercioIds.length === 0) return;
+
+    const tipoComprobante =
+      TIPOS_COMPROBANTE.find((tipo) => tipo.value === selectedVenta.tipo_comprobante)?.label ||
+      "Comprobante";
+
+    crearNotificacion.mutate(
+      {
+        titulo: `${tipoComprobante} ${selectedVenta.numero_comprobante}`,
+        mensaje: `Se emitio un comprobante de venta para ${selectedVenta.cliente_nombre}.`,
+        categoria: "comprobante",
+        prioridad: "normal",
+        comercioIds: notificationComercioIds,
+        comprobante_numero: selectedVenta.numero_comprobante,
+        comprobante_fecha: format(new Date(selectedVenta.fecha_venta), "yyyy-MM-dd"),
+        comprobante_monto: getVentaTotalFinal(selectedVenta),
+        metadata: {
+          venta_id: selectedVenta.id || null,
+          comercio_emisor_id: selectedVenta.comercio_id || comercio?.id || null,
+          tipo_comprobante: selectedVenta.tipo_comprobante,
+          cliente_nombre: selectedVenta.cliente_nombre,
+        },
+      },
+      {
+        onSuccess: () => {
+          setShowNotificationDialog(false);
+          setNotificationComercioIds([]);
+        },
+      },
+    );
   };
 
   const filteredVentas = ventas.filter(venta =>
@@ -408,6 +458,17 @@ export const VentasList = () => {
                     </Button>
                   )}
                   <FacturaImpresion venta={selectedVenta} />
+                  {isAppAdmin && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowNotificationDialog(true)}
+                    >
+                      <BellPlus className="mr-2 h-4 w-4" />
+                      Enviar a notificaciones
+                    </Button>
+                  )}
                   <Button
                     onClick={() => handleSendWhatsApp(selectedVenta)}
                     size="sm"
@@ -536,6 +597,62 @@ export const VentasList = () => {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar comprobante a notificaciones</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Seleccione los comercios que recibiran el comprobante
+              {selectedVenta ? ` ${selectedVenta.numero_comprobante}` : ""}.
+            </p>
+            <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
+              {comerciosQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando comercios...</p>
+              ) : (comerciosQuery.data || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay comercios disponibles.</p>
+              ) : (
+                (comerciosQuery.data || []).map((destinatario) => (
+                  <div key={destinatario.id} className="flex items-center gap-3">
+                    <Checkbox
+                      id={`notificacion-comercio-${destinatario.id}`}
+                      checked={notificationComercioIds.includes(destinatario.id)}
+                      onCheckedChange={(checked) =>
+                        toggleNotificationComercio(destinatario.id, checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor={`notificacion-comercio-${destinatario.id}`}
+                      className="font-normal"
+                    >
+                      {destinatario.nombre_comercio}
+                      {destinatario.usuario?.email ? ` (${destinatario.usuario.email})` : ""}
+                    </Label>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowNotificationDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="success"
+              disabled={notificationComercioIds.length === 0 || crearNotificacion.isPending}
+              onClick={handleSendNotification}
+            >
+              <BellPlus className="mr-2 h-4 w-4" />
+              {crearNotificacion.isPending ? "Enviando..." : "Enviar comprobante"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

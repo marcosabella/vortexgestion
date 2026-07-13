@@ -359,6 +359,132 @@ export type Database = {
           },
         ]
       }
+      notificacion_destinatarios: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          id: string
+          notificacion_id: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          id?: string
+          notificacion_id: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          notificacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacion_destinatarios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacion_destinatarios_notificacion_id_fkey"
+            columns: ["notificacion_id"]
+            isOneToOne: false
+            referencedRelation: "notificaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificacion_lecturas: {
+        Row: {
+          comercio_id: string | null
+          id: string
+          notificacion_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          comercio_id?: string | null
+          id?: string
+          notificacion_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          comercio_id?: string | null
+          id?: string
+          notificacion_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacion_lecturas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacion_lecturas_notificacion_id_fkey"
+            columns: ["notificacion_id"]
+            isOneToOne: false
+            referencedRelation: "notificaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificaciones: {
+        Row: {
+          activo: boolean
+          categoria: string
+          comprobante_fecha: string | null
+          comprobante_monto: number | null
+          comprobante_numero: string | null
+          comprobante_periodo: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          mensaje: string
+          metadata: Json
+          prioridad: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria?: string
+          comprobante_fecha?: string | null
+          comprobante_monto?: number | null
+          comprobante_numero?: string | null
+          comprobante_periodo?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mensaje: string
+          metadata?: Json
+          prioridad?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria?: string
+          comprobante_fecha?: string | null
+          comprobante_monto?: number | null
+          comprobante_numero?: string | null
+          comprobante_periodo?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mensaje?: string
+          metadata?: Json
+          prioridad?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cuenta_corriente: {
         Row: {
           cliente_id: string

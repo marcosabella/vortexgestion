@@ -7,8 +7,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { useNotificaciones } from "@/hooks/useNotificaciones";
 import { ModuloSistema } from "@/config/parametrizacion";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -37,6 +38,8 @@ import NuevaTarjeta from "./pages/NuevaTarjeta";
 import NuevoCheque from "./pages/NuevoCheque";
 import AdminComercios from "./pages/AdminComercios";
 import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
+import AdminNotificaciones from "./pages/AdminNotificaciones";
+import Notificaciones from "./pages/Notificaciones";
 import Seguridad from "./pages/Seguridad";
 import NotFound from "./pages/NotFound";
 import ListadoClientes from "./pages/listados/ListadoClientes";
@@ -73,6 +76,7 @@ function AuthenticatedLayout() {
   const { session, isLoading, signOut, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { noLeidas } = useNotificaciones();
 
   if (isLoading) {
     return (
@@ -104,6 +108,14 @@ function AuthenticatedLayout() {
             <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
               {user?.email}
             </span>
+            <Button variant="outline" size="sm" onClick={() => navigate("/notificaciones")} className="relative">
+              <Bell className="h-4 w-4" />
+              {noLeidas > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
+                  {noLeidas}
+                </span>
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
               Salir
@@ -134,7 +146,9 @@ function AuthenticatedLayout() {
               <Route path="/tarjetas/nueva" element={<ParametrizedRoute modulo="tarjetas"><NuevaTarjeta /></ParametrizedRoute>} />
               <Route path="/afip" element={<ParametrizedRoute modulo="afip"><Afip /></ParametrizedRoute>} />
               <Route path="/seguridad" element={<ParametrizedRoute modulo="seguridad"><Seguridad /></ParametrizedRoute>} />
+              <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="/admin" element={<AdminComercios />} />
+              <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />

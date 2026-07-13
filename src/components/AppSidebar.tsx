@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modulo: ModuloSistema }> = [
+const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema }> = [
   { title: "Caja Diaria", url: "/caja", icon: Banknote, modulo: "caja" },
   { title: "Clientes", url: "/clientes", icon: Users, modulo: "clientes" },
   { title: "Proveedores", url: "/proveedores", icon: Truck, modulo: "proveedores" },
@@ -32,6 +32,7 @@ const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modu
   { title: "Presupuestos", url: "/presupuestos", icon: ClipboardList, modulo: "presupuestos" },
   { title: "Cuenta Corriente", url: "/cuenta-corriente", icon: CreditCard, modulo: "cuenta_corriente" },
   { title: "Cartera de Cheques", url: "/cheques", icon: Receipt, modulo: "cheques" },
+  { title: "Notificaciones", url: "/notificaciones", icon: Bell },
 ]
 
 const configuracionItems: Array<{ title: string; url: string; icon: typeof Store; modulo?: ModuloSistema }> = [
@@ -109,20 +110,36 @@ export function AppSidebar() {
               ))}
 
               {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    className={`mx-2 ${isActive('/admin')
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    }`}
-                  >
-                    <NavLink to="/admin" end onClick={closeMobileMenu}>
-                      <Shield className="h-4 w-4" />
-                      {!collapsed && <span className="ml-3">Administrador Comercio</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      className={`mx-2 ${isActive('/admin')
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      }`}
+                    >
+                      <NavLink to="/admin" end onClick={closeMobileMenu}>
+                        <Shield className="h-4 w-4" />
+                        {!collapsed && <span className="ml-3">Administrador Comercio</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      className={`mx-2 ${isActive('/admin/notificaciones')
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      }`}
+                    >
+                      <NavLink to="/admin/notificaciones" end onClick={closeMobileMenu}>
+                        <Bell className="h-4 w-4" />
+                        {!collapsed && <span className="ml-3">Notificaciones Admin</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
 
               {enabledConfiguracionItems.length > 0 && (
