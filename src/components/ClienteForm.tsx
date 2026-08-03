@@ -23,14 +23,14 @@ const clienteSchema = z.object({
     if (limpio.length === 11) return validateCUIT(val);
     return false;
   }, 'Ingrese un DNI (7-8 dígitos) o CUIT válido (11 dígitos)'),
-  calle: z.string().min(3, 'La calle debe tener al menos 3 caracteres'),
-  numero: z.string().min(1, 'El número es requerido'),
-  codigo_postal: z.string().min(4, 'Código postal inválido'),
-  localidad: z.string().min(2, 'La localidad debe tener al menos 2 caracteres'),
-  provincia: z.string().min(1, 'Seleccione una provincia'),
+  calle: z.string().optional(),
+  numero: z.string().optional(),
+  codigo_postal: z.string().optional(),
+  localidad: z.string().optional(),
+  provincia: z.string().optional(),
   telefono: z.string().optional().refine((val) => !val || validatePhone(val), 'Teléfono inválido'),
   email: z.string().optional().refine((val) => !val || validateEmail(val), 'Email inválido'),
-  situacion_afip: z.string().min(1, 'Seleccione una situación AFIP'),
+  situacion_afip: z.string().optional(),
   ingresos_brutos: z.string().optional(),
   tipo_persona: z.enum(['fisica', 'juridica']),
 }).superRefine((data, ctx) => {
@@ -81,6 +81,18 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
       tipo_persona: cliente.tipo_persona,
     } : {
       tipo_persona: 'fisica',
+      nombre: '',
+      apellido: '',
+      cuit: '',
+      calle: '',
+      numero: '',
+      codigo_postal: '',
+      localidad: '',
+      provincia: '',
+      telefono: '',
+      email: '',
+      situacion_afip: '',
+      ingresos_brutos: '',
     },
   });
 
@@ -128,12 +140,12 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
         nombre: data.nombre,
         apellido: data.tipo_persona === 'juridica' ? '' : data.apellido || '',
         cuit: data.cuit,
-        calle: data.calle,
-        numero: data.numero,
-        codigo_postal: data.codigo_postal,
-        localidad: data.localidad,
-        provincia: data.provincia,
-        situacion_afip: data.situacion_afip,
+        calle: data.calle || '',
+        numero: data.numero || '',
+        codigo_postal: data.codigo_postal || '',
+        localidad: data.localidad || '',
+        provincia: data.provincia || '',
+        situacion_afip: data.situacion_afip || '',
         tipo_persona: data.tipo_persona,
         telefono: data.telefono || null,
         email: data.email || null,
@@ -164,7 +176,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* CUIT/DNI - Primer campo */}
           <div className="space-y-2">
-            <Label htmlFor="cuit">CUIT o DNI</Label>
+            <Label htmlFor="cuit">CUIT o DNI *</Label>
             <div className="flex gap-2">
               <Input
                 id="cuit"
@@ -201,7 +213,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
 
           {/* Tipo de Persona */}
           <div className="space-y-3">
-            <Label className="text-base font-medium">Tipo de Persona</Label>
+            <Label className="text-base font-medium">Tipo de Persona *</Label>
             <RadioGroup 
               value={watchedTipoPersona} 
               onValueChange={(value) => setValue('tipo_persona', value as 'fisica' | 'juridica')}
@@ -222,7 +234,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="nombre">
-                {watchedTipoPersona === 'juridica' ? 'Razón Social' : 'Nombre'}
+                {watchedTipoPersona === 'juridica' ? 'Razón Social *' : 'Nombre *'}
               </Label>
               <Input
                 id="nombre"
@@ -236,7 +248,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
 
             {watchedTipoPersona === 'fisica' && (
               <div className="space-y-2">
-                <Label htmlFor="apellido">Apellido</Label>
+                <Label htmlFor="apellido">Apellido *</Label>
                 <Input
                   id="apellido"
                   {...register('apellido')}

@@ -4,10 +4,10 @@ export interface AfipConfig {
   punto_venta: number;
   cuit_emisor: string;
   ambiente: 'homologacion' | 'produccion';
-  certificado_crt?: string;
-  certificado_key?: string;
-  nombre_certificado_crt?: string;
-  nombre_certificado_key?: string;
+  certificado_crt?: string | null;
+  certificado_key?: string | null;
+  nombre_certificado_crt?: string | null;
+  nombre_certificado_key?: string | null;
   certificado_vencimiento?: string | null;
   certificado_vigente?: boolean | null;
   activo: boolean;

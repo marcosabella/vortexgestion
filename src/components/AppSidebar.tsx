@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -136,6 +136,20 @@ export function AppSidebar() {
                       <NavLink to="/admin/notificaciones" end onClick={closeMobileMenu}>
                         <Bell className="h-4 w-4" />
                         {!collapsed && <span className="ml-3">Notificaciones Admin</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      className={`mx-2 ${isActive('/admin/migraciones')
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      }`}
+                    >
+                      <NavLink to="/admin/migraciones" end onClick={closeMobileMenu}>
+                        <Database className="h-4 w-4" />
+                        {!collapsed && <span className="ml-3">Migraciones</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

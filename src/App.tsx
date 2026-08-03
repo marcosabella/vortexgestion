@@ -39,6 +39,7 @@ import NuevoCheque from "./pages/NuevoCheque";
 import AdminComercios from "./pages/AdminComercios";
 import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import AdminNotificaciones from "./pages/AdminNotificaciones";
+import AdminMigraciones from "./pages/AdminMigraciones";
 import Notificaciones from "./pages/Notificaciones";
 import Seguridad from "./pages/Seguridad";
 import NotFound from "./pages/NotFound";
@@ -149,6 +150,7 @@ function AuthenticatedLayout() {
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="/admin" element={<AdminComercios />} />
               <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
+              <Route path="/admin/migraciones" element={<AdminMigraciones />} />
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />

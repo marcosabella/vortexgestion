@@ -11,8 +11,19 @@ import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { AMBIENTES_AFIP, TIPOS_COMPROBANTE } from '@/types/afip';
-import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, X } from 'lucide-react';
+import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractCertificateExpirationDate } from '@/utils/certificate';
 import { useComercio } from '@/hooks/useComercio';
@@ -202,6 +213,35 @@ const Afip = () => {
     } else {
       createConfig.mutate(configData);
     }
+  };
+
+  const handleDeleteCertificates = () => {
+    if (!config?.id) return;
+
+    updateConfig.mutate(
+      {
+        id: config.id,
+        certificado_crt: null,
+        certificado_key: null,
+        nombre_certificado_crt: null,
+        nombre_certificado_key: null,
+        certificado_vencimiento: null,
+        certificado_vigente: null,
+      },
+      {
+        onSuccess: () => {
+          setCertificadoCrt('');
+          setCertificadoKey('');
+          setNombreCertificadoCrt('');
+          setNombreCertificadoKey('');
+          setCertificadoVencimiento('');
+          setCrtError('');
+          setKeyError('');
+          if (inputCrtRef.current) inputCrtRef.current.value = '';
+          if (inputKeyRef.current) inputKeyRef.current.value = '';
+        },
+      }
+    );
   };
 
   const handleConsultarUltimo = () => {
@@ -480,6 +520,37 @@ const Afip = () => {
                     </>
                   )}
                 </Button>
+                {config?.id && (certificadoCrt || certificadoKey) && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={updateConfig.isPending}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar certificados
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar los certificados de ARCA?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Se eliminarán permanentemente el certificado CRT y la clave privada KEY. La configuración fiscal se conservará, pero no podrá emitir comprobantes hasta cargar y guardar certificados nuevos.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteCertificates}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Eliminar certificados
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </form>
           </CardContent>

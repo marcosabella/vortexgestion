@@ -19,6 +19,9 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "events": path.resolve(__dirname, "./node_modules/events/events.js"),
+      "process": path.resolve(__dirname, "./node_modules/process/browser.js"),
+      "stream": path.resolve(__dirname, "./node_modules/stream-browserify/index.js"),
     },
   },
 }));

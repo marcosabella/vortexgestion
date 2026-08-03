@@ -67,7 +67,7 @@ export function useUpdateAfipConfig() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, ...config }: AfipConfig) => {
+    mutationFn: async ({ id, ...config }: AfipConfigUpdate & { id: string }) => {
       const comercioId = localStorage.getItem('selectedComercioId');
       const configWithComercio = comercioId ? { ...config, comercio_id: comercioId } : config;
 

@@ -70,6 +70,13 @@ export function useNotificaciones() {
   const notificacionesQuery = useQuery({
     queryKey: ["notificaciones", comercio?.id],
     enabled: Boolean(comercio?.id),
+    // El envio se realiza desde otra sesion (la del administrador), por lo que
+    // invalidar la cache alli no actualiza automaticamente el navegador del
+    // comercio destinatario. El sondeo mantiene sincronizados el contador y la
+    // bandeja aun cuando el usuario deja la aplicacion abierta.
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: "always",
     queryFn: async () => {
       const {
         data: { user },
