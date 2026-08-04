@@ -5,6 +5,8 @@ import process from "process";
 import { AlertTriangle, CheckCircle2, Database, Eye, FileSearch, Loader2, LockKeyhole, Play, RotateCcw, UploadCloud } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { getMapping, inspectLegacySchema, LegacyCompatibility, previewClientRows, previewColumns, previewProductRows, previewProviderRows, previewRows, PreviewRow } from "@/utils/accessMigrationPreview";
+import { buildOperationalPayload } from "@/utils/accessOperationalMigration";
+import { buildClosurePayload, ClosurePayload } from "@/utils/accessClosureMigration";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +56,12 @@ export default function AdminMigraciones() {
   const [migrationId, setMigrationId] = useState("");
   const [simulation, setSimulation] = useState<SimulationSummary | null>(null);
   const [migrationStatus, setMigrationStatus] = useState<"idle" | "staging" | "simulated" | "applying" | "applied" | "reverting" | "reverted">("idle");
+  const [operationalMigrationId, setOperationalMigrationId] = useState("");
+  const [operationalSimulation, setOperationalSimulation] = useState<SimulationSummary | null>(null);
+  const [operationalStatus, setOperationalStatus] = useState<"idle" | "staging" | "simulated" | "applying" | "applied" | "reverting" | "reverted">("idle");
+  const [closurePayload, setClosurePayload] = useState<ClosurePayload | null>(null);
+  const [closureSimulation, setClosureSimulation] = useState<SimulationSummary | null>(null);
+  const [closureStatus, setClosureStatus] = useState<"idle" | "simulating" | "simulated" | "applying" | "applied">("idle");
   const [error, setError] = useState("");
 
   const comercio = useMemo(() => comerciosQuery.data?.find((item) => item.id === comercioId), [comercioId, comerciosQuery.data]);
@@ -64,7 +72,7 @@ export default function AdminMigraciones() {
   if (isAdminLoading) return <div className="p-8">Verificando permisos...</div>;
   if (!isAdmin) return <Navigate to="/" replace />;
 
-  const resetAnalysis = () => { setReaderState(null); setCompatibility(null); setSelectedTable(""); setPreview([]); setMigrationId(""); setSimulation(null); setMigrationStatus("idle"); setError(""); };
+  const resetAnalysis = () => { setReaderState(null); setCompatibility(null); setSelectedTable(""); setPreview([]); setMigrationId(""); setSimulation(null); setMigrationStatus("idle"); setOperationalMigrationId(""); setOperationalSimulation(null); setOperationalStatus("idle"); setError(""); };
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0] || null;
     resetAnalysis();
@@ -219,6 +227,56 @@ export default function AdminMigraciones() {
     }
   };
 
+  const prepareOperationalSimulation = async () => {
+    if (!file || !readerState || !comercioId) return;
+    setOperationalStatus("staging"); setOperationalSimulation(null); setError("");
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+      const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const payload = buildOperationalPayload({
+        Ventas: tableData("Ventas"), Detalle_Venta: tableData("Detalle_Venta"), Pagos: tableData("Pagos"),
+        Cheques: tableData("Cheques"), Banco: tableData("Banco"), Articulos: tableData("Articulos"),
+      });
+      const id = await rpc<string>("migracion_crear_operaciones", { p_comercio_id: comercioId, p_archivo_nombre: file.name, p_archivo_hash: hash, p_archivo_tamano: file.size });
+      setOperationalMigrationId(id);
+      for (const module of ["ventas", "items", "pagos", "cheques"] as const) {
+        const rows = payload[module];
+        if (!rows.length) await rpc("migracion_cargar_staging_operaciones", { p_migracion_id: id, p_modulo: module, p_filas: [], p_reemplazar: true });
+        for (let offset = 0; offset < rows.length; offset += STAGING_BATCH_SIZE) {
+          await rpc("migracion_cargar_staging_operaciones", { p_migracion_id: id, p_modulo: module, p_filas: rows.slice(offset, offset + STAGING_BATCH_SIZE), p_reemplazar: offset === 0 });
+        }
+      }
+      const result = await rpc<SimulationSummary>("migracion_simular_operaciones", { p_migracion_id: id });
+      setOperationalSimulation(result); setOperationalStatus("simulated");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo simular el historial."); setOperationalStatus("idle"); }
+  };
+
+  const applyOperationalMigration = async () => {
+    if (!operationalMigrationId || !operationalSimulation || operationalSimulation.errores > 0) return;
+    if (!window.confirm(`Se insertaran ${operationalSimulation.validos} registros historicos en ${comercio?.nombre_comercio}. No se modificara el stock. ¿Continuar?`)) return;
+    setOperationalStatus("applying"); setError("");
+    try { await rpc("migracion_aplicar_operaciones", { p_migracion_id: operationalMigrationId }); setOperationalStatus("applied"); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo aplicar el historial."); setOperationalStatus("simulated"); }
+  };
+
+  const revertOperationalMigration = async () => {
+    if (!operationalMigrationId || !window.confirm("Se eliminaran solo las operaciones historicas de esta ejecucion. ¿Revertir?")) return;
+    setOperationalStatus("reverting"); setError("");
+    try { await rpc("migracion_revertir_operaciones", { p_migracion_id: operationalMigrationId }); setOperationalStatus("reverted"); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo revertir el historial."); setOperationalStatus("applied"); }
+  };
+
+  const prepareClosure = async () => {
+    if (!readerState || !comercioId) return; setClosureStatus("simulating"); setError("");
+    try { const payload=buildClosurePayload({Ventas:tableData("Ventas"),Detalle_Venta:tableData("Detalle_Venta"),CompraProveedor:tableData("CompraProveedor"),PagosProveedores:tableData("PagosProveedores"),TempCtaCte:tableData("TempCtaCte"),CotizacionDolar:tableData("CotizacionDolar"),Usuarios:tableData("Usuarios")}); setClosurePayload(payload); setClosureSimulation(await rpc<SimulationSummary>("migracion_simular_cierre",{p_comercio_id:comercioId,p_payload:payload})); setClosureStatus("simulated"); }
+    catch(cause){setError(cause instanceof Error?cause.message:"No se pudo simular el cierre.");setClosureStatus("idle");}
+  };
+  const applyClosure = async () => {
+    if(!file||!closurePayload||!closureSimulation||closureSimulation.errores>0||!window.confirm(`Se aplicaran ${closureSimulation.validos} registros de cierre en ${comercio?.nombre_comercio}. ¿Continuar?`))return;setClosureStatus("applying");
+    try{const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());const hash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join("");await rpc("migracion_aplicar_cierre",{p_comercio_id:comercioId,p_archivo_nombre:file.name,p_archivo_hash:hash,p_archivo_tamano:file.size,p_payload:closurePayload});setClosureStatus("applied");}
+    catch(cause){setError(cause instanceof Error?cause.message:"No se pudo aplicar el cierre.");setClosureStatus("simulated");}
+  };
+
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-8">
       <div><h1 className="flex items-center gap-3 text-3xl font-bold"><Database className="h-8 w-8" /> Migraciones</h1><p className="mt-1 text-sm text-muted-foreground">Análisis, simulación y carga controlada de maestros desde Access.</p></div>
@@ -264,6 +322,22 @@ export default function AdminMigraciones() {
         {migrationStatus === "applied" && <Alert><CheckCircle2 className="h-4 w-4" /><AlertTitle>Migración aplicada</AlertTitle><AlertDescription>Los maestros quedaron insertados. La reversión sigue disponible mientras no existan operaciones que los referencien.</AlertDescription></Alert>}
         {migrationStatus === "reverted" && <Alert><RotateCcw className="h-4 w-4" /><AlertTitle>Migración revertida</AlertTitle><AlertDescription>Se eliminaron los registros creados por esta ejecución; los datos anteriores del comercio no fueron modificados.</AlertDescription></Alert>}
       </CardContent></Card>}
+
+      {readerState && <Card><CardHeader><CardTitle>4. Historial operativo</CardTitle><CardDescription>Migra ventas, detalles, cuenta corriente, pagos y cheques sin modificar el stock actual.</CardDescription></CardHeader><CardContent className="space-y-4">
+        <Alert><LockKeyhole className="h-4 w-4" /><AlertTitle>Segunda etapa independiente</AlertTitle><AlertDescription>Requiere maestros aplicados. Los presupuestos quedan fuera de ventas y los comprobantes históricos no solicitan CAE.</AlertDescription></Alert>
+        <Button disabled={operationalStatus !== "idle" || !compatibility?.compatible} onClick={prepareOperationalSimulation}>{operationalStatus === "staging" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}{operationalStatus === "staging" ? "Cargando historial..." : "Preparar simulación del historial"}</Button>
+        {operationalMigrationId && <p className="break-all text-xs text-muted-foreground">Ejecución operativa: {operationalMigrationId}</p>}
+        {operationalSimulation && <div className="grid gap-3 sm:grid-cols-4">
+          <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Total</p><p className="text-2xl font-bold">{operationalSimulation.total}</p></div>
+          <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Listos</p><p className="text-2xl font-bold text-green-600">{operationalSimulation.validos}</p></div>
+          <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Omitidos</p><p className="text-2xl font-bold text-amber-600">{operationalSimulation.omitidos}</p></div>
+          <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Errores</p><p className="text-2xl font-bold text-destructive">{operationalSimulation.errores}</p></div>
+        </div>}
+        {operationalSimulation && <div className="flex flex-wrap justify-end gap-3"><Button disabled={operationalSimulation.errores > 0 || operationalStatus !== "simulated"} onClick={applyOperationalMigration}>{operationalStatus === "applying" && <Loader2 className="h-4 w-4 animate-spin" />}Aplicar historial</Button>{operationalStatus === "applied" && <Button variant="destructive" onClick={revertOperationalMigration}><RotateCcw className="h-4 w-4" />Revertir historial</Button>}</div>}
+        {operationalStatus === "applied" && <Alert><CheckCircle2 className="h-4 w-4" /><AlertTitle>Historial aplicado</AlertTitle><AlertDescription>Las operaciones históricas quedaron insertadas sin alterar el stock.</AlertDescription></Alert>}
+      </CardContent></Card>}
+
+      {readerState && <Card><CardHeader><CardTitle>5. Cierre histórico</CardTitle><CardDescription>Migra presupuestos y conserva operaciones legacy sin módulo equivalente.</CardDescription></CardHeader><CardContent className="space-y-4"><Alert><LockKeyhole className="h-4 w-4"/><AlertTitle>Credenciales excluidas</AlertTitle><AlertDescription>Los usuarios antiguos se archivan sin contraseñas.</AlertDescription></Alert><Button disabled={closureStatus!=="idle"} onClick={prepareClosure}>{closureStatus==="simulating"?<Loader2 className="h-4 w-4 animate-spin"/>:<Play className="h-4 w-4"/>}Preparar simulación de cierre</Button>{closureSimulation&&<div className="grid gap-3 sm:grid-cols-4"><div className="rounded-md border p-3">Total<br/><strong>{closureSimulation.total}</strong></div><div className="rounded-md border p-3">Listos<br/><strong>{closureSimulation.validos}</strong></div><div className="rounded-md border p-3">Omitidos<br/><strong>{closureSimulation.omitidos}</strong></div><div className="rounded-md border p-3">Errores<br/><strong>{closureSimulation.errores}</strong></div></div>}{closureSimulation&&<div className="flex justify-end"><Button disabled={closureStatus!=="simulated"||closureSimulation.errores>0} onClick={applyClosure}>Aplicar cierre</Button></div>}{closureStatus==="applied"&&<Alert><CheckCircle2 className="h-4 w-4"/><AlertTitle>Cierre aplicado</AlertTitle><AlertDescription>Presupuestos y archivo histórico conservados.</AlertDescription></Alert>}</CardContent></Card>}
 
       {preview.length > 0 && <Card><CardHeader><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>Vista previa: datos como quedarían en {mapping?.targetTable}</CardTitle><CardDescription>Primeros {preview.length} de {selectedInfo?.rows.toLocaleString("es-AR")} registros · destino: {comercio?.nombre_comercio}</CardDescription></div><Badge variant="outline" className="w-fit gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Solo vista previa</Badge></div></CardHeader><CardContent className="space-y-4">
         <Alert><Eye className="h-4 w-4" /><AlertTitle>Transformación en memoria</AlertTitle><AlertDescription>Los avisos muestran normalizaciones o datos incompletos detectados antes de preparar la simulación completa.</AlertDescription></Alert>

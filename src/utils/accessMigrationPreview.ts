@@ -80,7 +80,10 @@ const afipSituation = (input: unknown) => {
 };
 const isoDate = (input: unknown) => {
   if (input instanceof Date) return input.toISOString();
-  const parsed = new Date(string(input));
+  const raw = string(input);
+  const legacy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
+  if (legacy) return new Date(Date.UTC(Number(legacy[3]), Number(legacy[2]) - 1, Number(legacy[1]))).toISOString();
+  const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 };
 const withRequiredWarnings = (data: Record<string, unknown>, required: string[]) =>
@@ -144,7 +147,7 @@ export const MIGRATION_MAPPINGS: MigrationMapping[] = [
     transform: (row, comercioId) => {
       const total = number(value(row, "monto"));
       const date = isoDate(value(row, "fecha_venta"));
-      const data = { comercio_id: comercioId, numero_comprobante: sourceId(row, "idVenta"), fecha_venta: date, cliente_id: mappedId("clientes", value(row, "idCliente")), tipo_pago: `[equivalencia CondicionVenta:${string(value(row, "idCondicion_venta"))}]`, tipo_comprobante: `[equivalencia Comprobantes:${string(value(row, "idComprobante"))}]`, porcentaje_descuento: number(value(row, "descuento_venta")), porcentaje_recargo: number(value(row, "recargo_venta")), subtotal: total, total_iva: 0, total, observaciones: nullable(value(row, "observaciones")), source_id: sourceId(row, "idVenta") };
+      const data = { comercio_id: comercioId, numero_comprobante: sourceId(row, "idVenta"), fecha_venta: date, cliente_source_id: string(value(row, "idCliente")) || null, tipo_pago: `[equivalencia CondicionVenta:${string(value(row, "idCondicion_venta"))}]`, tipo_comprobante: `[equivalencia Comprobantes:${string(value(row, "idComprobante"))}]`, porcentaje_descuento: number(value(row, "descuento_venta")), porcentaje_recargo: number(value(row, "recargo_venta")), subtotal: total, total_iva: 0, total, observaciones: nullable(value(row, "observaciones")), source_id: sourceId(row, "idVenta") };
       return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["fecha_venta"]) };
     },
   },
@@ -152,12 +155,32 @@ export const MIGRATION_MAPPINGS: MigrationMapping[] = [
     module: "Detalle de ventas", sourceTable: "Detalle_Venta", targetTable: "venta_items", dependencies: ["Ventas", "Articulos"],
     transform: (row, comercioId) => {
       const cantidad = number(value(row, "cantidad")), precio = number(value(row, "precioUnitario"));
-      const data = { comercio_id: comercioId, venta_id: mappedId("ventas", value(row, "idVenta")), producto_id: mappedId("productos", value(row, "idArticulo")), cantidad, precio_unitario: precio, porcentaje_iva: 0, porcentaje_descuento: 0, porcentaje_recargo: 0, subtotal: cantidad * precio, monto_iva: 0, monto_descuento: 0, monto_recargo: 0, total: cantidad * precio, source_id: sourceId(row, "IdDetalle_venta") };
-      return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["venta_id", "producto_id"]) };
+      const data = { comercio_id: comercioId, venta_source_id: string(value(row, "idVenta")) || null, producto_source_id: string(value(row, "idArticulo")) || null, cantidad, precio_unitario: precio, porcentaje_iva: 0, porcentaje_descuento: 0, porcentaje_recargo: 0, subtotal: cantidad * precio, monto_iva: 0, monto_descuento: 0, monto_recargo: 0, total: cantidad * precio, source_id: sourceId(row, "IdDetalle_venta") };
+      return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["venta_source_id", "producto_source_id"]) };
     },
   },
-  { module: "Pagos", sourceTable: "Pagos", targetTable: "cuenta_corriente", dependencies: ["Clientes", "Ventas"] },
-  { module: "Cheques", sourceTable: "Cheques", targetTable: "cheques", dependencies: ["Clientes", "Banco"] },
+  {
+    module: "Pagos", sourceTable: "Pagos", targetTable: "cuenta_corriente", dependencies: ["Clientes"],
+    transform: (row, comercioId) => {
+      const condition = string(value(row, "idCondicion_venta"));
+      const data = { comercio_id: comercioId, cliente_source_id: string(value(row, "idCliente")) || null, fecha_movimiento: isoDate(value(row, "fecha_pago")), tipo_movimiento: "credito", monto: number(value(row, "importe")), concepto: `Pago historico #${sourceId(row, "idPago")}`, tipo_pago_origen: condition, observaciones: nullable(value(row, "observaciones")), source_id: sourceId(row, "idPago") };
+      return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["cliente_source_id", "fecha_movimiento", "monto"]) };
+    },
+  },
+  {
+    module: "Cheques", sourceTable: "Cheques", targetTable: "cheques", dependencies: ["Banco"],
+    transform: (row, comercioId) => {
+      const data = { comercio_id: comercioId, numero_cheque: string(value(row, "nroCheque")), banco_source_id: string(value(row, "idBanco")) || null, monto: number(value(row, "monto")), fecha_emision: isoDate(value(row, "fecha")), fecha_vencimiento: isoDate(value(row, "vencimiento")), emisor_nombre: string(value(row, "emisor")) || "EMISOR NO INFORMADO", estado: value(row, "enCartera") === false ? "depositado" : "en_cartera", source_id: sourceId(row, "Id") };
+      return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["numero_cheque", "monto", "fecha_emision", "fecha_vencimiento"]) };
+    },
+  },
+  {
+    module: "Bancos (auxiliar)", sourceTable: "Banco", targetTable: null, dependencies: [],
+    transform: (row, comercioId) => {
+      const data = { comercio_id: comercioId, nombre_banco: string(value(row, "nombre")), sucursal: nullable(value(row, "sucursal")), uso: "Resolver banco emisor de cheques", source_id: sourceId(row, "Id") };
+      return { sourceId: data.source_id, data, warnings: withRequiredWarnings(data, ["nombre_banco"]) };
+    },
+  },
   { module: "Compras", sourceTable: "Compras", targetTable: null, dependencies: [] },
 ];
 

@@ -121,10 +121,16 @@ export const VentasList = () => {
     );
   };
 
-  const filteredVentas = ventas.filter(venta =>
-    venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    venta.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVentas = ventas
+    .filter(venta =>
+      venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (venta.cliente_nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const dateDifference = new Date(b.fecha_venta).getTime() - new Date(a.fecha_venta).getTime();
+      if (dateDifference !== 0) return dateDifference;
+      return Number(b.numero_comprobante) - Number(a.numero_comprobante);
+    });
 
   const getTipoComprobanteBadgeVariant = (tipo: string) => {
     if (tipo.includes('factura')) return 'default';
@@ -358,7 +364,7 @@ export const VentasList = () => {
                 {filteredVentas.map((venta) => (
                   <TableRow key={venta.id}>
                     <TableCell>
-                      {format(new Date(venta.fecha_venta), "dd/MM/yyyy HH:mm")}
+                      {format(new Date(venta.fecha_venta), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell className="font-medium">
                       {venta.numero_comprobante}

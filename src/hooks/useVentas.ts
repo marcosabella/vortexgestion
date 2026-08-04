@@ -46,6 +46,7 @@ export const useVentas = () => {
             cheque:cheques(numero_cheque, monto, banco_emisor)
           )
         `)
+        .order("fecha_venta", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) throw error;

@@ -47,6 +47,10 @@ const ListadoVentas = () => {
       }
       
       return true;
+    }).sort((a, b) => {
+      const dateDifference = new Date(b.fecha_venta).getTime() - new Date(a.fecha_venta).getTime();
+      if (dateDifference !== 0) return dateDifference;
+      return Number(b.numero_comprobante) - Number(a.numero_comprobante);
     });
   }, [ventas, fechaDesde, fechaHasta, clienteFilter]);
 
@@ -385,7 +389,7 @@ const ListadoVentas = () => {
                   ventasFiltradas.map((venta) => (
                     <TableRow key={venta.id}>
                       <TableCell>
-                        {format(new Date(venta.fecha_venta), 'dd/MM/yyyy HH:mm', { locale: es })}
+                        {format(new Date(venta.fecha_venta), 'dd/MM/yyyy', { locale: es })}
                       </TableCell>
                       <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
                       <TableCell>

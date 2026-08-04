@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Backups privados de bases legacy (nunca publicar ni versionar)
+private-backups/
