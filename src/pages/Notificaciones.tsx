@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Check, ReceiptText } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Eye, ReceiptText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,10 +159,12 @@ function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
 
 function NotificacionItem({
   notificacion,
-  onOpen,
+  expanded,
+  onToggle,
 }: {
   notificacion: Notificacion;
-  onOpen: (id: string) => void;
+  expanded: boolean;
+  onToggle: (notificacion: Notificacion) => void;
 }) {
   const hasComprobante = Boolean(notificacion.comprobante_numero || notificacion.comprobante_monto);
 
@@ -183,40 +185,59 @@ function NotificacionItem({
               <span className="text-xs text-muted-foreground">{formatDate(notificacion.created_at)}</span>
             </div>
           </div>
-          {!notificacion.leida && (
-            <Button type="button" variant="outline" size="sm" onClick={() => onOpen(notificacion.id)}>
-              <Check className="h-4 w-4" />
-              Marcar leida
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant={notificacion.leida ? "outline" : "default"}
+            size="sm"
+            onClick={() => onToggle(notificacion)}
+            aria-expanded={expanded}
+            aria-controls={`notificacion-${notificacion.id}`}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {expanded ? "Ocultar notificación" : notificacion.leida ? "Volver a leer" : "Leer notificación"}
+            {!expanded && <ChevronDown className="h-4 w-4" />}
+          </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="whitespace-pre-line text-sm">{notificacion.mensaje}</p>
+      {expanded && (
+        <CardContent id={`notificacion-${notificacion.id}`} className="space-y-4 border-t pt-4">
+          <p className="whitespace-pre-line text-sm leading-6">{notificacion.mensaje}</p>
 
-        {hasComprobante && (
-          <Dialog onOpenChange={(open) => open && onOpen(notificacion.id)}>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="sm">
-                <ReceiptText className="h-4 w-4" />
-                Ver comprobante
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-5xl">
-              <DialogHeader>
-                <DialogTitle>Comprobante</DialogTitle>
-              </DialogHeader>
-              <ComprobanteView notificacion={notificacion} />
-            </DialogContent>
-          </Dialog>
-        )}
-      </CardContent>
+          {hasComprobante && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm">
+                  <ReceiptText className="h-4 w-4" />
+                  Ver comprobante
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-5xl">
+                <DialogHeader>
+                  <DialogTitle>Comprobante</DialogTitle>
+                </DialogHeader>
+                <ComprobanteView notificacion={notificacion} />
+              </DialogContent>
+            </Dialog>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
 
 export default function Notificaciones() {
   const { notificacionesQuery, notificaciones, noLeidas, marcarLeida } = useNotificaciones();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const toggleNotificacion = (notificacion: Notificacion) => {
+    if (expandedId === notificacion.id) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(notificacion.id);
+    if (!notificacion.leida) marcarLeida.mutate(notificacion.id);
+  };
 
   return (
     <div className="container mx-auto max-w-5xl space-y-6 p-8">
@@ -245,7 +266,8 @@ export default function Notificaciones() {
             <NotificacionItem
               key={notificacion.id}
               notificacion={notificacion}
-              onOpen={(id) => marcarLeida.mutate(id)}
+              expanded={expandedId === notificacion.id}
+              onToggle={toggleNotificacion}
             />
           ))}
         </div>

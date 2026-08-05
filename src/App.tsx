@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ModuleHelp } from "@/components/ModuleHelp";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Bell, LogOut } from "lucide-react";
@@ -109,6 +110,7 @@ function AuthenticatedLayout() {
             <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
               {user?.email}
             </span>
+            <ModuleHelp />
             <Button variant="outline" size="sm" onClick={() => navigate("/notificaciones")} className="relative">
               <Bell className="h-4 w-4" />
               {noLeidas > 0 && (
