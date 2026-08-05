@@ -16,6 +16,11 @@ import { useComercio } from '@/hooks/useComercio';
 import { useToast } from '@/hooks/use-toast';
 import { buildListadoVentasPdfFile } from '@/utils/listadoVentasPdf';
 
+const parseLocalDateInput = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const ListadoVentas = () => {
   const { ventas, isLoading } = useVentas();
   const { data: clientes } = useClientes();
@@ -33,8 +38,10 @@ const ListadoVentas = () => {
       // Filtro por fecha
       if (fechaDesde || fechaHasta) {
         const fechaVenta = new Date(venta.fecha_venta);
-        const desde = fechaDesde ? startOfDay(new Date(fechaDesde)) : new Date(0);
-        const hasta = fechaHasta ? endOfDay(new Date(fechaHasta)) : new Date();
+        // El input date no incluye zona horaria. new Date("AAAA-MM-DD") se
+        // interpreta como UTC y en Argentina desplaza el rango al dia anterior.
+        const desde = fechaDesde ? startOfDay(parseLocalDateInput(fechaDesde)) : new Date(0);
+        const hasta = fechaHasta ? endOfDay(parseLocalDateInput(fechaHasta)) : new Date();
         
         if (!isWithinInterval(fechaVenta, { start: desde, end: hasta })) {
           return false;
