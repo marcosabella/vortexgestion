@@ -6,13 +6,56 @@ import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import { getVentaTotalFinal, Venta } from "@/types/venta";
 import { generarQRAfip } from "@/utils/afipQr";
-import { buildFacturaHtmlFile } from "@/utils/facturaPrint";
+import { buildFacturaPrintHtml } from "@/utils/facturaPrint";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 
 interface FacturaImpresionProps {
   venta: Venta;
   documentType?: "venta" | "presupuesto";
 }
+
+const printHtml = async (html: string) => {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  document.body.appendChild(frame);
+
+  const frameDocument = frame.contentDocument;
+  const frameWindow = frame.contentWindow;
+
+  if (!frameDocument || !frameWindow) {
+    frame.remove();
+    throw new Error("No se pudo preparar el comprobante para imprimir");
+  }
+
+  frameDocument.open();
+  frameDocument.write(html);
+  frameDocument.close();
+
+  await Promise.all(
+    Array.from(frameDocument.images).map(
+      (image) => new Promise<void>((resolve) => {
+        if (image.complete) return resolve();
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => resolve(), { once: true });
+      }),
+    ),
+  );
+  await frameDocument.fonts?.ready;
+
+  const removeFrame = () => window.setTimeout(() => frame.remove(), 500);
+  frameWindow.addEventListener("afterprint", removeFrame, { once: true });
+  frameWindow.focus();
+  frameWindow.print();
+  window.setTimeout(() => {
+    if (frame.isConnected) frame.remove();
+  }, 60_000);
+};
 
 export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpresionProps) => {
   const { comercio } = useComercio();
@@ -42,26 +85,20 @@ export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpre
       }
     }
 
-    const comprobanteFile = buildFacturaHtmlFile(
+    const comprobanteHtml = buildFacturaPrintHtml(
       { venta, comercio, afipConfig, qrDataUrl, documentType, formato: parametrizacion.impresion.formato_comprobante },
-      { autoPrint: action === "pdf" }
     );
-    const url = URL.createObjectURL(comprobanteFile);
-    const facturaWindow = window.open(url, "_blank");
-
-    if (!facturaWindow) {
-      URL.revokeObjectURL(url);
+    try {
+      await printHtml(comprobanteHtml);
+    } catch (error) {
       toast({
-        title: "No se pudo abrir el PDF",
-        description: "Revise si el navegador bloqueo la ventana emergente.",
+        title: "No se pudo imprimir el comprobante",
+        description: error instanceof Error ? error.message : "Intente nuevamente.",
         variant: "destructive",
       });
       setOpeningAction(null);
       return;
     }
-
-    facturaWindow.opener = null;
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
     if (action === "pdf") {
       toast({
         title: "Descargar comprobante en PDF",

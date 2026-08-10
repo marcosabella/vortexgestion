@@ -695,11 +695,13 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               </div>
             </div>
           `
-          : `
+          : isPresupuesto
+          ? `
             <div class="disclaimer-full">
-              ${isPresupuesto ? "Presupuesto no fiscal. No genera movimientos de stock hasta su confirmacion como venta." : "Comprobante sin CAE informado. La seccion de autorizacion ARCA se omite hasta obtener CAE."}
+              Presupuesto no fiscal. No genera movimientos de stock hasta su confirmacion como venta.
             </div>
           `
+          : ""
       }
       <div class="page-number">Pag. 1/1</div>
     </div>
