@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getVentaTotalFinal, Venta } from "@/types/venta";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaHtmlFile } from "@/utils/facturaPrint";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 
 interface FacturaImpresionProps {
   venta: Venta;
@@ -16,6 +17,7 @@ interface FacturaImpresionProps {
 export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpresionProps) => {
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
+  const { data: parametrizacion } = useComercioParametrizacion();
   const { toast } = useToast();
   const [openingAction, setOpeningAction] = useState<"print" | "pdf" | null>(null);
 
@@ -41,7 +43,7 @@ export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpre
     }
 
     const comprobanteFile = buildFacturaHtmlFile(
-      { venta, comercio, afipConfig, qrDataUrl, documentType },
+      { venta, comercio, afipConfig, qrDataUrl, documentType, formato: parametrizacion.impresion.formato_comprobante },
       { autoPrint: action === "pdf" }
     );
     const url = URL.createObjectURL(comprobanteFile);

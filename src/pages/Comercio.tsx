@@ -2,9 +2,13 @@ import { ComercioForm } from "@/components/ComercioForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useComercio } from "@/hooks/useComercio";
 import { ComercioFormData } from "@/types/comercio";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 const Comercio = () => {
   const { comercio, comerciosDisponibles, isLoading, selectComercio, updateComercio } = useComercio();
+  const { data: parametrizacion, updateFormatoImpresion } = useComercioParametrizacion();
 
   const handleSubmit = (data: ComercioFormData) => {
     if (comercio) {
@@ -44,13 +48,42 @@ const Comercio = () => {
         )}
 
         {comercio ? (
-          <ComercioForm
-            key={comercio.id}
-            initialData={comercio}
-            comercioId={comercio.id}
-            onSubmit={handleSubmit}
-            isLoading={updateComercio.isPending}
-          />
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Impresion de comprobantes</CardTitle>
+              </CardHeader>
+              <CardContent className="max-w-xl space-y-2">
+                <Label htmlFor="formato-impresion">Formato predeterminado</Label>
+                <Select
+                  value={parametrizacion.impresion.formato_comprobante}
+                  disabled={updateFormatoImpresion.isPending}
+                  onValueChange={(value) => updateFormatoImpresion.mutate({
+                    comercioId: comercio.id,
+                    formato: value === "58mm" ? "58mm" : "a4",
+                  })}
+                >
+                  <SelectTrigger id="formato-impresion" className="max-w-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a4">Hoja A4</SelectItem>
+                    <SelectItem value="58mm">Rollo termico de 58 mm</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Esta opcion se aplicara a las proximas impresiones de comprobantes.
+                </p>
+              </CardContent>
+            </Card>
+            <ComercioForm
+              key={comercio.id}
+              initialData={comercio}
+              comercioId={comercio.id}
+              onSubmit={handleSubmit}
+              isLoading={updateComercio.isPending}
+            />
+          </>
         ) : comerciosDisponibles.length > 1 ? (
           <div className="rounded-lg border bg-card p-6 text-muted-foreground">
             Seleccione un comercio para editar sus datos.

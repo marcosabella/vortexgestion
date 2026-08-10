@@ -43,6 +43,9 @@ const defaultParametrizacion = {
     impresion_etiquetas_productos: true,
     exportacion_pdf: true,
   },
+  impresion: {
+    formato_comprobante: 'a4',
+  },
 };
 
 async function getAdminUserId(req: Request, supabase: any): Promise<string> {
@@ -479,6 +482,9 @@ function mergeParametrizacion(parametros: any) {
     funciones: {
       ...defaultParametrizacion.funciones,
       ...(parametros?.funciones || {}),
+    },
+    impresion: {
+      formato_comprobante: parametros?.impresion?.formato_comprobante === '58mm' ? '58mm' : 'a4',
     },
   };
 }

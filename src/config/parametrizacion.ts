@@ -21,9 +21,14 @@ export type FuncionSistema =
   | "impresion_etiquetas_productos"
   | "exportacion_pdf";
 
+export type FormatoComprobante = "a4" | "58mm";
+
 export type ComercioParametrizacion = {
   modulos: Record<ModuloSistema, boolean>;
   funciones: Record<FuncionSistema, boolean>;
+  impresion: {
+    formato_comprobante: FormatoComprobante;
+  };
 };
 
 export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; description: string }> = [
@@ -60,6 +65,9 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     (acc, funcion) => ({ ...acc, [funcion.key]: true }),
     {} as Record<FuncionSistema, boolean>,
   ),
+  impresion: {
+    formato_comprobante: "a4",
+  },
 };
 
 export function normalizeParametrizacion(value?: Partial<ComercioParametrizacion> | null): ComercioParametrizacion {
@@ -71,6 +79,9 @@ export function normalizeParametrizacion(value?: Partial<ComercioParametrizacion
     funciones: {
       ...DEFAULT_PARAMETRIZACION.funciones,
       ...(value?.funciones || {}),
+    },
+    impresion: {
+      formato_comprobante: value?.impresion?.formato_comprobante === "58mm" ? "58mm" : "a4",
     },
   };
 }

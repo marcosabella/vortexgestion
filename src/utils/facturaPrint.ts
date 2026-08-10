@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
 import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
+import { FormatoComprobante } from "@/config/parametrizacion";
 
 interface FacturaPrintOptions {
   venta: Venta;
@@ -9,6 +10,7 @@ interface FacturaPrintOptions {
   afipConfig?: AfipConfig | null;
   qrDataUrl?: string;
   documentType?: "venta" | "presupuesto";
+  formato?: FormatoComprobante;
 }
 
 interface FacturaHtmlOptions {
@@ -67,7 +69,7 @@ const sanitizeFilename = (value: string) =>
 
 const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
-export const getFacturaPrintStyles = () => `
+export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
   * {
     box-sizing: border-box;
     margin: 0;
@@ -389,6 +391,46 @@ export const getFacturaPrintStyles = () => `
       min-height: calc(297mm - 16mm);
     }
   }
+
+  ${formato === "58mm" ? `
+    @page { margin: 2mm; size: 58mm auto; }
+    body { font-family: "Courier New", monospace; font-size: 8px; padding: 2mm; width: 58mm; }
+    .factura-container, .factura-container.sin-cae { border: 0; max-width: none; min-height: 0; padding: 0 0 3mm; width: 54mm; }
+    .copy-indicator { border-bottom: 1px dashed #000; font-size: 9px; padding: 2mm 0; }
+    .header { border: 0; border-bottom: 1px dashed #000; display: flex; flex-direction: column; min-height: 0; padding: 2mm 0; }
+    .header-left, .header-right { border: 0; padding: 1mm 0; text-align: center; }
+    .header-center { order: 2; }
+    .header-right { order: 3; }
+    .comercio-nombre { font-size: 13px; margin-bottom: 1mm; }
+    .comercio-logo { height: 18mm; margin-bottom: 1mm; max-width: 48mm; }
+    .comercio-datos { font-size: 8px; }
+    .tipo-letra { border: 1px solid #000; font-size: 18px; margin: 1mm auto; padding: 1mm; }
+    .tipo-codigo { font-size: 7px; }
+    .factura-titulo { font-size: 12px; margin-bottom: 1mm; }
+    .factura-info strong { min-width: 0; }
+    .numero-line strong span, .numero-line .presupuesto-numero { font-size: 11px; margin: 0; padding: 1mm 0; }
+    .periodo-section { display: none; }
+    .cliente-section { border-bottom: 1px dashed #000; padding: 2mm 0; }
+    .cliente-row, .cliente-row.full { display: block; margin: 0; }
+    .cliente-row > div { margin-bottom: 1mm; }
+    .items-table { table-layout: fixed; }
+    .items-table th, .items-table td { font-size: 7px; overflow-wrap: anywhere; padding: 1.5mm .5mm; }
+    .items-table th { background: transparent; border-bottom: 1px dashed #000; border-right: 0; }
+    .ticket-hide { display: none; }
+    .empty-rows { display: none; }
+    .totales-section, .sin-cae .totales-section { border: 0; border-top: 1px dashed #000; padding: 2mm 0; position: static; }
+    .totales-grid { margin: 0; width: 100%; }
+    .totales-row { grid-template-columns: 1fr auto; }
+    .footer-section { border-top: 1px dashed #000; display: block; min-height: 0; padding: 2mm 0; position: static; text-align: center; }
+    .qr-container { height: 30mm; margin: 0 auto 1mm; width: 30mm; }
+    .footer-center { margin: 1mm 0; }
+    .cae-info { font-size: 8px; text-align: center; }
+    .arca-logo { font-size: 12px; }
+    .arca-caption { font-size: 6px; margin: auto; }
+    .disclaimer-full { border-top: 1px dashed #000; font-size: 6px; padding: 2mm 0; position: static; }
+    .page-number { display: none; }
+    @media print { body { padding: 0; width: 54mm; } .factura-container { min-height: 0; } }
+  ` : ""}
 `;
 
 const getTipoComprobanteLetra = (tipo: string) => {
@@ -486,14 +528,14 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
 
           return `
             <tr>
-              <td>${escapeHtml(getVentaItemCodigo(item))}</td>
+              <td class="ticket-hide">${escapeHtml(getVentaItemCodigo(item))}</td>
               <td>${escapeHtml(`${descripcion}${recargo}`)}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.cantidad))}</td>
-              <td class="text-center">unidades</td>
+              <td class="text-center ticket-hide">unidades</td>
               <td class="text-right">${escapeHtml(formatMoney(discriminaIva ? precioUnitarioSinIva : item.precio_unitario))}</td>
-              ${discriminaIva ? `<td class="text-right">${escapeHtml(formatMoney(porcentajeIva))}%</td>` : ""}
-              <td class="text-right">${escapeHtml(formatMoney(item.porcentaje_descuento || 0))}</td>
-              <td class="text-right">${escapeHtml(formatMoney(item.monto_descuento || 0))}</td>
+              ${discriminaIva ? `<td class="text-right ticket-hide">${escapeHtml(formatMoney(porcentajeIva))}%</td>` : ""}
+              <td class="text-right ticket-hide">${escapeHtml(formatMoney(item.porcentaje_descuento || 0))}</td>
+              <td class="text-right ticket-hide">${escapeHtml(formatMoney(item.monto_descuento || 0))}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.total))}</td>
             </tr>
           `;
@@ -558,14 +600,14 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 12%">Codigo</th>
+            <th class="ticket-hide" style="width: 12%">Codigo</th>
             <th style="width: 27%">Producto / Servicio</th>
             <th style="width: 8%">Cantidad</th>
-            <th style="width: 9%">U. Medida</th>
+            <th class="ticket-hide" style="width: 9%">U. Medida</th>
             <th style="width: 12%">${discriminaIva ? "Precio Unit. s/IVA" : "Precio Unitario"}</th>
-            ${discriminaIva ? `<th style="width: 8%">IVA %</th>` : ""}
-            <th style="width: 8%">% Bonif</th>
-            <th style="width: 8%">Imp. Bonif.</th>
+            ${discriminaIva ? `<th class="ticket-hide" style="width: 8%">IVA %</th>` : ""}
+            <th class="ticket-hide" style="width: 8%">% Bonif</th>
+            <th class="ticket-hide" style="width: 8%">Imp. Bonif.</th>
             <th style="width: 8%">Total</th>
           </tr>
         </thead>
@@ -670,7 +712,7 @@ export const buildFacturaPrintHtml = (options: FacturaPrintOptions, htmlOptions:
     <head>
       <meta charset="utf-8" />
       <title>${options.documentType === "presupuesto" ? "Presupuesto" : "Comprobante"} ${escapeHtml(options.venta.numero_comprobante)}</title>
-      <style>${getFacturaPrintStyles()}</style>
+      <style>${getFacturaPrintStyles(options.formato)}</style>
     </head>
     <body>
       ${buildFacturaPrintBody(options)}

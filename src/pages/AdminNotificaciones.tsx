@@ -31,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
@@ -123,6 +124,7 @@ export default function AdminNotificaciones() {
   const [comprobanteFecha, setComprobanteFecha] = useState("");
   const [comprobanteMonto, setComprobanteMonto] = useState("");
   const [comprobantePeriodo, setComprobantePeriodo] = useState("");
+  const [activeTab, setActiveTab] = useState("carga");
 
   const comercios = useMemo(() => comerciosQuery.data || [], [comerciosQuery.data]);
   const comerciosById = useMemo(
@@ -164,6 +166,7 @@ export default function AdminNotificaciones() {
     setComprobanteFecha(notificacion.comprobante_fecha || "");
     setComprobanteMonto(notificacion.comprobante_monto?.toString() || "");
     setComprobantePeriodo(notificacion.comprobante_periodo || "");
+    setActiveTab("carga");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -205,6 +208,13 @@ export default function AdminNotificaciones() {
         </p>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 md:w-[520px]">
+          <TabsTrigger value="carga">Carga de notificaciones</TabsTrigger>
+          <TabsTrigger value="historial">Historial de notificaciones</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="carga" className="mt-0">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -354,7 +364,9 @@ export default function AdminNotificaciones() {
           </form>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="historial" className="mt-0">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -491,6 +503,8 @@ export default function AdminNotificaciones() {
           </Table>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

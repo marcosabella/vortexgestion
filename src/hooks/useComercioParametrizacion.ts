@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { DEFAULT_PARAMETRIZACION, normalizeParametrizacion } from "@/config/parametrizacion";
+import { DEFAULT_PARAMETRIZACION, FormatoComprobante, normalizeParametrizacion } from "@/config/parametrizacion";
+import { useToast } from "@/hooks/use-toast";
 
 export function useComercioParametrizacion() {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const query = useQuery({
     queryKey: ["comercio-parametrizacion", localStorage.getItem("selectedComercioId")],
     queryFn: async () => {
       const {
@@ -48,4 +51,28 @@ export function useComercioParametrizacion() {
     staleTime: 5 * 60 * 1000,
     initialData: DEFAULT_PARAMETRIZACION,
   });
+
+  const updateFormatoImpresion = useMutation({
+    mutationFn: async ({ comercioId, formato }: { comercioId: string; formato: FormatoComprobante }) => {
+      const { data, error } = await (supabase as any).rpc("actualizar_formato_impresion_comercio", {
+        p_comercio_id: comercioId,
+        p_formato: formato,
+      });
+
+      if (error) throw error;
+      return normalizeParametrizacion(data);
+    },
+    onSuccess: (parametros) => {
+      queryClient.setQueryData(
+        ["comercio-parametrizacion", localStorage.getItem("selectedComercioId")],
+        parametros,
+      );
+      toast({ title: "Formato actualizado", description: "El formato de impresion quedo guardado." });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: `No se pudo guardar el formato: ${error.message}` });
+    },
+  });
+
+  return { ...query, updateFormatoImpresion };
 }

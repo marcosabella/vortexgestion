@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Preserve real files and directories (JS, CSS, images, etc.).
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Let React Router resolve application routes on direct access or refresh.
+  RewriteRule ^ index.html [L]
+</IfModule>

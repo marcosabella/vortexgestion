@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function updateParam<TGroup extends keyof ComercioParametrizacion>(
   current: ComercioParametrizacion,
@@ -58,6 +59,13 @@ export default function AdminComercioParametrizacion() {
     setDraft((current) => updateParam(normalizeParametrizacion(current || parametros), "funciones", key, value));
   };
 
+  const setFormatoComprobante = (value: ComercioParametrizacion["impresion"]["formato_comprobante"]) => {
+    setDraft((current) => ({
+      ...normalizeParametrizacion(current || parametros),
+      impresion: { formato_comprobante: value },
+    }));
+  };
+
   const guardar = () => {
     updateParametrizacion.mutate(parametros, {
       onSuccess: (data: any) => setDraft(normalizeParametrizacion(data.parametros)),
@@ -89,6 +97,31 @@ export default function AdminComercioParametrizacion() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Impresion de comprobantes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-w-md space-y-2">
+              <Label htmlFor="formato-comprobante">Formato predeterminado</Label>
+              <Select
+                value={parametros.impresion.formato_comprobante}
+                onValueChange={(value) => setFormatoComprobante(value === "58mm" ? "58mm" : "a4")}
+              >
+                <SelectTrigger id="formato-comprobante">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="a4">Hoja A4</SelectItem>
+                  <SelectItem value="58mm">Rollo termico de 58 mm</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                A4 se utiliza por defecto. El formato de 58 mm adapta el contenido al ancho de una impresora termica.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Modulos del sistema</CardTitle>
