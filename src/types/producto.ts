@@ -1,5 +1,6 @@
 export interface Producto {
   id: string;
+  comercio_id?: string;
   cod_producto: string;
   cod_barras?: string;
   descripcion: string;

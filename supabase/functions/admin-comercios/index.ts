@@ -41,6 +41,7 @@ const defaultParametrizacion = {
     facturacion_afip: true,
     impresion_comprobantes: true,
     impresion_etiquetas_productos: true,
+    imagenes_productos: true,
     exportacion_pdf: true,
   },
   impresion: {

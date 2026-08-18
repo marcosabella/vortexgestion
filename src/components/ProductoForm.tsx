@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { ChangeEvent, useState, useEffect } from "react";
+import { ImagePlus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,19 @@ import { useProveedores } from "@/hooks/useProveedores";
 import { useMarcas } from "@/hooks/useMarcas";
 import { useRubros } from "@/hooks/useRubros";
 import { useSubRubros } from "@/hooks/useSubRubros";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
 
 const EMPTY_SELECT_VALUE = "__none__";
+const PRODUCT_IMAGE_BUCKET = "producto-imagenes";
+const MAX_PRODUCT_IMAGES = 5;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+type ProductoImagen = { id: string; storage_path: string; orden: number; publicUrl: string };
+type ImagenPendiente = { file: File; previewUrl: string };
 
 interface ProductoFormProps {
   producto?: Producto;
@@ -34,8 +45,14 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
   const { marcas } = useMarcas();
   const { rubros } = useRubros();
   const { subrubros } = useSubRubros();
+  const { data: parametrizacion } = useComercioParametrizacion();
+  const { toast } = useToast();
   
   const [filteredSubRubros, setFilteredSubRubros] = useState(subrubros);
+  const [imagenes, setImagenes] = useState<ProductoImagen[]>([]);
+  const [imagenesPendientes, setImagenesPendientes] = useState<ImagenPendiente[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const imagenesHabilitadas = parametrizacion?.funciones.imagenes_productos ?? false;
 
   const {
     register,
@@ -110,6 +127,122 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
     }
   }, [producto, setValue]);
 
+  useEffect(() => {
+    if (!producto?.id || !imagenesHabilitadas) {
+      setImagenes([]);
+      return;
+    }
+
+    const loadImages = async () => {
+      const { data, error } = await (supabase as any)
+        .from("producto_imagenes")
+        .select("id, storage_path, orden")
+        .eq("producto_id", producto.id)
+        .order("orden");
+
+      if (error) {
+        toast({ variant: "destructive", title: "No se pudieron cargar las imagenes", description: error.message });
+        return;
+      }
+
+      setImagenes((data || []).map((image: Omit<ProductoImagen, "publicUrl">) => ({
+        ...image,
+        publicUrl: supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(image.storage_path).data.publicUrl,
+      })));
+    };
+
+    void loadImages();
+  }, [producto?.id, imagenesHabilitadas, toast]);
+
+  const selectImages = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    const availableSlots = MAX_PRODUCT_IMAGES - imagenes.length - imagenesPendientes.length;
+
+    if (!files.length || availableSlots <= 0) {
+      toast({ variant: "destructive", title: "Limite alcanzado", description: "Cada producto admite hasta cinco imagenes." });
+      return;
+    }
+
+    const validFiles = files.slice(0, availableSlots).filter((file) => {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        toast({ variant: "destructive", title: "Formato no admitido", description: "Use archivos PNG, JPG o WEBP." });
+        return false;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast({ variant: "destructive", title: "Archivo demasiado grande", description: "Cada imagen puede pesar hasta 5 MB." });
+        return false;
+      }
+      return true;
+    });
+
+    if (files.length > availableSlots) {
+      toast({ title: "Se alcanzó el limite", description: `Solo se agregaron ${availableSlots} imagenes.` });
+    }
+    setImagenesPendientes((current) => [...current, ...validFiles.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
+  };
+
+  const removePendingImage = (index: number) => {
+    setImagenesPendientes((current) => {
+      URL.revokeObjectURL(current[index].previewUrl);
+      return current.filter((_, currentIndex) => currentIndex !== index);
+    });
+  };
+
+  const removeStoredImage = async (image: ProductoImagen) => {
+    const { error: storageError } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([image.storage_path]);
+    if (storageError) {
+      toast({ variant: "destructive", title: "No se pudo eliminar la imagen", description: storageError.message });
+      return;
+    }
+    const { error } = await (supabase as any).from("producto_imagenes").delete().eq("id", image.id);
+    if (error) {
+      toast({ variant: "destructive", title: "No se pudo eliminar la imagen", description: error.message });
+      return;
+    }
+    setImagenes((current) => current.filter((item) => item.id !== image.id));
+  };
+
+  const uploadPendingImages = async (savedProducto: Producto) => {
+    if (!imagenesPendientes.length) return;
+    const comercioId = savedProducto.comercio_id || localStorage.getItem("selectedComercioId");
+    if (!comercioId) throw new Error("No se identificó el comercio del producto.");
+
+    setIsUploadingImages(true);
+    try {
+      const newImages: ProductoImagen[] = [];
+      const usedOrders = new Set(imagenes.map((image) => image.orden));
+      for (const pendingImage of imagenesPendientes) {
+        const extension = pendingImage.file.name.split(".").pop() || "jpg";
+        const storagePath = `${comercioId}/${savedProducto.id}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(storagePath, pendingImage.file, {
+          cacheControl: "3600",
+          contentType: pendingImage.file.type,
+        });
+        if (uploadError) throw uploadError;
+
+        const orden = [1, 2, 3, 4, 5].find((position) => !usedOrders.has(position));
+        if (!orden) throw new Error("Cada producto admite hasta cinco imagenes.");
+        usedOrders.add(orden);
+        const { data, error } = await (supabase as any)
+          .from("producto_imagenes")
+          .insert({ producto_id: savedProducto.id, comercio_id: comercioId, storage_path: storagePath, orden })
+          .select("id, storage_path, orden")
+          .single();
+        if (error) {
+          await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([storagePath]);
+          throw error;
+        }
+        newImages.push({ ...data, publicUrl: supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(storagePath).data.publicUrl });
+      }
+      imagenesPendientes.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+      setImagenes((current) => [...current, ...newImages]);
+      setImagenesPendientes([]);
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
   const onSubmit = (data: Producto) => {
     // Limpiar datos relacionados antes de enviar
     const {
@@ -128,9 +261,23 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
     };
 
     if (producto) {
-      updateProducto({ ...cleanData, id: producto.id }, { onSuccess: afterSuccess });
+      updateProducto({ ...cleanData, id: producto.id }, { onSuccess: async (savedProducto) => {
+        try {
+          await uploadPendingImages(savedProducto as Producto);
+          afterSuccess();
+        } catch (error) {
+          toast({ variant: "destructive", title: "Producto actualizado", description: `No se pudieron cargar las imagenes: ${error instanceof Error ? error.message : "intente nuevamente"}` });
+        }
+      } });
     } else {
-      createProducto(cleanData, { onSuccess: afterSuccess });
+      createProducto(cleanData, { onSuccess: async (savedProducto) => {
+        try {
+          await uploadPendingImages(savedProducto as Producto);
+          afterSuccess();
+        } catch (error) {
+          toast({ variant: "destructive", title: "Producto creado", description: `No se pudieron cargar las imagenes: ${error instanceof Error ? error.message : "intente nuevamente"}` });
+        }
+      } });
     }
   };
 
@@ -380,15 +527,52 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
                 rows={3}
               />
             </div>
+
+            {imagenesHabilitadas && (
+              <div className="space-y-3 md:col-span-2">
+                <div className="flex items-baseline justify-between gap-4">
+                  <div>
+                    <Label>Imagenes del producto</Label>
+                    <p className="text-sm text-muted-foreground">Hasta 5 imagenes PNG, JPG o WEBP de 5 MB cada una.</p>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{imagenes.length + imagenesPendientes.length}/{MAX_PRODUCT_IMAGES}</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {imagenes.map((image) => (
+                    <div key={image.id} className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted">
+                      <img src={image.publicUrl} alt="Imagen del producto" className="h-full w-full object-cover" />
+                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" onClick={() => void removeStoredImage(image)} aria-label="Eliminar imagen">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {imagenesPendientes.map((image, index) => (
+                    <div key={image.previewUrl} className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted">
+                      <img src={image.previewUrl} alt="Vista previa de imagen" className="h-full w-full object-cover" />
+                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" onClick={() => removePendingImage(index)} aria-label="Quitar imagen">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {imagenes.length + imagenesPendientes.length < MAX_PRODUCT_IMAGES && (
+                    <Label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed text-muted-foreground hover:bg-muted" htmlFor="producto-imagenes">
+                      <ImagePlus className="h-5 w-5" />
+                      <span className="text-xs">Agregar</span>
+                      <Input id="producto-imagenes" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={selectImages} />
+                    </Label>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 pt-4">
             <Button 
               type="submit" 
               variant="success"
-              disabled={isCreating || isUpdating}
+              disabled={isCreating || isUpdating || isUploadingImages}
             >
-              {producto ? "Actualizar" : "Crear"} Producto
+              {isUploadingImages ? "Cargando imagenes..." : `${producto ? "Actualizar" : "Crear"} Producto`}
             </Button>
             {onClose && (
               <Button type="button" variant="cancel" onClick={onClose}>
