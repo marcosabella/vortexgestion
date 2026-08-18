@@ -13,7 +13,7 @@ export function usePedidosOnline() {
     queryKey: ["pedidos-online", comercio?.id], enabled: Boolean(comercio?.id), refetchInterval: 15_000,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("pedidos_online")
-        .select("*, pedido_online_items(*)").eq("comercio_id", comercio!.id)
+        .select("*, pedido_online_items(*), cliente:clientes(id,nombre,apellido,email,telefono)").eq("comercio_id", comercio!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];

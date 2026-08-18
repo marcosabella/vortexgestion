@@ -105,6 +105,7 @@ export function ClientesList() {
                   <TableHead>Situación AFIP</TableHead>
                   <TableHead>Localidad</TableHead>
                   <TableHead>Teléfono</TableHead>
+                  <TableHead>Cuenta online</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -123,6 +124,7 @@ export function ClientesList() {
                     <TableCell>{cliente.situacion_afip}</TableCell>
                     <TableCell>{cliente.localidad}</TableCell>
                     <TableCell>{cliente.telefono || '-'}</TableCell>
+                    <TableCell>{cliente.cliente_usuarios?.length ? <Badge>Vinculada</Badge> : <Badge variant="outline">Sin vincular</Badge>}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Dialog open={isEditDialogOpen && selectedCliente?.id === cliente.id} onOpenChange={(open) => {

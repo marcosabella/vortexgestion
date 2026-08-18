@@ -17,15 +17,16 @@ export interface Cliente {
   situacion_afip: string;
   ingresos_brutos?: string;
   tipo_persona: 'fisica' | 'juridica';
+  cliente_usuarios?: Array<{ user_id: string; metodo: 'email_verificado' | 'creado_pedido' | 'manual'; created_at: string }>;
 }
 
 export function useClientes() {
   return useQuery({
     queryKey: ['clientes'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('clientes')
-        .select('*')
+        .select('*, cliente_usuarios(user_id,metodo,created_at)')
         .order('apellido', { ascending: true });
       
       if (error) throw error;
