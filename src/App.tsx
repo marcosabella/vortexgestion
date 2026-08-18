@@ -43,6 +43,7 @@ import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
 import Notificaciones from "./pages/Notificaciones";
 import Seguridad from "./pages/Seguridad";
+import PedidosOnline from "./pages/PedidosOnline";
 import NotFound from "./pages/NotFound";
 import ListadoClientes from "./pages/listados/ListadoClientes";
 import ListadoProveedores from "./pages/listados/ListadoProveedores";
@@ -134,6 +135,7 @@ function AuthenticatedLayout() {
               <Route path="/productos" element={<ParametrizedRoute modulo="productos"><Productos /></ParametrizedRoute>} />
               <Route path="/productos/nuevo" element={<ParametrizedRoute modulo="productos"><NuevoProducto /></ParametrizedRoute>} />
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
+              <Route path="/pedidos-online" element={<ParametrizedRoute modulo="pedidos_online"><PedidosOnline /></ParametrizedRoute>} />
               <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />
               <Route path="/ventas/:ventaId/editar" element={<ParametrizedRoute modulo="ventas"><EditarVenta /></ParametrizedRoute>} />
               <Route path="/presupuestos" element={<ParametrizedRoute modulo="presupuestos"><Presupuestos /></ParametrizedRoute>} />

@@ -34,6 +34,7 @@ const defaultParametrizacion = {
     afip: true,
     seguridad: true,
     listados: true,
+    pedidos_online: false,
   },
   funciones: {
     venta_items_manuales: true,

@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -29,6 +29,7 @@ const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modu
   { title: "Proveedores", url: "/proveedores", icon: Truck, modulo: "proveedores" },
   { title: "Productos", url: "/productos", icon: Package, modulo: "productos" },
   { title: "Ventas", url: "/ventas", icon: ShoppingCart, modulo: "ventas" },
+  { title: "Pedidos Online", url: "/pedidos-online", icon: ShoppingBag, modulo: "pedidos_online" },
   { title: "Presupuestos", url: "/presupuestos", icon: ClipboardList, modulo: "presupuestos" },
   { title: "Cuenta Corriente", url: "/cuenta-corriente", icon: CreditCard, modulo: "cuenta_corriente" },
   { title: "Cartera de Cheques", url: "/cheques", icon: Receipt, modulo: "cheques" },

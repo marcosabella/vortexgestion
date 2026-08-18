@@ -11,7 +11,8 @@ export type ModuloSistema =
   | "tarjetas"
   | "afip"
   | "seguridad"
-  | "listados";
+  | "listados"
+  | "pedidos_online";
 
 export type FuncionSistema =
   | "venta_items_manuales"
@@ -47,6 +48,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "afip", label: "ARCA", description: "Configuracion fiscal y certificados." },
   { key: "seguridad", label: "Seguridad", description: "Cambio de contrasena del comercio." },
   { key: "listados", label: "Listados", description: "Reportes imprimibles y exportables." },
+  { key: "pedidos_online", label: "Pedidos online", description: "Gestion de pedidos recibidos desde la tienda online." },
 ];
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
@@ -61,10 +63,13 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
 ];
 
 export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
-  modulos: MODULOS_SISTEMA.reduce(
-    (acc, modulo) => ({ ...acc, [modulo.key]: true }),
-    {} as Record<ModuloSistema, boolean>,
-  ),
+  modulos: {
+    ...MODULOS_SISTEMA.reduce(
+      (acc, modulo) => ({ ...acc, [modulo.key]: true }),
+      {} as Record<ModuloSistema, boolean>,
+    ),
+    pedidos_online: false,
+  },
   funciones: {
     ...FUNCIONES_SISTEMA.reduce(
       (acc, funcion) => ({ ...acc, [funcion.key]: true }),
