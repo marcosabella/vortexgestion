@@ -48,7 +48,10 @@ export function useComercioParametrizacion() {
 
       return normalizeParametrizacion(data?.parametros);
     },
-    staleTime: 5 * 60 * 1000,
+    // Los permisos pueden cambiar desde la administracion mientras el usuario tiene la aplicacion abierta.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     initialData: DEFAULT_PARAMETRIZACION,
   });
 

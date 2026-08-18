@@ -53,6 +53,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
   const [imagenesPendientes, setImagenesPendientes] = useState<ImagenPendiente[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const imagenesHabilitadas = parametrizacion?.funciones.imagenes_productos ?? false;
+  const publicacionTiendaHabilitada = parametrizacion?.funciones.publicacion_tienda_online ?? false;
 
   const {
     register,
@@ -76,6 +77,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       porcentaje_descuento: 0,
       stock: 0,
       tipo_moneda: "ARS",
+      visible_en_tienda: false,
       observaciones: "",
     },
   });
@@ -527,6 +529,20 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
                 rows={3}
               />
             </div>
+
+            {publicacionTiendaHabilitada && (
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  {...register("visible_en_tienda")}
+                />
+                <span>
+                  <span className="block font-medium">Mostrar en tienda online</span>
+                  <span className="text-sm text-muted-foreground">El producto se publicará para la venta online cuando tenga stock.</span>
+                </span>
+              </label>
+            )}
 
             {imagenesHabilitadas && (
               <div className="space-y-3 md:col-span-2">

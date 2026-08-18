@@ -20,6 +20,7 @@ export type FuncionSistema =
   | "impresion_comprobantes"
   | "impresion_etiquetas_productos"
   | "imagenes_productos"
+  | "publicacion_tienda_online"
   | "exportacion_pdf";
 
 export type FormatoComprobante = "a4" | "58mm";
@@ -55,6 +56,7 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
   { key: "impresion_comprobantes", label: "Impresion de comprobantes", description: "Permite imprimir comprobantes desde ventas." },
   { key: "impresion_etiquetas_productos", label: "Impresion de etiquetas de productos", description: "Permite generar etiquetas A4 con codigo de barras desde productos." },
   { key: "imagenes_productos", label: "Imagenes de productos", description: "Permite cargar hasta cinco imagenes por producto." },
+  { key: "publicacion_tienda_online", label: "Publicacion en tienda online", description: "Permite indicar si un producto se muestra en la tienda online." },
   { key: "exportacion_pdf", label: "Exportacion PDF", description: "Permite generar PDFs de comprobantes y listados." },
 ];
 
@@ -63,10 +65,13 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     (acc, modulo) => ({ ...acc, [modulo.key]: true }),
     {} as Record<ModuloSistema, boolean>,
   ),
-  funciones: FUNCIONES_SISTEMA.reduce(
-    (acc, funcion) => ({ ...acc, [funcion.key]: true }),
-    {} as Record<FuncionSistema, boolean>,
-  ),
+  funciones: {
+    ...FUNCIONES_SISTEMA.reduce(
+      (acc, funcion) => ({ ...acc, [funcion.key]: true }),
+      {} as Record<FuncionSistema, boolean>,
+    ),
+    publicacion_tienda_online: false,
+  },
   impresion: {
     formato_comprobante: "a4",
   },

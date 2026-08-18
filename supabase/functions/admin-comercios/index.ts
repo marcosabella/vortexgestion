@@ -42,6 +42,7 @@ const defaultParametrizacion = {
     impresion_comprobantes: true,
     impresion_etiquetas_productos: true,
     imagenes_productos: true,
+    publicacion_tienda_online: false,
     exportacion_pdf: true,
   },
   impresion: {
