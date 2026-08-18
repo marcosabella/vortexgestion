@@ -16,6 +16,7 @@ export interface Producto {
   stock: number;
   tipo_moneda: 'ARS' | 'USD' | 'USD_BLUE';
   visible_en_tienda?: boolean;
+  destacado_en_tienda?: boolean;
   observaciones?: string;
   created_at: string;
   updated_at: string;

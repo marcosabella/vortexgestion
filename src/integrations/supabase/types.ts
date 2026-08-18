@@ -678,6 +678,7 @@ export type Database = {
           tipo_moneda: Database["public"]["Enums"]["tipo_moneda"]
           updated_at: string
           visible_en_tienda: boolean
+          destacado_en_tienda: boolean
         }
         Insert: {
           cod_barras?: string | null
@@ -700,6 +701,7 @@ export type Database = {
           tipo_moneda?: Database["public"]["Enums"]["tipo_moneda"]
           updated_at?: string
           visible_en_tienda?: boolean
+          destacado_en_tienda?: boolean
         }
         Update: {
           cod_barras?: string | null
@@ -722,6 +724,7 @@ export type Database = {
           tipo_moneda?: Database["public"]["Enums"]["tipo_moneda"]
           updated_at?: string
           visible_en_tienda?: boolean
+          destacado_en_tienda?: boolean
         }
         Relationships: [
           {

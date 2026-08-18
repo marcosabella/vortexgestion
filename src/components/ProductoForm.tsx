@@ -78,6 +78,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       stock: 0,
       tipo_moneda: "ARS",
       visible_en_tienda: false,
+      destacado_en_tienda: false,
       observaciones: "",
     },
   });
@@ -531,17 +532,30 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
             </div>
 
             {publicacionTiendaHabilitada && (
-              <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 md:col-span-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-primary"
-                  {...register("visible_en_tienda")}
-                />
-                <span>
-                  <span className="block font-medium">Mostrar en tienda online</span>
-                  <span className="text-sm text-muted-foreground">El producto se publicará para la venta online cuando tenga stock.</span>
-                </span>
-              </label>
+              <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    {...register("visible_en_tienda")}
+                  />
+                  <span>
+                    <span className="block font-medium">Mostrar en tienda online</span>
+                    <span className="text-sm text-muted-foreground">Se publicará cuando tenga stock.</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    {...register("destacado_en_tienda")}
+                  />
+                  <span>
+                    <span className="block font-medium">Producto destacado</span>
+                    <span className="text-sm text-muted-foreground">Aparecerá debajo del carrusel usando su primera imagen.</span>
+                  </span>
+                </label>
+              </div>
             )}
 
             {imagenesHabilitadas && (
