@@ -663,6 +663,7 @@ export type Database = {
           comercio_id: string | null
           created_at: string
           descripcion: string
+          descripcion_tienda_html: string | null
           id: string
           marca_id: string | null
           observaciones: string | null
@@ -686,6 +687,7 @@ export type Database = {
           comercio_id?: string | null
           created_at?: string
           descripcion: string
+          descripcion_tienda_html?: string | null
           id?: string
           marca_id?: string | null
           observaciones?: string | null
@@ -709,6 +711,7 @@ export type Database = {
           comercio_id?: string | null
           created_at?: string
           descripcion?: string
+          descripcion_tienda_html?: string | null
           id?: string
           marca_id?: string | null
           observaciones?: string | null

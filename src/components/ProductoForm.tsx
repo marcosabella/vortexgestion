@@ -16,6 +16,8 @@ import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
+import { ProductDescriptionEditor } from "@/components/ProductDescriptionEditor";
+import { sanitizeProductDescription } from "@/utils/productDescription";
 
 const EMPTY_SELECT_VALUE = "__none__";
 const PRODUCT_IMAGE_BUCKET = "producto-imagenes";
@@ -54,6 +56,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const imagenesHabilitadas = parametrizacion?.funciones.imagenes_productos ?? false;
   const publicacionTiendaHabilitada = parametrizacion?.funciones.publicacion_tienda_online ?? false;
+  const descripcionTiendaHabilitada = parametrizacion?.funciones.descripcion_enriquecida_productos ?? false;
 
   const {
     register,
@@ -80,6 +83,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       visible_en_tienda: false,
       destacado_en_tienda: false,
       observaciones: "",
+      descripcion_tienda_html: "",
     },
   });
 
@@ -255,6 +259,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       subrubro: _subrubro,
       ...cleanData
     } = data as ProductoFormData;
+    cleanData.descripcion_tienda_html = sanitizeProductDescription(cleanData.descripcion_tienda_html);
     
     const afterSuccess = () => {
       if (!producto) {
@@ -522,14 +527,23 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="observaciones">Observaciones</Label>
+              <Label htmlFor="observaciones">Observaciones internas</Label>
               <Textarea
                 id="observaciones"
                 {...register("observaciones")}
-                placeholder="Observaciones adicionales"
+                placeholder="Notas internas que no se mostrarán en la tienda"
                 rows={3}
               />
             </div>
+
+            {descripcionTiendaHabilitada && <div className="space-y-2 md:col-span-2">
+              <Label>Descripción para tienda online</Label>
+              <p className="text-sm text-muted-foreground">Este contenido aparecerá en la solapa Descripción de la ficha pública del producto.</p>
+              <ProductDescriptionEditor
+                value={watch("descripcion_tienda_html") || ""}
+                onChange={(value) => setValue("descripcion_tienda_html", value, { shouldDirty: true })}
+              />
+            </div>}
 
             {publicacionTiendaHabilitada && (
               <div className="grid gap-3 md:col-span-2 md:grid-cols-2">

@@ -18,6 +18,7 @@ export interface Producto {
   visible_en_tienda?: boolean;
   destacado_en_tienda?: boolean;
   observaciones?: string;
+  descripcion_tienda_html?: string | null;
   created_at: string;
   updated_at: string;
   // Relations

@@ -22,6 +22,7 @@ export type FuncionSistema =
   | "impresion_etiquetas_productos"
   | "imagenes_productos"
   | "publicacion_tienda_online"
+  | "descripcion_enriquecida_productos"
   | "exportacion_pdf";
 
 export type FormatoComprobante = "a4" | "58mm";
@@ -59,6 +60,7 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
   { key: "impresion_etiquetas_productos", label: "Impresion de etiquetas de productos", description: "Permite generar etiquetas A4 con codigo de barras desde productos." },
   { key: "imagenes_productos", label: "Imagenes de productos", description: "Permite cargar hasta cinco imagenes por producto." },
   { key: "publicacion_tienda_online", label: "Publicacion en tienda online", description: "Permite indicar si un producto se muestra en la tienda online." },
+  { key: "descripcion_enriquecida_productos", label: "Descripcion enriquecida de productos", description: "Permite editar la descripcion publica con formato para la tienda online." },
   { key: "exportacion_pdf", label: "Exportacion PDF", description: "Permite generar PDFs de comprobantes y listados." },
 ];
 
@@ -76,6 +78,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
       {} as Record<FuncionSistema, boolean>,
     ),
     publicacion_tienda_online: false,
+    descripcion_enriquecida_productos: false,
   },
   impresion: {
     formato_comprobante: "a4",
