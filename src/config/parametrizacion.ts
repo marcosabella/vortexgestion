@@ -12,7 +12,8 @@ export type ModuloSistema =
   | "afip"
   | "seguridad"
   | "listados"
-  | "pedidos_online";
+  | "pedidos_online"
+  | "mercado_pago";
 
 export type FuncionSistema =
   | "venta_items_manuales"
@@ -50,6 +51,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "seguridad", label: "Seguridad", description: "Cambio de contrasena del comercio." },
   { key: "listados", label: "Listados", description: "Reportes imprimibles y exportables." },
   { key: "pedidos_online", label: "Pedidos online", description: "Gestion de pedidos recibidos desde la tienda online." },
+  { key: "mercado_pago", label: "Mercado Pago", description: "Checkout online, cobros QR y conciliacion por comercio." },
 ];
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
@@ -71,6 +73,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
       {} as Record<ModuloSistema, boolean>,
     ),
     pedidos_online: false,
+    mercado_pago: true,
   },
   funciones: {
     ...FUNCIONES_SISTEMA.reduce(

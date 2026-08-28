@@ -35,6 +35,7 @@ const defaultParametrizacion = {
     seguridad: true,
     listados: true,
     pedidos_online: false,
+    mercado_pago: true,
   },
   funciones: {
     venta_items_manuales: true,

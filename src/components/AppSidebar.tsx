@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database, QrCode } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -40,6 +40,7 @@ const configuracionItems: Array<{ title: string; url: string; icon: typeof Store
   { title: "Mi Comercio", url: "/comercio", icon: Store },
   { title: "Bancos", url: "/bancos", icon: Building2, modulo: "bancos" },
   { title: "Tarjetas", url: "/tarjetas", icon: CreditCard, modulo: "tarjetas" },
+  { title: "Mercado Pago", url: "/mercado-pago", icon: QrCode, modulo: "mercado_pago" },
   { title: "ARCA", url: "/afip", icon: FileKey, modulo: "afip" },
   { title: "Seguridad", url: "/seguridad", icon: KeyRound, modulo: "seguridad" },
 ]

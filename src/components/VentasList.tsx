@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,8 @@ import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
+import { useMercadoPago } from "@/hooks/useMercadoPago";
+import QRCode from "qrcode";
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
@@ -31,6 +34,7 @@ export const VentasList = () => {
     afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
   );
   const { toast } = useToast();
+  const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago();
   const { data: isAppAdmin = false } = useIsAppAdmin();
   const { comerciosQuery } = useAdminComercios(isAppAdmin);
   const { crearNotificacion } = useAdminNotificaciones(isAppAdmin);
@@ -39,6 +43,25 @@ export const VentasList = () => {
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [qrPreview, setQrPreview] = useState("");
+  const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
+  const operacionMercadoPago = selectedVenta?.id
+    ? (mercadoPagoStatus.data?.operaciones || []).find((operacion: any) => operacion.venta_id === selectedVenta.id)
+    : null;
+  const cobroMercadoPagoPendiente = operacionMercadoPago && ["pendiente", "procesando"].includes(operacionMercadoPago.estado);
+
+  const mostrarQrMercadoPago = async () => {
+    if (!operacionMercadoPago?.qr_data) return;
+    const qrData = String(operacionMercadoPago.qr_data);
+    setQrPreview(/^https?:\/\//i.test(qrData) ? qrData : await QRCode.toDataURL(qrData, { width: 360, margin: 2 }));
+  };
+
+  const cancelarCobroMercadoPago = async () => {
+    if (!operacionMercadoPago) return;
+    await runMercadoPago({ action: "cancel_qr", operacionId: operacionMercadoPago.id });
+    setShowCancelMercadoPagoDialog(false);
+    await mercadoPagoStatus.refetch();
+  };
 
   useEffect(() => {
     const ventaId = searchParams.get("detalle");
@@ -486,6 +509,15 @@ export const VentasList = () => {
                 </div>
               </div>
 
+              {operacionMercadoPago && (
+                <div className={`rounded-md border p-4 ${cobroMercadoPagoPendiente ? "border-amber-300 bg-amber-50" : operacionMercadoPago.estado === "aprobado" ? "border-green-300 bg-green-50" : "bg-muted"}`}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div><p className="font-semibold">Mercado Pago</p><p className="text-sm">Estado: <strong>{operacionMercadoPago.estado}</strong> · Importe: ${Number(operacionMercadoPago.importe).toFixed(2)}</p></div>
+                    {cobroMercadoPagoPendiente && <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={mostrarQrMercadoPago}>Volver a mostrar QR</Button><Button type="button" variant="destructive" size="sm" disabled={mercadoPagoWorking} onClick={() => setShowCancelMercadoPagoDialog(true)}>Cancelar cobro</Button></div>}
+                  </div>
+                </div>
+              )}
+
               {selectedVenta.venta_items && selectedVenta.venta_items.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Items</h4>
@@ -605,6 +637,37 @@ export const VentasList = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(qrPreview)} onOpenChange={(open) => { if (!open) setQrPreview(""); }}>
+        <DialogContent className="max-w-md text-center">
+          <DialogHeader><DialogTitle>QR Mercado Pago</DialogTitle></DialogHeader>
+          {qrPreview && <><img className="mx-auto w-full max-w-[360px]" src={qrPreview} alt="QR Mercado Pago"/><p className="text-sm text-muted-foreground">El cobro permanece pendiente hasta recibir la confirmacion de Mercado Pago.</p></>}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showCancelMercadoPagoDialog} onOpenChange={setShowCancelMercadoPagoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar cobro de Mercado Pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se cancelará el cobro pendiente. La venta permanecerá registrada sin ese pago.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mercadoPagoWorking}>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={mercadoPagoWorking}
+              onClick={(event) => {
+                event.preventDefault();
+                void cancelarCobroMercadoPago();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {mercadoPagoWorking ? "Cancelando..." : "Sí, cancelar cobro"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
         <DialogContent className="max-w-lg">

@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
+import QRCode from "qrcode"
 import {
   Card,
   CardContent,
@@ -23,15 +24,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { supabase } from "@/integrations/supabase/client"
 import { useVentas } from "@/hooks/useVentas"
 import { usePresupuestos } from "@/hooks/usePresupuestos"
 import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
+import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Plus, Search } from "lucide-react"
+import { Trash2, Plus, Search, QrCode } from "lucide-react"
 import { PagosVentaManager } from "@/components/PagosVentaManager"
 
 const ventaSchema = z.object({
@@ -122,7 +125,8 @@ const calcularTotalesVenta = (
 
 const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta" }) => {
   const { toast } = useToast()
-  const { createVenta, updateVenta } = useVentas()
+  const { createVentaAsync, updateVenta } = useVentas()
+  const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
   const esPresupuesto = modo === "presupuesto"
   const nombreDocumento = esPresupuesto ? "presupuesto" : "venta"
@@ -155,6 +159,64 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   // Estado para pagos
   const [pagosVenta, setPagosVenta] = useState<Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">[]>([])
   const [finalizarDialogOpen, setFinalizarDialogOpen] = useState(false)
+  const [mercadoPagoCajaId, setMercadoPagoCajaId] = useState("")
+  const [qrCobro, setQrCobro] = useState<{ image: string; ventaId: string; operacionId: string; importe: number } | null>(null)
+  const [ventaMercadoPagoPendienteId, setVentaMercadoPagoPendienteId] = useState("")
+  const [cancelarMercadoPagoTarget, setCancelarMercadoPagoTarget] = useState<"qr" | "pendiente" | null>(null)
+  const mercadoPagoData = mercadoPagoStatus.data || {}
+  const mercadoPagoCajas = mercadoPagoData.cajas || []
+  const mercadoPagoHabilitado = !esPresupuesto && !venta
+
+  useEffect(() => {
+    if (!mercadoPagoCajaId && mercadoPagoCajas[0]?.id) setMercadoPagoCajaId(mercadoPagoCajas[0].id)
+  }, [mercadoPagoCajaId, mercadoPagoCajas])
+
+  useEffect(() => {
+    if (!qrCobro) return
+    const timer = window.setInterval(() => void mercadoPagoStatus.refetch(), 3000)
+    return () => window.clearInterval(timer)
+  }, [qrCobro, mercadoPagoStatus])
+
+  const operacionQr = qrCobro
+    ? (mercadoPagoData.operaciones || []).find((operacion: any) => operacion.id === qrCobro.operacionId)
+    : null
+  const pagoQrAprobado = operacionQr?.estado === "aprobado"
+  const operacionPendienteVenta = venta?.id
+    ? (mercadoPagoData.operaciones || []).find((operacion: any) =>
+      operacion.venta_id === venta.id && ["pendiente", "procesando"].includes(operacion.estado)
+    )
+    : null
+
+  const cerrarCobroQr = () => {
+    setQrCobro(null)
+    onSuccess()
+  }
+
+  const cancelarCobroQr = async () => {
+    if (!qrCobro) return
+    await runMercadoPago({ action: "cancel_qr", operacionId: qrCobro.operacionId })
+    setCancelarMercadoPagoTarget(null)
+    cerrarCobroQr()
+  }
+
+  const mostrarCobroPendiente = async () => {
+    if (!operacionPendienteVenta?.qr_data || !venta?.id) return
+    const qrData = String(operacionPendienteVenta.qr_data)
+    const image = /^https?:\/\//i.test(qrData) ? qrData : await QRCode.toDataURL(qrData, { width: 360, margin: 2 })
+    setQrCobro({ image, ventaId: venta.id, operacionId: operacionPendienteVenta.id, importe: Number(operacionPendienteVenta.importe) })
+  }
+
+  const cancelarCobroPendiente = async () => {
+    if (!operacionPendienteVenta) return
+    await runMercadoPago({ action: "cancel_qr", operacionId: operacionPendienteVenta.id })
+    setCancelarMercadoPagoTarget(null)
+    await mercadoPagoStatus.refetch()
+  }
+
+  const confirmarCancelacionMercadoPago = async () => {
+    if (cancelarMercadoPagoTarget === "qr") await cancelarCobroQr()
+    if (cancelarMercadoPagoTarget === "pendiente") await cancelarCobroPendiente()
+  }
 
   const form = useForm<VentaFormData>({
     resolver: zodResolver(ventaSchema),
@@ -528,6 +590,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     }
 
     try {
+      const pagoMercadoPago = pagosVenta.find(pago => pago.tipo_pago === "mercado_pago")
+      if (pagoMercadoPago && !mercadoPagoCajaId) {
+        throw new Error("Debe seleccionar una caja de Mercado Pago")
+      }
       const totalFinal = roundMoney(pagosVenta.reduce((sum, pago) => sum + Number(pago.monto || 0), 0))
       const factorTotalFinal = data.total > 0 ? totalFinal / data.total : 1
       const subtotalFinal = roundMoney(data.subtotal * factorTotalFinal)
@@ -567,11 +633,30 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           pagos: pagosVenta
         })
       } else {
-        await createVenta({
-          venta: ventaData,
-          items: ventaItems,
-          pagos: pagosVenta
-        })
+        const pagosConfirmados = pagosVenta.filter(pago => pago.tipo_pago !== "mercado_pago")
+        const nuevaVenta = ventaMercadoPagoPendienteId
+          ? { id: ventaMercadoPagoPendienteId }
+          : await createVentaAsync({ venta: ventaData, items: ventaItems, pagos: pagosConfirmados })
+        if (pagoMercadoPago) {
+          setVentaMercadoPagoPendienteId(nuevaVenta.id)
+          try {
+            const importeMercadoPago = getTotalPagosBase([pagoMercadoPago])
+            const result = await runMercadoPago({
+              action: "create_qr",
+              ventaId: nuevaVenta.id,
+              cajaId: mercadoPagoCajaId,
+              importe: importeMercadoPago,
+            })
+            if (!result.operacion?.qr_data) throw new Error("Mercado Pago no devolvio el codigo QR")
+            const qrData = String(result.operacion.qr_data)
+            const image = /^https?:\/\//i.test(qrData) ? qrData : await QRCode.toDataURL(qrData, { width: 360, margin: 2 })
+            setFinalizarDialogOpen(false)
+            setQrCobro({ image, ventaId: nuevaVenta.id, operacionId: result.operacion.id, importe: importeMercadoPago })
+            return
+          } catch (error) {
+            throw new Error(`La venta fue registrada, pero no se pudo generar el QR: ${error instanceof Error ? error.message : "error desconocido"}`)
+          }
+        }
       }
       
       onSuccess()
@@ -1068,6 +1153,21 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
               )}
             />
 
+            {operacionPendienteVenta && (
+              <Card className="border-amber-300 bg-amber-50">
+                <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-amber-900">Cobro Mercado Pago pendiente</p>
+                    <p className="text-sm text-amber-800">Importe: ${Number(operacionPendienteVenta.importe).toFixed(2)}. Todavia no fue registrado como pago de la venta.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={mostrarCobroPendiente}>Volver a mostrar QR</Button>
+                    <Button type="button" variant="destructive" disabled={mercadoPagoWorking} onClick={() => setCancelarMercadoPagoTarget("pendiente")}>Cancelar cobro</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Botones de acción */}
             <div className="flex gap-4 justify-end">
               <Button type="button" variant="cancel" onClick={onSuccess}>
@@ -1174,6 +1274,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                     clienteId={form.watch("cliente_id")}
                     pagos={pagosVenta}
                     onChange={setPagosVenta}
+                    mercadoPagoHabilitado={mercadoPagoHabilitado}
+                    mercadoPagoCajas={mercadoPagoCajas}
+                    mercadoPagoCajaId={mercadoPagoCajaId}
+                    onMercadoPagoCajaChange={setMercadoPagoCajaId}
                   />
                 </div>
 
@@ -1181,12 +1285,44 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   <Button type="button" variant="cancel" onClick={() => setFinalizarDialogOpen(false)}>
                     Volver
                   </Button>
-                  <Button type="button" variant="success" onClick={form.handleSubmit(onSubmit)}>
-                    {venta ? "Confirmar actualizacion" : esPresupuesto ? "Guardar presupuesto" : "Confirmar venta"}
+                  <Button type="button" variant="success" disabled={mercadoPagoWorking} onClick={form.handleSubmit(onSubmit)}>
+                    {mercadoPagoWorking ? "Generando QR..." : venta ? "Confirmar actualizacion" : esPresupuesto ? "Guardar presupuesto" : "Confirmar venta"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            <Dialog open={Boolean(qrCobro)} onOpenChange={(open) => { if (!open) cerrarCobroQr() }}>
+              <DialogContent className="max-w-md text-center">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-center gap-2"><QrCode className="h-5 w-5" />Cobro con Mercado Pago</DialogTitle>
+                </DialogHeader>
+                {qrCobro && <div className="space-y-4"><p>{pagoQrAprobado ? "El pago fue confirmado correctamente." : "La venta fue registrada. El cliente debe escanear el QR fijo de la caja para pagar."}</p><img className="mx-auto w-full max-w-[360px]" src={qrCobro.image} alt="QR de cobro Mercado Pago"/><p className="text-2xl font-bold">${qrCobro.importe.toFixed(2)}</p><div className={`rounded-md p-3 font-semibold ${pagoQrAprobado ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{pagoQrAprobado ? "Pago confirmado" : "Esperando confirmacion de Mercado Pago..."}</div></div>}
+                <DialogFooter className="flex-col gap-2 sm:flex-col">{pagoQrAprobado ? <Button className="w-full" type="button" onClick={cerrarCobroQr}>Finalizar venta</Button> : <><Button className="w-full" variant="outline" type="button" onClick={cerrarCobroQr}>Cerrar y dejar pago pendiente</Button><Button className="w-full" variant="destructive" type="button" disabled={mercadoPagoWorking} onClick={() => setCancelarMercadoPagoTarget("qr")}>Cancelar cobro</Button></>}</DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <AlertDialog open={cancelarMercadoPagoTarget !== null} onOpenChange={(open) => { if (!open) setCancelarMercadoPagoTarget(null) }}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancelar cobro de Mercado Pago</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se cancelará el cobro pendiente. La venta permanecerá registrada sin ese pago.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={mercadoPagoWorking}>Volver</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={mercadoPagoWorking}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      void confirmarCancelacionMercadoPago()
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {mercadoPagoWorking ? "Cancelando..." : "Sí, cancelar cobro"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </form>
         </Form>
       </CardContent>

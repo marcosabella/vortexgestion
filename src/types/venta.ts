@@ -108,7 +108,7 @@ export const getVentaItemCodigo = (item: Pick<VentaItem, "producto" | "codigo_ma
   return codigo.toUpperCase() === "MANUAL" ? "" : codigo;
 };
 
-export type TipoPago = 'contado' | 'transferencia' | 'tarjeta' | 'cheque' | 'cta_cte';
+export type TipoPago = 'contado' | 'transferencia' | 'tarjeta' | 'cheque' | 'cta_cte' | 'mercado_pago';
 
 export type TipoComprobante = 
   | 'factura_a'
@@ -133,10 +133,11 @@ export const TIPOS_PAGO: { value: TipoPago; label: string }[] = [
   { value: 'tarjeta', label: 'Tarjeta' },
   { value: 'cheque', label: 'Cheque' },
   { value: 'cta_cte', label: 'Cuenta Corriente' },
+  { value: 'mercado_pago', label: 'Mercado Pago' },
 ];
 
 export const getTipoPagoLabel = (tipo: TipoPago | string) =>
-  TIPOS_PAGO.find(t => t.value === tipo)?.label || tipo;
+  tipo === 'mercado_pago' ? 'Mercado Pago' : TIPOS_PAGO.find(t => t.value === tipo)?.label || tipo;
 
 export const getVentaTipoPagoLabel = (venta: Pick<Venta, "tipo_pago" | "pagos_venta">) => {
   const pagos = venta.pagos_venta || [];

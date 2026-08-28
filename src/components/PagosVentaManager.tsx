@@ -19,13 +19,21 @@ type PagosVentaManagerProps = {
   clienteId?: string
   pagos: Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">[]
   onChange: (pagos: Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">[]) => void
+  mercadoPagoHabilitado?: boolean
+  mercadoPagoCajas?: Array<{ id: string; nombre: string; sucursal?: { nombre?: string } }>
+  mercadoPagoCajaId?: string
+  onMercadoPagoCajaChange?: (cajaId: string) => void
 }
 
 export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
   totalVenta,
   clienteId,
   pagos,
-  onChange
+  onChange,
+  mercadoPagoHabilitado = false,
+  mercadoPagoCajas = [],
+  mercadoPagoCajaId = "",
+  onMercadoPagoCajaChange,
 }) => {
   const { toast } = useToast()
   const { tarjetas } = useTarjetas()
@@ -105,6 +113,15 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
       toast({
         title: "Error",
         description: "Debe seleccionar un cliente para cargar saldo en cuenta corriente",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (tipoPago === "mercado_pago" && !mercadoPagoCajaId) {
+      toast({
+        title: "Mercado Pago",
+        description: "Debe seleccionar una caja QR",
         variant: "destructive",
       })
       return
@@ -227,7 +244,7 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TIPOS_PAGO.map(tipo => (
+                    {TIPOS_PAGO.filter(tipo => tipo.value !== "mercado_pago" || mercadoPagoHabilitado).map(tipo => (
                       <SelectItem key={tipo.value} value={tipo.value}>
                         {tipo.label}
                       </SelectItem>
@@ -308,6 +325,25 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
                   </div>
                 )}
               </>
+            )}
+
+            {tipoPago === "mercado_pago" && (
+              <div>
+                <Label>Caja Mercado Pago</Label>
+                {mercadoPagoCajas.length === 0 && <p className="mb-2 text-sm text-destructive">No hay una caja QR disponible. Verifique la conexion y la configuracion en el modulo Mercado Pago.</p>}
+                <Select value={mercadoPagoCajaId} onValueChange={onMercadoPagoCajaChange} disabled={mercadoPagoCajas.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar caja QR" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mercadoPagoCajas.map(caja => (
+                      <SelectItem key={caja.id} value={caja.id}>
+                        {caja.sucursal?.nombre ? `${caja.sucursal.nombre} / ` : ""}{caja.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
             <Button type="button" variant="new" onClick={agregarPago} className="w-full">

@@ -270,6 +270,15 @@ export const useVentas = () => {
 
       if (cajaError) throw cajaError;
 
+      // Las operaciones QR pertenecen a la venta. Deben eliminarse antes porque
+      // su restriccion exige conservar una venta o un pedido asociado.
+      const { error: mercadoPagoError } = await (supabase as any)
+        .from("mercadopago_operaciones")
+        .delete()
+        .eq("venta_id", id);
+
+      if (mercadoPagoError) throw mercadoPagoError;
+
       // Then delete the sale
       const { error } = await supabase.from("ventas").delete().eq("id", id);
       if (error) throw error;
@@ -301,6 +310,7 @@ export const useVentas = () => {
     isLoading,
     error,
     createVenta: createVentaMutation.mutate,
+    createVentaAsync: createVentaMutation.mutateAsync,
     updateVenta: updateVentaMutation.mutate,
     deleteVenta: deleteVentaMutation.mutate,
     isCreating: createVentaMutation.isPending,
