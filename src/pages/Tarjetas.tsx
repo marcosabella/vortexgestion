@@ -7,7 +7,7 @@ const Tarjetas = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Tarjetas de Crédito</h1>
           <p className="text-muted-foreground">
-            Administre las tarjetas de crédito, configure cuotas y recargos para ventas
+            Administre las tarjetas de crédito, sus comisiones, cuotas y recargos para ventas
           </p>
         </div>
         <TarjetasList />

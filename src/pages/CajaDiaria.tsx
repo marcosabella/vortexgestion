@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { AlertTriangle, Banknote, Lock, Pencil, Plus, Printer, Trash2, Unlock, WalletCards } from "lucide-react";
 import {
@@ -450,6 +451,27 @@ const CajaDiaria = () => {
                       )}
                     </TableBody>
                   </Table>
+                  {resumen.totalTarjeta > 0 && (
+                    <div className="mt-4 space-y-2 rounded-md border bg-muted/40 p-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Cobrado con tarjetas</span>
+                        <strong>{formatCurrency(resumen.totalTarjeta)}</strong>
+                      </div>
+                      <div className="flex justify-between text-destructive">
+                        <span>Comisiones estimadas</span>
+                        <strong>-{formatCurrency(resumen.totalComisionTarjeta)}</strong>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 text-base">
+                        <span>Neto estimado a acreditar</span>
+                        <strong>{formatCurrency(resumen.totalNetoTarjeta)}</strong>
+                      </div>
+                      <div className="flex justify-end pt-1 no-print">
+                        <Button asChild variant="outline" size="sm">
+                          <Link to="/tarjetas">Ir a conciliación de tarjetas</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

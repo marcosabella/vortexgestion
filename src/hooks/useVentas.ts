@@ -188,10 +188,12 @@ export const useVentas = () => {
       }
 
       // Delete existing pagos
-      await supabase
+      const { error: deletePagosError } = await supabase
         .from("pagos_venta")
         .delete()
         .eq("venta_id", ventaId);
+
+      if (deletePagosError) throw deletePagosError;
 
       // Insert new pagos
       if (pagos.length > 0) {

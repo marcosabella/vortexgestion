@@ -8,6 +8,16 @@ export interface PagoVenta {
   tarjeta_id?: string;
   cuotas?: number;
   recargo_cuotas?: number;
+  porcentaje_comision_aplicado?: number;
+  comision_snapshot_at?: string | null;
+  monto_comision_estimado?: number;
+  monto_neto_estimado?: number;
+  monto_comision_real?: number | null;
+  monto_neto_acreditado?: number | null;
+  fecha_acreditacion?: string | null;
+  referencia_liquidacion?: string | null;
+  observaciones_conciliacion?: string | null;
+  estado_conciliacion?: "no_aplica" | "pendiente" | "conciliada" | "con_diferencia" | "anulada";
   cheque_id?: string;
   created_at?: string;
   updated_at?: string;

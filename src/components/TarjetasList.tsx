@@ -11,6 +11,7 @@ import { Plus, Search, Edit, Trash2, CreditCard, Settings } from "lucide-react";
 import { useTarjetas } from "@/hooks/useTarjetas";
 import { TarjetaForm } from "./TarjetaForm";
 import { TarjetaCuotasForm } from "./TarjetaCuotasForm";
+import { TarjetasConciliacion } from "./TarjetasConciliacion";
 import { TarjetaCredito } from "@/types/tarjeta";
 
 export const TarjetasList = () => {
@@ -67,6 +68,7 @@ export const TarjetasList = () => {
             <TabsList>
               <TabsTrigger value="tarjetas">Tarjetas</TabsTrigger>
               <TabsTrigger value="cuotas">Configuración de Cuotas</TabsTrigger>
+              <TabsTrigger value="conciliacion">Conciliación</TabsTrigger>
             </TabsList>
             
             <TabsContent value="tarjetas" className="space-y-4">
@@ -88,6 +90,7 @@ export const TarjetasList = () => {
                     <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Estado</TableHead>
+                      <TableHead>Comisión</TableHead>
                       <TableHead>Cuotas Configuradas</TableHead>
                       <TableHead>Observaciones</TableHead>
                       <TableHead>Acciones</TableHead>
@@ -106,6 +109,12 @@ export const TarjetasList = () => {
                           <Badge variant={tarjeta.activa ? "default" : "secondary"}>
                             {tarjeta.activa ? "Activa" : "Inactiva"}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {Number(tarjeta.porcentaje_comision || 0).toLocaleString("es-AR", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}%
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
@@ -154,6 +163,10 @@ export const TarjetasList = () => {
 
             <TabsContent value="cuotas">
               <TarjetaCuotasForm />
+            </TabsContent>
+
+            <TabsContent value="conciliacion">
+              <TarjetasConciliacion />
             </TabsContent>
           </Tabs>
         </CardContent>

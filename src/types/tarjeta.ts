@@ -2,6 +2,7 @@ export interface TarjetaCredito {
   id: string;
   nombre: string;
   activa: boolean;
+  porcentaje_comision: number;
   observaciones?: string;
   created_at: string;
   updated_at: string;

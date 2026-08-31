@@ -346,6 +346,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           tarjeta_id: pago.tarjeta_id,
           cuotas: pago.cuotas,
           recargo_cuotas: pago.recargo_cuotas,
+          porcentaje_comision_aplicado: pago.porcentaje_comision_aplicado,
+          monto_comision_estimado: pago.monto_comision_estimado,
+          monto_neto_estimado: pago.monto_neto_estimado,
+          comision_snapshot_at: pago.comision_snapshot_at,
           cheque_id: pago.cheque_id,
         })))
       }

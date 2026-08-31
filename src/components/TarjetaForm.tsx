@@ -11,6 +11,9 @@ import { TarjetaCredito } from "@/types/tarjeta";
 
 const tarjetaSchema = z.object({
   nombre: z.string().min(1, "El nombre de la tarjeta es obligatorio"),
+  porcentaje_comision: z.number()
+    .min(0, "La comisión no puede ser negativa")
+    .max(100, "La comisión no puede superar el 100%"),
   activa: z.boolean(),
   observaciones: z.string().optional().transform(val => val || undefined),
 });
@@ -29,10 +32,12 @@ export const TarjetaForm = ({ tarjeta, onSuccess }: TarjetaFormProps) => {
     resolver: zodResolver(tarjetaSchema),
     defaultValues: tarjeta ? {
       nombre: tarjeta.nombre,
+      porcentaje_comision: Number(tarjeta.porcentaje_comision || 0),
       activa: tarjeta.activa,
       observaciones: tarjeta.observaciones || "",
     } : {
       nombre: "",
+      porcentaje_comision: 0,
       activa: true,
       observaciones: "",
     },
@@ -62,6 +67,31 @@ export const TarjetaForm = ({ tarjeta, onSuccess }: TarjetaFormProps) => {
               <FormControl>
                 <Input placeholder="Ej: Visa, Mastercard, American Express" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="porcentaje_comision"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Comisión de la tarjeta (%)</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="Ej: 10"
+                  {...field}
+                  onChange={(event) => field.onChange(Number(event.target.value))}
+                />
+              </FormControl>
+              <p className="text-sm text-muted-foreground">
+                Porcentaje que la tarjeta descuenta al comercio. Por ejemplo, una comisión del 10% sobre $100 deja un neto de $90.
+              </p>
               <FormMessage />
             </FormItem>
           )}

@@ -50,6 +50,8 @@ export type CajaResumen = {
   totalContado: number;
   totalTransferencia: number;
   totalTarjeta: number;
+  totalComisionTarjeta: number;
+  totalNetoTarjeta: number;
   totalCheque: number;
   totalCuentaCorriente: number;
   ingresosManuales: number;
@@ -111,6 +113,11 @@ export const buildCajaResumen = (
     .reduce((sum, movimiento) => sum + Number(movimiento.monto || 0), 0);
 
   const totalContado = totalPorTipo("contado");
+  const pagosTarjeta = pagos.filter((pago) => pago.tipo_pago === "tarjeta");
+  const totalComisionTarjeta = pagosTarjeta.reduce(
+    (sum, pago) => sum + Number(pago.monto_comision_estimado || 0),
+    0,
+  );
 
   return {
     ventas,
@@ -120,6 +127,8 @@ export const buildCajaResumen = (
     totalContado,
     totalTransferencia: totalPorTipo("transferencia"),
     totalTarjeta: totalPorTipo("tarjeta"),
+    totalComisionTarjeta,
+    totalNetoTarjeta: totalPorTipo("tarjeta") - totalComisionTarjeta,
     totalCheque: totalPorTipo("cheque"),
     totalCuentaCorriente: totalPorTipo("cta_cte"),
     ingresosManuales,

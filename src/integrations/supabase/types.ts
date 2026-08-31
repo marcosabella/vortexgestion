@@ -587,11 +587,21 @@ export type Database = {
           banco_id: string | null
           cheque_id: string | null
           comercio_id: string | null
+          comision_snapshot_at: string | null
           created_at: string
           cuotas: number | null
+          estado_conciliacion: string
+          fecha_acreditacion: string | null
           id: string
           monto: number
+          monto_comision_estimado: number
+          monto_comision_real: number | null
+          monto_neto_acreditado: number | null
+          monto_neto_estimado: number
+          observaciones_conciliacion: string | null
+          porcentaje_comision_aplicado: number
           recargo_cuotas: number | null
+          referencia_liquidacion: string | null
           tarjeta_id: string | null
           tipo_pago: Database["public"]["Enums"]["tipo_pago"]
           updated_at: string
@@ -601,11 +611,21 @@ export type Database = {
           banco_id?: string | null
           cheque_id?: string | null
           comercio_id?: string | null
+          comision_snapshot_at?: string | null
           created_at?: string
           cuotas?: number | null
+          estado_conciliacion?: string
+          fecha_acreditacion?: string | null
           id?: string
           monto?: number
+          monto_comision_estimado?: number
+          monto_comision_real?: number | null
+          monto_neto_acreditado?: number | null
+          monto_neto_estimado?: number
+          observaciones_conciliacion?: string | null
+          porcentaje_comision_aplicado?: number
           recargo_cuotas?: number | null
+          referencia_liquidacion?: string | null
           tarjeta_id?: string | null
           tipo_pago: Database["public"]["Enums"]["tipo_pago"]
           updated_at?: string
@@ -615,11 +635,21 @@ export type Database = {
           banco_id?: string | null
           cheque_id?: string | null
           comercio_id?: string | null
+          comision_snapshot_at?: string | null
           created_at?: string
           cuotas?: number | null
+          estado_conciliacion?: string
+          fecha_acreditacion?: string | null
           id?: string
           monto?: number
+          monto_comision_estimado?: number
+          monto_comision_real?: number | null
+          monto_neto_acreditado?: number | null
+          monto_neto_estimado?: number
+          observaciones_conciliacion?: string | null
+          porcentaje_comision_aplicado?: number
           recargo_cuotas?: number | null
+          referencia_liquidacion?: string | null
           tarjeta_id?: string | null
           tipo_pago?: Database["public"]["Enums"]["tipo_pago"]
           updated_at?: string
@@ -937,6 +967,7 @@ export type Database = {
           id: string
           nombre: string
           observaciones: string | null
+          porcentaje_comision: number
           updated_at: string
         }
         Insert: {
@@ -946,6 +977,7 @@ export type Database = {
           id?: string
           nombre: string
           observaciones?: string | null
+          porcentaje_comision?: number
           updated_at?: string
         }
         Update: {
@@ -955,6 +987,7 @@ export type Database = {
           id?: string
           nombre?: string
           observaciones?: string | null
+          porcentaje_comision?: number
           updated_at?: string
         }
         Relationships: []
