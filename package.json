@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/verify-supabase-env.mjs development && vite --mode development",
     "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build:dev": "node scripts/verify-supabase-env.mjs development && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
   },

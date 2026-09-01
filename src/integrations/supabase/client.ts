@@ -2,13 +2,90 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://zhtqkygjvaaizbdwwsbi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpodHFreWdqdmFhaXpiZHd3c2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5Nzc0OTksImV4cCI6MjA3MjU1MzQ5OX0.z0cddbdYfjrpyGpN9RLtZrl8ExdFJRgSnQUEXNFl8rU";
+const DEVELOPMENT_PROJECT_REF = 'zduznqqgxmvyhlfjupjx';
+const PRODUCTION_PROJECT_REF = 'zhtqkygjvaaizbdwwsbi';
+
+const requiredEnv = {
+  appEnv: import.meta.env.VITE_APP_ENV,
+  projectId: import.meta.env.VITE_SUPABASE_PROJECT_ID,
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  publishableKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+};
+
+for (const [name, value] of Object.entries(requiredEnv)) {
+  if (!value?.trim()) {
+    throw new Error(`[Vortex] Falta la variable de entorno requerida: ${name}`);
+  }
+}
+
+const { appEnv, projectId, supabaseUrl, publishableKey } = requiredEnv as Record<
+  keyof typeof requiredEnv,
+  string
+>;
+
+if (appEnv !== 'development' && appEnv !== 'production') {
+  throw new Error('[Vortex] VITE_APP_ENV debe ser development o production');
+}
+
+const extractProjectRef = (urlValue: string) => {
+  let hostname: string;
+
+  try {
+    hostname = new URL(urlValue).hostname;
+  } catch {
+    throw new Error('[Vortex] VITE_SUPABASE_URL no es una URL valida');
+  }
+
+  const match = hostname.match(/^([a-z0-9]+)\.supabase\.co$/);
+  if (!match) {
+    throw new Error('[Vortex] VITE_SUPABASE_URL no corresponde a un proyecto Supabase valido');
+  }
+
+  return match[1];
+};
+
+const decodeJwtRole = (key: string) => {
+  const parts = key.split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const payload = JSON.parse(atob(padded)) as { role?: unknown };
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    throw new Error('[Vortex] VITE_SUPABASE_PUBLISHABLE_KEY tiene un JWT invalido');
+  }
+};
+
+const urlProjectRef = extractProjectRef(supabaseUrl);
+
+if (urlProjectRef !== projectId) {
+  throw new Error('[Vortex] La URL de Supabase no coincide con VITE_SUPABASE_PROJECT_ID');
+}
+
+if (publishableKey.startsWith('sb_secret_')) {
+  throw new Error('[Vortex] No se permite una clave secreta en el frontend');
+}
+
+if (decodeJwtRole(publishableKey) === 'service_role') {
+  throw new Error('[Vortex] No se permite una clave service_role en el frontend');
+}
+
+if (appEnv === 'development') {
+  if (projectId === PRODUCTION_PROJECT_REF) {
+    throw new Error('[Vortex] Produccion esta prohibida durante el desarrollo local');
+  }
+
+  if (projectId !== DEVELOPMENT_PROJECT_REF) {
+    throw new Error('[Vortex] Desarrollo debe usar exclusivamente el proyecto Supabase autorizado');
+  }
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(supabaseUrl, publishableKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
