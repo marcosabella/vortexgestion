@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
-import { Search, Sprout } from "lucide-react";
+import { Plus, Search, Sprout } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoEstablecimientos } from "@/hooks/useCampoEstablecimientos";
 import type { CampoEstablecimientoListItem, CampoEstadoFilter } from "@/types/campo";
+import { EstablecimientoForm } from "@/components/campo/EstablecimientoForm";
 
 type EstablecimientosListProps = {
   comercioId: string | null;
@@ -38,6 +41,7 @@ function EstadoBadge({ activo }: { activo: boolean }) {
 export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoading }: EstablecimientosListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [estado, setEstado] = useState<CampoEstadoFilter>("activos");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const access = useCampoAccess(comercioId);
   const establecimientosQuery = useCampoEstablecimientos(comercioId, access.perteneceAlComercio);
 
@@ -80,8 +84,32 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
             {comercioNombre ? `Comercio activo: ${comercioNombre}` : "Establecimientos del comercio activo"}
           </p>
         </div>
-        {!isLoading && <Badge variant="outline">{roleLabel}</Badge>}
+        <div className="flex items-center gap-2">
+          {!isLoading && <Badge variant="outline">{roleLabel}</Badge>}
+          {!isLoading && comercioId && access.perteneceAlComercio && access.isAdmin && (
+            <Button variant="new" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nuevo establecimiento
+            </Button>
+          )}
+        </div>
       </div>
+
+      {comercioId && access.perteneceAlComercio && access.isAdmin && (
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nuevo establecimiento</DialogTitle>
+            </DialogHeader>
+            <EstablecimientoForm
+              comercioId={comercioId}
+              hasAccess={access.perteneceAlComercio}
+              isAdmin={access.isAdmin}
+              onSuccess={() => setIsCreateDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1 sm:max-w-md">
