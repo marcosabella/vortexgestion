@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database, QrCode } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database, QrCode, Sprout } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema }> = [
+const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema; activePrefix?: string }> = [
   { title: "Caja Diaria", url: "/caja", icon: Banknote, modulo: "caja" },
   { title: "Clientes", url: "/clientes", icon: Users, modulo: "clientes" },
   { title: "Proveedores", url: "/proveedores", icon: Truck, modulo: "proveedores" },
@@ -33,6 +33,7 @@ const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modu
   { title: "Presupuestos", url: "/presupuestos", icon: ClipboardList, modulo: "presupuestos" },
   { title: "Cuenta Corriente", url: "/cuenta-corriente", icon: CreditCard, modulo: "cuenta_corriente" },
   { title: "Cartera de Cheques", url: "/cheques", icon: Receipt, modulo: "cheques" },
+  { title: "Vortex Campo", url: "/campo/establecimientos", icon: Sprout, modulo: "campo", activePrefix: "/campo" },
   { title: "Notificaciones", url: "/notificaciones", icon: Bell },
 ]
 
@@ -70,6 +71,8 @@ export function AppSidebar() {
   const enabledConfiguracionItems = configuracionItems.filter((item) => isModuloEnabled(item.modulo))
 
   const isActive = (path: string) => currentPath === path
+  const isMenuItemActive = (item: (typeof menuItems)[number]) =>
+    item.activePrefix ? currentPath === item.activePrefix || currentPath.startsWith(`${item.activePrefix}/`) : isActive(item.url)
   const isConfiguracionActive = currentPath === '/comercio' || enabledConfiguracionItems.some((item) => currentPath === item.url)
   const isListadosActive = parametrizacion.modulos.listados && currentPath.startsWith('/listados')
   const closeMobileMenu = () => {
@@ -98,7 +101,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    className={`mx-2 ${isActive(item.url)
+                    className={`mx-2 ${isMenuItemActive(item)
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                     }`}

@@ -13,7 +13,8 @@ export type ModuloSistema =
   | "seguridad"
   | "listados"
   | "pedidos_online"
-  | "mercado_pago";
+  | "mercado_pago"
+  | "campo";
 
 export type FuncionSistema =
   | "venta_items_manuales"
@@ -52,6 +53,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "listados", label: "Listados", description: "Reportes imprimibles y exportables." },
   { key: "pedidos_online", label: "Pedidos online", description: "Gestion de pedidos recibidos desde la tienda online." },
   { key: "mercado_pago", label: "Mercado Pago", description: "Checkout online, cobros QR y conciliacion por comercio." },
+  { key: "campo", label: "Vortex Campo", description: "Consulta de establecimientos y lotes del comercio." },
 ];
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
@@ -74,6 +76,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     ),
     pedidos_online: false,
     mercado_pago: true,
+    campo: false,
   },
   funciones: {
     ...FUNCIONES_SISTEMA.reduce(

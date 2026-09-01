@@ -52,6 +52,7 @@ import ListadoProductos from "./pages/listados/ListadoProductos";
 import ListadoVentas from "./pages/listados/ListadoVentas";
 import ListadoCuentaCorriente from "./pages/listados/ListadoCuentaCorriente";
 import ListadoCaja from "./pages/listados/ListadoCaja";
+import CampoEstablecimientos from "./pages/CampoEstablecimientos";
 
 const queryClient = new QueryClient();
 
@@ -160,6 +161,8 @@ function AuthenticatedLayout() {
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
+              <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
+              <Route path="/campo/establecimientos" element={<ParametrizedRoute modulo="campo"><CampoEstablecimientos /></ParametrizedRoute>} />
               <Route path="/listados/clientes" element={<ParametrizedRoute modulo="listados"><ListadoClientes /></ParametrizedRoute>} />
               <Route path="/listados/proveedores" element={<ParametrizedRoute modulo="listados"><ListadoProveedores /></ParametrizedRoute>} />
               <Route path="/listados/productos" element={<ParametrizedRoute modulo="listados"><ListadoProductos /></ParametrizedRoute>} />
