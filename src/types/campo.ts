@@ -2,6 +2,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type EstablecimientoRow = Database["public"]["Tables"]["campo_establecimientos"]["Row"];
 type EstablecimientoInsert = Database["public"]["Tables"]["campo_establecimientos"]["Insert"];
+type LoteRow = Database["public"]["Tables"]["campo_lotes"]["Row"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
@@ -23,6 +24,18 @@ export type CampoEstablecimientoListItem = Pick<
 };
 
 export type CampoEstadoFilter = "activos" | "inactivos" | "todos";
+
+export type CampoEstablecimientoDetail = Pick<
+  EstablecimientoRow,
+  "id" | "nombre" | "codigo_interno" | "activo"
+> & {
+  cliente: Pick<ClienteRow, "nombre" | "apellido"> | null;
+};
+
+export type CampoLoteListItem = Pick<
+  LoteRow,
+  "id" | "nombre" | "codigo_interno" | "superficie_ha" | "observaciones" | "activo"
+>;
 
 export type CampoClienteOption = Pick<ClienteRow, "id" | "nombre" | "apellido" | "tipo_persona">;
 

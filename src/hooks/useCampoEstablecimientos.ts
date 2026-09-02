@@ -3,13 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type {
   CampoEstablecimientoCreatePayload,
+  CampoEstablecimientoDetail,
   CampoEstablecimientoListItem,
   CampoEstablecimientoStatusParams,
   CampoEstablecimientoUpdateParams,
   CampoEstablecimientoUpdatePayload,
 } from "@/types/campo";
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isCampoUuid } from "@/utils/campo";
 
 function campoCreateErrorMessage(error: unknown) {
   const supabaseError = error as { code?: string; message?: string };
@@ -95,15 +95,48 @@ export function useCampoEstablecimientos(comercioId?: string | null, hasAccess =
   });
 }
 
+export function useCampoEstablecimiento(
+  comercioId?: string | null,
+  establecimientoId?: string | null,
+  hasAccess = false,
+) {
+  return useQuery({
+    queryKey: ["campo", comercioId ?? null, "establecimientos", establecimientoId ?? null],
+    enabled: isCampoUuid(comercioId) && isCampoUuid(establecimientoId) && hasAccess,
+    queryFn: async (): Promise<CampoEstablecimientoDetail | null> => {
+      if (!isCampoUuid(comercioId) || !isCampoUuid(establecimientoId) || !hasAccess) return null;
+
+      const { data, error } = await supabase
+        .from("campo_establecimientos")
+        .select(`
+          id,
+          nombre,
+          codigo_interno,
+          activo,
+          cliente:clientes!campo_establecimientos_cliente_id_fkey(
+            nombre,
+            apellido
+          )
+        `)
+        .eq("id", establecimientoId)
+        .eq("comercio_id", comercioId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useUpdateCampoEstablecimiento(comercioId?: string | null, isAdmin = false) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ establecimientoId, payload: values }: CampoEstablecimientoUpdateParams) => {
-      if (!comercioId || !UUID_PATTERN.test(comercioId) || !isAdmin) {
+      if (!isCampoUuid(comercioId) || !isAdmin) {
         throw new Error("No tenés permisos para modificar establecimientos en este comercio.");
       }
-      if (!UUID_PATTERN.test(establecimientoId)) throw new Error("El establecimiento indicado no es válido.");
+      if (!isCampoUuid(establecimientoId)) throw new Error("El establecimiento indicado no es válido.");
       if (!values.cliente_id) throw new Error("El cliente es obligatorio.");
 
       const payload: CampoEstablecimientoUpdatePayload = {
@@ -146,10 +179,10 @@ export function useSetCampoEstablecimientoStatus(comercioId?: string | null, isA
 
   return useMutation({
     mutationFn: async ({ establecimientoId, nuevoEstado }: CampoEstablecimientoStatusParams) => {
-      if (!comercioId || !UUID_PATTERN.test(comercioId) || !isAdmin) {
+      if (!isCampoUuid(comercioId) || !isAdmin) {
         throw new Error("No tenés permisos para modificar establecimientos en este comercio.");
       }
-      if (!UUID_PATTERN.test(establecimientoId)) throw new Error("El establecimiento indicado no es válido.");
+      if (!isCampoUuid(establecimientoId)) throw new Error("El establecimiento indicado no es válido.");
 
       const { data, error } = await supabase
         .from("campo_establecimientos")

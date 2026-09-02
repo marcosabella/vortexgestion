@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Power, PowerOff, Search, Sprout } from "lucide-react";
+import { Eye, Pencil, Plus, Power, PowerOff, Search, Sprout } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,27 +51,45 @@ function EstadoBadge({ activo }: { activo: boolean }) {
 
 type EstablecimientoActionsProps = {
   establecimiento: CampoEstablecimientoListItem;
-  disabled: boolean;
+  isAdmin: boolean;
+  statusDisabled: boolean;
+  onViewLotes: (establecimientoId: string) => void;
   onEdit: (establecimiento: CampoEstablecimientoListItem) => void;
   onStatus: (establecimiento: CampoEstablecimientoListItem) => void;
 };
 
-function EstablecimientoActions({ establecimiento, disabled, onEdit, onStatus }: EstablecimientoActionsProps) {
+function EstablecimientoActions({
+  establecimiento,
+  isAdmin,
+  statusDisabled,
+  onViewLotes,
+  onEdit,
+  onStatus,
+}: EstablecimientoActionsProps) {
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onEdit(establecimiento)}>
-        <Pencil className="h-4 w-4" />
-        Editar
+      <Button type="button" variant="outline" size="sm" onClick={() => onViewLotes(establecimiento.id)}>
+        <Eye className="h-4 w-4" />
+        Ver lotes
       </Button>
-      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onStatus(establecimiento)}>
-        {establecimiento.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-        {establecimiento.activo ? "Desactivar" : "Reactivar"}
-      </Button>
+      {isAdmin && (
+        <>
+          <Button type="button" variant="outline" size="sm" disabled={statusDisabled} onClick={() => onEdit(establecimiento)}>
+            <Pencil className="h-4 w-4" />
+            Editar
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={statusDisabled} onClick={() => onStatus(establecimiento)}>
+            {establecimiento.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+            {establecimiento.activo ? "Desactivar" : "Reactivar"}
+          </Button>
+        </>
+      )}
     </div>
   );
 }
 
 export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoading }: EstablecimientosListProps) {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [estado, setEstado] = useState<CampoEstadoFilter>("activos");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -273,11 +292,16 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                   <div><span className="block text-muted-foreground">Cliente</span>{clienteNombre(establecimiento)}</div>
                   <div><span className="block text-muted-foreground">Localidad</span>{establecimiento.localidad || "Sin informar"}</div>
                   <div className="col-span-2"><span className="block text-muted-foreground">Superficie total</span>{superficieLabel(establecimiento.superficie_total_ha)}</div>
-                  {access.isAdmin && (
-                    <div className="col-span-2 pt-2">
-                      <EstablecimientoActions establecimiento={establecimiento} disabled={setStatus.isPending} onEdit={setEditingEstablecimiento} onStatus={setStatusEstablecimiento} />
-                    </div>
-                  )}
+                  <div className="col-span-2 pt-2">
+                    <EstablecimientoActions
+                      establecimiento={establecimiento}
+                      isAdmin={access.isAdmin}
+                      statusDisabled={setStatus.isPending}
+                      onViewLotes={(id) => navigate(`/campo/establecimientos/${id}/lotes`)}
+                      onEdit={setEditingEstablecimiento}
+                      onStatus={setStatusEstablecimiento}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -294,7 +318,7 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                     <TableHead>Localidad</TableHead>
                     <TableHead>Superficie total</TableHead>
                     <TableHead>Estado</TableHead>
-                    {access.isAdmin && <TableHead className="text-right">Acciones</TableHead>}
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -306,11 +330,16 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                       <TableCell>{establecimiento.localidad || "Sin informar"}</TableCell>
                       <TableCell>{superficieLabel(establecimiento.superficie_total_ha)}</TableCell>
                       <TableCell><EstadoBadge activo={establecimiento.activo} /></TableCell>
-                      {access.isAdmin && (
-                        <TableCell>
-                          <EstablecimientoActions establecimiento={establecimiento} disabled={setStatus.isPending} onEdit={setEditingEstablecimiento} onStatus={setStatusEstablecimiento} />
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        <EstablecimientoActions
+                          establecimiento={establecimiento}
+                          isAdmin={access.isAdmin}
+                          statusDisabled={setStatus.isPending}
+                          onViewLotes={(id) => navigate(`/campo/establecimientos/${id}/lotes`)}
+                          onEdit={setEditingEstablecimiento}
+                          onStatus={setStatusEstablecimiento}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
