@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OrdenDetalle } from "@/components/campo/OrdenDetalle";
 import { OrdenForm } from "@/components/campo/OrdenForm";
+import { OrdenLaborForm } from "@/components/campo/OrdenLaborForm";
+import { OrdenLaboresList } from "@/components/campo/OrdenLaboresList";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoOrdenDetalle } from "@/hooks/useCampoOrdenDetalle";
+import { useCampoOrdenLabores } from "@/hooks/useCampoOrdenLabores";
 import { useComercio } from "@/hooks/useComercio";
 import { isCampoUuid } from "@/utils/campo";
 
@@ -26,19 +29,31 @@ export default function CampoOrdenDetalle() {
   const hasConfirmedAccess = access.perteneceAlComercio && !access.isLoading && !access.error;
   const ordenQuery = useCampoOrdenDetalle(comercioId, ordenId, hasConfirmedAccess && idValido);
   const orden = hasConfirmedAccess && idValido ? ordenQuery.data : null;
+  const laboresQuery = useCampoOrdenLabores(comercioId, ordenId, hasConfirmedAccess && idValido, orden);
+  const labores = hasConfirmedAccess && orden ? laboresQuery.data : undefined;
   const canEdit = Boolean(orden && access.isAdmin && orden.estado === "borrador");
+  const canCreateLabor = Boolean(canEdit && orden?.establecimiento?.activo === true);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditPending, setIsEditPending] = useState(false);
+  const [isLaborOpen, setIsLaborOpen] = useState(false);
+  const [isLaborPending, setIsLaborPending] = useState(false);
   const closeEdit = useCallback(() => setIsEditOpen(false), []);
+  const closeLabor = useCallback(() => setIsLaborOpen(false), []);
 
   useEffect(() => {
     setIsEditOpen(false);
     setIsEditPending(false);
+    setIsLaborOpen(false);
+    setIsLaborPending(false);
   }, [comercioId, ordenId]);
 
   useEffect(() => {
     if (!canEdit) setIsEditOpen(false);
   }, [canEdit]);
+
+  useEffect(() => {
+    if (!canCreateLabor) setIsLaborOpen(false);
+  }, [canCreateLabor]);
 
   let content: React.ReactNode;
   if (isComercioLoading) content = <PageMessage>Cargando comercio...</PageMessage>;
@@ -50,7 +65,23 @@ export default function CampoOrdenDetalle() {
   else if (ordenQuery.isLoading) content = <PageMessage>Cargando orden...</PageMessage>;
   else if (ordenQuery.error) content = <PageMessage destructive>No se pudo cargar la orden. Intentá nuevamente.</PageMessage>;
   else if (!orden) content = <PageMessage>Orden no encontrada o sin acceso.</PageMessage>;
-  else content = <OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} />;
+  else content = (
+    <>
+      <OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} />
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-6">
+          <h2 className="text-xl font-semibold">Labores planificadas</h2>
+          {canCreateLabor && <Button type="button" variant="success" onClick={() => setIsLaborOpen(true)}><Plus className="h-4 w-4" />Nueva labor</Button>}
+        </div>
+        <CardContent className="pt-6">
+          {orden.establecimiento?.activo === false && <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">No pueden agregarse labores mientras el establecimiento esté inactivo.</p>}
+          {laboresQuery.isLoading ? <p className="py-8 text-center text-muted-foreground">Cargando labores...</p>
+            : laboresQuery.error ? <p className="py-8 text-center text-destructive">No se pudieron cargar las labores.</p>
+              : <OrdenLaboresList labores={labores ?? []} />}
+        </CardContent>
+      </Card>
+    </>
+  );
 
   return (
     <div className="container mx-auto space-y-6 p-4 sm:p-6 lg:p-8">
@@ -74,6 +105,25 @@ export default function CampoOrdenDetalle() {
               onSuccess={closeEdit}
               onCancel={closeEdit}
               onSavingChange={setIsEditPending}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {canCreateLabor && comercioId && ordenId && orden && (
+        <Dialog open={isLaborOpen} onOpenChange={(open) => { if (!isLaborPending) setIsLaborOpen(open); }}>
+          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onEscapeKeyDown={(event) => { if (isLaborPending) event.preventDefault(); }} onInteractOutside={(event) => { if (isLaborPending) event.preventDefault(); }}>
+            <DialogHeader><DialogTitle>Nueva labor</DialogTitle></DialogHeader>
+            <OrdenLaborForm
+              key={orden.id}
+              comercioId={comercioId}
+              ordenId={ordenId}
+              hasAccess={hasConfirmedAccess}
+              isAdmin={access.isAdmin}
+              orden={orden}
+              onSuccess={closeLabor}
+              onCancel={closeLabor}
+              onSavingChange={setIsLaborPending}
             />
           </DialogContent>
         </Dialog>

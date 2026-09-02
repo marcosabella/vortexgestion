@@ -9,6 +9,8 @@ type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 type OrdenTrabajoRow = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Row"];
 type OrdenTrabajoInsert = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Insert"];
 type OrdenTrabajoUpdate = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Update"];
+type OrdenLaborRow = Database["public"]["Tables"]["campo_orden_labores"]["Row"];
+type OrdenLaborInsert = Database["public"]["Tables"]["campo_orden_labores"]["Insert"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -117,6 +119,37 @@ export type CampoOrdenUpdateParams = {
   ordenId: string;
   payload: CampoOrdenUpdatePayload;
 };
+
+export type CampoOrdenLaborUnidad = "ha" | "hora" | "km" | "tonelada" | "unidad" | "fijo";
+
+export type CampoOrdenLaborListItem = Pick<
+  OrdenLaborRow,
+  | "id"
+  | "orden_id"
+  | "nombre"
+  | "codigo_interno"
+  | "descripcion"
+  | "unidad"
+  | "posicion"
+  | "activo"
+  | "created_at"
+  | "updated_at"
+>;
+
+export type CampoOrdenLaborFormValues = {
+  nombre: string;
+  codigo_interno: string;
+  descripcion: string;
+  unidad: CampoOrdenLaborUnidad;
+  posicion: string;
+};
+
+export type CampoOrdenLaborCreatePayload = Pick<
+  OrdenLaborInsert,
+  "comercio_id" | "orden_id" | "nombre" | "codigo_interno" | "descripcion" | "unidad" | "posicion"
+>;
+
+export type CampoOrdenLaborCreateParams = Omit<CampoOrdenLaborCreatePayload, "comercio_id" | "orden_id">;
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,
