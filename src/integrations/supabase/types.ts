@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -392,6 +392,218 @@ export type Database = {
           },
           {
             foreignKeyName: "campo_lotes_establecimiento_id_fkey"
+            columns: ["establecimiento_id"]
+            isOneToOne: false
+            referencedRelation: "campo_establecimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_orden_labor_lotes: {
+        Row: {
+          activo: boolean
+          cantidad_planificada: number
+          comercio_id: string
+          created_at: string
+          created_by: string
+          id: string
+          lote_id: string
+          observaciones: string | null
+          orden_labor_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad_planificada: number
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          lote_id: string
+          observaciones?: string | null
+          orden_labor_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad_planificada?: number
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          lote_id?: string
+          observaciones?: string | null
+          orden_labor_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_labor_lotes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labor_lotes_labor_fkey"
+            columns: ["comercio_id", "orden_labor_id"]
+            isOneToOne: false
+            referencedRelation: "campo_orden_labores"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labor_lotes_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "campo_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_orden_labores: {
+        Row: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          orden_id: string
+          posicion: number
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          orden_id: string
+          posicion?: number
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          orden_id?: string
+          posicion?: number
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_labores_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labores_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_ordenes_trabajo: {
+        Row: {
+          cancelada_at: string | null
+          cliente_id: string
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          establecimiento_id: string
+          estado: string
+          fecha_fin_planificada: string | null
+          fecha_inicio_planificada: string | null
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string | null
+          numero: number
+          observaciones: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cancelada_at?: string | null
+          cliente_id: string
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          establecimiento_id: string
+          estado?: string
+          fecha_fin_planificada?: string | null
+          fecha_inicio_planificada?: string | null
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string | null
+          numero?: number
+          observaciones?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          cancelada_at?: string | null
+          cliente_id?: string
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          establecimiento_id?: string
+          estado?: string
+          fecha_fin_planificada?: string | null
+          fecha_inicio_planificada?: string | null
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string | null
+          numero?: number
+          observaciones?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_ordenes_trabajo_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_ordenes_trabajo_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_ordenes_trabajo_establecimiento_id_fkey"
             columns: ["establecimiento_id"]
             isOneToOne: false
             referencedRelation: "campo_establecimientos"
@@ -3197,12 +3409,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3226,11 +3438,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3251,11 +3463,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3276,11 +3488,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3293,11 +3505,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
