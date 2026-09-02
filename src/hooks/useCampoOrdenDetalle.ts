@@ -7,6 +7,8 @@ import type {
   CampoOrdenDetail,
   CampoOrdenUpdateParams,
   CampoOrdenUpdatePayload,
+  CampoOrdenStatusParams,
+  CampoOrdenStatusPayload,
 } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
 
@@ -165,5 +167,62 @@ export function useUpdateCampoOrden(
     onError: (error) => {
       toast({ title: "No se pudo actualizar la orden", description: campoOrdenUpdateErrorMessage(error), variant: "destructive" });
     },
+  });
+}
+
+function campoOrdenStatusErrorMessage(error: unknown) {
+  const safeError = error as { code?: string; message?: string };
+  const message = safeError.message?.toLocaleLowerCase("es") ?? "";
+
+  if (message.includes("campo_orden_sin_labores_activas")) return "La orden necesita al menos una labor activa.";
+  if (message.includes("campo_labor_sin_lotes_activos")) return "Cada labor activa debe tener al menos un lote activo asignado.";
+  if (message.includes("campo_asignacion_no_disponible_planificar")) return "Revisá que los lotes estén activos, pertenezcan al establecimiento y tengan cantidades válidas.";
+  if (message.includes("campo_establecimiento_no_disponible_planificar")) return "El establecimiento debe estar activo para planificar.";
+  if (message.includes("campo_cliente_no_coincide_establecimiento")) return "El cliente de la orden ya no coincide con el establecimiento.";
+  if (message.includes("campo_transicion_orden_no_habilitada") || message.includes("campo_planificacion_congelada") || message.includes("estado actual no coincide")) return "La orden cambió de estado. Actualizá la página e intentá nuevamente.";
+  if (message.includes("orden no está disponible o su estado cambió")) return "La orden no está disponible o su estado cambió.";
+  if (safeError.code === "PGRST116") return "La orden no está disponible o su estado cambió.";
+  if (safeError.code === "42501" || message.includes("row-level security") || message.includes("permission denied") || message.includes("no tenés permisos")) return "No tenés permisos para cambiar el estado de esta orden.";
+  return "No se pudo cambiar el estado de la orden. Intentá nuevamente.";
+}
+
+export function useSetCampoOrdenStatus(
+  comercioId: string | null | undefined,
+  ordenId: string | null | undefined,
+  hasAccess: boolean,
+  isAdmin: boolean,
+  orden: CampoOrdenDetail | null | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ estadoActual, nuevoEstado }: CampoOrdenStatusParams) => {
+      if (!isCampoUuid(comercioId) || !isCampoUuid(ordenId) || !hasAccess || !isAdmin) throw new Error("No tenés permisos para cambiar el estado de esta orden.");
+      if (!orden || orden.id !== ordenId) throw new Error("La orden no está disponible o su estado cambió.");
+      if (orden.estado !== estadoActual) throw new Error("El estado actual no coincide.");
+      const transitionAllowed = (estadoActual === "borrador" && nuevoEstado === "planificada") || (estadoActual === "planificada" && nuevoEstado === "borrador");
+      if (!transitionAllowed) throw new Error("campo_transicion_orden_no_habilitada");
+      if (nuevoEstado === "planificada" && orden.establecimiento?.activo !== true) throw new Error("campo_establecimiento_no_disponible_planificar");
+
+      const payload: CampoOrdenStatusPayload = { estado: nuevoEstado };
+      const { data, error } = await supabase
+        .from("campo_ordenes_trabajo")
+        .update(payload)
+        .eq("id", ordenId)
+        .eq("comercio_id", comercioId)
+        .eq("estado", estadoActual)
+        .select("id, numero, estado")
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async (data) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "ordenes"] }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId] }),
+      ]);
+      toast({ title: data.estado === "planificada" ? `Orden N.º ${data.numero} planificada` : `Orden N.º ${data.numero} reabierta como borrador` });
+    },
+    onError: (error) => toast({ title: "No se pudo cambiar el estado", description: campoOrdenStatusErrorMessage(error), variant: "destructive" }),
   });
 }

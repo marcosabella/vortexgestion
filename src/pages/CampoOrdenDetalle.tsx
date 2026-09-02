@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,10 +11,11 @@ import { OrdenForm } from "@/components/campo/OrdenForm";
 import { OrdenLaborForm } from "@/components/campo/OrdenLaborForm";
 import { OrdenLaboresList } from "@/components/campo/OrdenLaboresList";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
-import { useCampoOrdenDetalle } from "@/hooks/useCampoOrdenDetalle";
+import { useCampoOrdenDetalle, useSetCampoOrdenStatus } from "@/hooks/useCampoOrdenDetalle";
 import { useCampoOrdenLabores } from "@/hooks/useCampoOrdenLabores";
 import { useComercio } from "@/hooks/useComercio";
 import { isCampoUuid } from "@/utils/campo";
+import type { CampoOrdenTransitionState } from "@/types/campo";
 
 function PageMessage({ children, destructive = false }: { children: React.ReactNode; destructive?: boolean }) {
   return <Card><CardContent className={`py-12 text-center ${destructive ? "text-destructive" : "text-muted-foreground"}`}>{children}</CardContent></Card>;
@@ -31,12 +33,17 @@ export default function CampoOrdenDetalle() {
   const orden = hasConfirmedAccess && idValido ? ordenQuery.data : null;
   const laboresQuery = useCampoOrdenLabores(comercioId, ordenId, hasConfirmedAccess && idValido, orden);
   const labores = hasConfirmedAccess && orden ? laboresQuery.data : undefined;
-  const canEdit = Boolean(orden && access.isAdmin && orden.estado === "borrador");
+  const setOrdenStatus = useSetCampoOrdenStatus(comercioId, ordenId, hasConfirmedAccess, access.isAdmin, orden);
+  const actionsAdmin = access.isAdmin && !setOrdenStatus.isPending;
+  const canEdit = Boolean(orden && actionsAdmin && orden.estado === "borrador");
   const canCreateLabor = Boolean(canEdit && orden?.establecimiento?.activo === true);
+  const canPlan = Boolean(orden && actionsAdmin && orden.estado === "borrador" && orden.establecimiento?.activo === true);
+  const canReopen = Boolean(orden && actionsAdmin && orden.estado === "planificada");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditPending, setIsEditPending] = useState(false);
   const [isLaborOpen, setIsLaborOpen] = useState(false);
   const [isLaborPending, setIsLaborPending] = useState(false);
+  const [targetStatus, setTargetStatus] = useState<CampoOrdenTransitionState | null>(null);
   const closeEdit = useCallback(() => setIsEditOpen(false), []);
   const closeLabor = useCallback(() => setIsLaborOpen(false), []);
 
@@ -45,6 +52,7 @@ export default function CampoOrdenDetalle() {
     setIsEditPending(false);
     setIsLaborOpen(false);
     setIsLaborPending(false);
+    setTargetStatus(null);
   }, [comercioId, ordenId]);
 
   useEffect(() => {
@@ -54,6 +62,16 @@ export default function CampoOrdenDetalle() {
   useEffect(() => {
     if (!canCreateLabor) setIsLaborOpen(false);
   }, [canCreateLabor]);
+
+  const confirmStatusChange = async () => {
+    if (!orden || !targetStatus || (orden.estado !== "borrador" && orden.estado !== "planificada")) return;
+    try {
+      await setOrdenStatus.mutateAsync({ estadoActual: orden.estado, nuevoEstado: targetStatus });
+      setTargetStatus(null);
+    } catch {
+      // El hook conserva la confirmación abierta y muestra un mensaje seguro.
+    }
+  };
 
   let content: React.ReactNode;
   if (isComercioLoading) content = <PageMessage>Cargando comercio...</PageMessage>;
@@ -67,7 +85,7 @@ export default function CampoOrdenDetalle() {
   else if (!orden) content = <PageMessage>Orden no encontrada o sin acceso.</PageMessage>;
   else content = (
     <>
-      <OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} />
+      <OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} canPlan={canPlan} canReopen={canReopen} onPlan={() => setTargetStatus("planificada")} onReopen={() => setTargetStatus("borrador")} />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-6">
           <h2 className="text-xl font-semibold">Labores planificadas</h2>
@@ -77,7 +95,7 @@ export default function CampoOrdenDetalle() {
           {orden.establecimiento?.activo === false && <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">No pueden agregarse labores mientras el establecimiento esté inactivo.</p>}
           {laboresQuery.isLoading ? <p className="py-8 text-center text-muted-foreground">Cargando labores...</p>
             : laboresQuery.error ? <p className="py-8 text-center text-destructive">No se pudieron cargar las labores.</p>
-              : <OrdenLaboresList comercioId={comercioId} ordenId={ordenId} hasAccess={hasConfirmedAccess} isAdmin={access.isAdmin} orden={orden} labores={labores ?? []} />}
+              : <OrdenLaboresList comercioId={comercioId} ordenId={ordenId} hasAccess={hasConfirmedAccess} isAdmin={actionsAdmin} orden={orden} labores={labores ?? []} />}
         </CardContent>
       </Card>
     </>
@@ -128,6 +146,21 @@ export default function CampoOrdenDetalle() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {orden && targetStatus && (
+        <AlertDialog open onOpenChange={(open) => { if (!open && !setOrdenStatus.isPending) setTargetStatus(null); }}>
+          <AlertDialogContent onEscapeKeyDown={(event) => { if (setOrdenStatus.isPending) event.preventDefault(); }} onInteractOutside={(event) => { if (setOrdenStatus.isPending) event.preventDefault(); }}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{targetStatus === "planificada" ? "¿Planificar esta orden?" : "¿Reabrir esta orden como borrador?"}</AlertDialogTitle>
+              <AlertDialogDescription>{targetStatus === "planificada" ? "Al planificarla, la cabecera, las labores y las asignaciones quedarán congeladas. Solo podrá modificarlas después de reabrir la orden como borrador." : "Las labores y asignaciones volverán a quedar disponibles para edición. Los datos existentes se conservarán."}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={setOrdenStatus.isPending}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction disabled={setOrdenStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatusChange(); }}>{setOrdenStatus.isPending ? "Guardando..." : targetStatus === "planificada" ? "Planificar orden" : "Reabrir como borrador"}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

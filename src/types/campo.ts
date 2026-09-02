@@ -124,6 +124,15 @@ export type CampoOrdenUpdateParams = {
   payload: CampoOrdenUpdatePayload;
 };
 
+export type CampoOrdenTransitionState = "borrador" | "planificada";
+export type CampoOrdenStatusPayload = Required<Pick<OrdenTrabajoUpdate, "estado">> & {
+  estado: CampoOrdenTransitionState;
+};
+export type CampoOrdenStatusParams = {
+  estadoActual: CampoOrdenTransitionState;
+  nuevoEstado: CampoOrdenTransitionState;
+};
+
 export type CampoOrdenLaborUnidad = "ha" | "hora" | "km" | "tonelada" | "unidad" | "fijo";
 
 export type CampoOrdenLaborListItem = Pick<
