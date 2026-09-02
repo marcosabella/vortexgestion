@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,8 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCampoClientes } from "@/hooks/useCampoClientes";
-import { useCreateCampoEstablecimiento } from "@/hooks/useCampoEstablecimientos";
-import type { CampoClienteOption, CampoEstablecimientoCreatePayload } from "@/types/campo";
+import { useCreateCampoEstablecimiento, useUpdateCampoEstablecimiento } from "@/hooks/useCampoEstablecimientos";
+import type {
+  CampoClienteOption,
+  CampoEstablecimientoCreatePayload,
+  CampoEstablecimientoListItem,
+  CampoEstablecimientoUpdatePayload,
+} from "@/types/campo";
 
 const optionalText = z.string().trim();
 
@@ -57,11 +63,44 @@ const establecimientoSchema = z.object({
 export type EstablecimientoFormValues = z.infer<typeof establecimientoSchema>;
 
 type EstablecimientoFormProps = {
+  mode: "create" | "edit";
   comercioId: string;
   hasAccess: boolean;
   isAdmin: boolean;
+  establecimiento?: CampoEstablecimientoListItem | null;
   onSuccess: () => void;
 };
+
+const emptyValues: EstablecimientoFormValues = {
+  cliente_id: "",
+  nombre: "",
+  codigo_interno: "",
+  direccion: "",
+  localidad: "",
+  provincia: "",
+  superficie_total_ha: "",
+  contacto_nombre: "",
+  contacto_telefono: "",
+  observaciones: "",
+  activo: true,
+};
+
+function formValues(establecimiento?: CampoEstablecimientoListItem | null): EstablecimientoFormValues {
+  if (!establecimiento) return emptyValues;
+  return {
+    cliente_id: establecimiento.cliente_id,
+    nombre: establecimiento.nombre,
+    codigo_interno: establecimiento.codigo_interno ?? "",
+    direccion: establecimiento.direccion ?? "",
+    localidad: establecimiento.localidad ?? "",
+    provincia: establecimiento.provincia ?? "",
+    superficie_total_ha: establecimiento.superficie_total_ha?.toString() ?? "",
+    contacto_nombre: establecimiento.contacto_nombre ?? "",
+    contacto_telefono: establecimiento.contacto_telefono ?? "",
+    observaciones: establecimiento.observaciones ?? "",
+    activo: establecimiento.activo,
+  };
+}
 
 function nullableText(value: string) {
   const normalized = value.trim();
@@ -73,9 +112,10 @@ function clienteLabel(cliente: CampoClienteOption) {
   return [cliente.nombre, cliente.apellido].filter(Boolean).join(" ").trim();
 }
 
-export function EstablecimientoForm({ comercioId, hasAccess, isAdmin, onSuccess }: EstablecimientoFormProps) {
+export function EstablecimientoForm({ mode, comercioId, hasAccess, isAdmin, establecimiento, onSuccess }: EstablecimientoFormProps) {
   const clientesQuery = useCampoClientes(comercioId, hasAccess);
   const createEstablecimiento = useCreateCampoEstablecimiento(comercioId, hasAccess && isAdmin);
+  const updateEstablecimiento = useUpdateCampoEstablecimiento(comercioId, hasAccess && isAdmin);
   const {
     control,
     register,
@@ -84,29 +124,21 @@ export function EstablecimientoForm({ comercioId, hasAccess, isAdmin, onSuccess 
     formState: { errors },
   } = useForm<EstablecimientoFormValues>({
     resolver: zodResolver(establecimientoSchema),
-    defaultValues: {
-      cliente_id: "",
-      nombre: "",
-      codigo_interno: "",
-      direccion: "",
-      localidad: "",
-      provincia: "",
-      superficie_total_ha: "",
-      contacto_nombre: "",
-      contacto_telefono: "",
-      observaciones: "",
-      activo: true,
-    },
+    defaultValues: formValues(mode === "edit" ? establecimiento : null),
   });
 
-  const isSaving = createEstablecimiento.isPending;
+  useEffect(() => {
+    reset(formValues(mode === "edit" ? establecimiento : null));
+  }, [establecimiento, mode, reset]);
+
+  const isSaving = createEstablecimiento.isPending || updateEstablecimiento.isPending;
   const controlsDisabled = isSaving || !hasAccess || !isAdmin;
 
   const onSubmit = async (values: EstablecimientoFormValues) => {
     const superficieTotal = parseSuperficieTotal(values.superficie_total_ha);
     if (!superficieTotal.valid) return;
 
-    const payload: Omit<CampoEstablecimientoCreatePayload, "comercio_id"> = {
+    const payload: CampoEstablecimientoUpdatePayload = {
       cliente_id: values.cliente_id,
       nombre: values.nombre,
       codigo_interno: nullableText(values.codigo_interno),
@@ -121,8 +153,14 @@ export function EstablecimientoForm({ comercioId, hasAccess, isAdmin, onSuccess 
     };
 
     try {
-      await createEstablecimiento.mutateAsync(payload);
-      reset();
+      if (mode === "edit") {
+        if (!establecimiento) return;
+        await updateEstablecimiento.mutateAsync({ establecimientoId: establecimiento.id, payload });
+      } else {
+        const createPayload: Omit<CampoEstablecimientoCreatePayload, "comercio_id"> = payload;
+        await createEstablecimiento.mutateAsync(createPayload);
+      }
+      reset(emptyValues);
       onSuccess();
     } catch {
       // El hook conserva el diálogo abierto y presenta un mensaje seguro mediante toast.
@@ -220,7 +258,7 @@ export function EstablecimientoForm({ comercioId, hasAccess, isAdmin, onSuccess 
 
       <div className="flex justify-end">
         <Button type="submit" variant="success" disabled={controlsDisabled || clientesQuery.isLoading || Boolean(clientesQuery.error) || !clientesQuery.data?.length}>
-          {isSaving ? "Guardando..." : "Crear establecimiento"}
+          {isSaving ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear establecimiento"}
         </Button>
       </div>
     </form>

@@ -6,7 +6,18 @@ type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
-  "id" | "nombre" | "codigo_interno" | "cliente_id" | "localidad" | "superficie_total_ha" | "activo"
+  | "id"
+  | "nombre"
+  | "codigo_interno"
+  | "cliente_id"
+  | "direccion"
+  | "localidad"
+  | "provincia"
+  | "superficie_total_ha"
+  | "contacto_nombre"
+  | "contacto_telefono"
+  | "observaciones"
+  | "activo"
 > & {
   cliente: Pick<ClienteRow, "nombre" | "apellido"> | null;
 };
@@ -30,3 +41,28 @@ export type CampoEstablecimientoCreatePayload = Pick<
   | "observaciones"
   | "activo"
 >;
+
+export type CampoEstablecimientoUpdatePayload = Pick<
+  EstablecimientoRow,
+  | "cliente_id"
+  | "nombre"
+  | "codigo_interno"
+  | "direccion"
+  | "localidad"
+  | "provincia"
+  | "superficie_total_ha"
+  | "contacto_nombre"
+  | "contacto_telefono"
+  | "observaciones"
+  | "activo"
+>;
+
+export type CampoEstablecimientoUpdateParams = {
+  establecimientoId: string;
+  payload: CampoEstablecimientoUpdatePayload;
+};
+
+export type CampoEstablecimientoStatusParams = {
+  establecimientoId: string;
+  nuevoEstado: boolean;
+};

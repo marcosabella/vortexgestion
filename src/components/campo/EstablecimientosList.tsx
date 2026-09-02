@@ -1,5 +1,15 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, Sprout } from "lucide-react";
+import { Pencil, Plus, Power, PowerOff, Search, Sprout } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
-import { useCampoEstablecimientos } from "@/hooks/useCampoEstablecimientos";
+import { useCampoEstablecimientos, useSetCampoEstablecimientoStatus } from "@/hooks/useCampoEstablecimientos";
 import type { CampoEstablecimientoListItem, CampoEstadoFilter } from "@/types/campo";
 import { EstablecimientoForm } from "@/components/campo/EstablecimientoForm";
 
@@ -38,12 +48,51 @@ function EstadoBadge({ activo }: { activo: boolean }) {
   return activo ? <Badge>Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>;
 }
 
+type EstablecimientoActionsProps = {
+  establecimiento: CampoEstablecimientoListItem;
+  disabled: boolean;
+  onEdit: (establecimiento: CampoEstablecimientoListItem) => void;
+  onStatus: (establecimiento: CampoEstablecimientoListItem) => void;
+};
+
+function EstablecimientoActions({ establecimiento, disabled, onEdit, onStatus }: EstablecimientoActionsProps) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onEdit(establecimiento)}>
+        <Pencil className="h-4 w-4" />
+        Editar
+      </Button>
+      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onStatus(establecimiento)}>
+        {establecimiento.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+        {establecimiento.activo ? "Desactivar" : "Reactivar"}
+      </Button>
+    </div>
+  );
+}
+
 export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoading }: EstablecimientosListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [estado, setEstado] = useState<CampoEstadoFilter>("activos");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingEstablecimiento, setEditingEstablecimiento] = useState<CampoEstablecimientoListItem | null>(null);
+  const [statusEstablecimiento, setStatusEstablecimiento] = useState<CampoEstablecimientoListItem | null>(null);
   const access = useCampoAccess(comercioId);
   const establecimientosQuery = useCampoEstablecimientos(comercioId, access.perteneceAlComercio);
+  const setStatus = useSetCampoEstablecimientoStatus(comercioId, access.perteneceAlComercio && access.isAdmin);
+
+  const closeEditDialog = () => setEditingEstablecimiento(null);
+  const confirmStatusChange = async () => {
+    if (!statusEstablecimiento) return;
+    try {
+      await setStatus.mutateAsync({
+        establecimientoId: statusEstablecimiento.id,
+        nuevoEstado: !statusEstablecimiento.activo,
+      });
+      setStatusEstablecimiento(null);
+    } catch {
+      // El hook muestra un mensaje seguro y la confirmación permanece abierta.
+    }
+  };
 
   const establecimientos = useMemo(() => {
     const term = searchTerm.trim().toLocaleLowerCase("es");
@@ -102,6 +151,7 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
               <DialogTitle>Nuevo establecimiento</DialogTitle>
             </DialogHeader>
             <EstablecimientoForm
+              mode="create"
               comercioId={comercioId}
               hasAccess={access.perteneceAlComercio}
               isAdmin={access.isAdmin}
@@ -109,6 +159,60 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {comercioId && access.perteneceAlComercio && access.isAdmin && (
+        <Dialog
+          open={Boolean(editingEstablecimiento)}
+          onOpenChange={(open) => {
+            if (!open) closeEditDialog();
+          }}
+        >
+          <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar establecimiento</DialogTitle>
+            </DialogHeader>
+            {editingEstablecimiento && (
+              <EstablecimientoForm
+                key={editingEstablecimiento.id}
+                mode="edit"
+                comercioId={comercioId}
+                hasAccess={access.perteneceAlComercio}
+                isAdmin={access.isAdmin}
+                establecimiento={editingEstablecimiento}
+                onSuccess={closeEditDialog}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {comercioId && access.perteneceAlComercio && access.isAdmin && (
+        <AlertDialog
+          open={Boolean(statusEstablecimiento)}
+          onOpenChange={(open) => {
+            if (!open && !setStatus.isPending) setStatusEstablecimiento(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {statusEstablecimiento?.activo ? "Desactivar establecimiento" : "Reactivar establecimiento"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {statusEstablecimiento?.activo
+                  ? "¿Desactivar este establecimiento? Permanecerá guardado y podrá reactivarse."
+                  : "¿Reactivar este establecimiento?"}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={setStatus.isPending}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction disabled={setStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatusChange(); }}>
+                {setStatus.isPending ? "Guardando..." : statusEstablecimiento?.activo ? "Desactivar" : "Reactivar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -169,6 +273,11 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                   <div><span className="block text-muted-foreground">Cliente</span>{clienteNombre(establecimiento)}</div>
                   <div><span className="block text-muted-foreground">Localidad</span>{establecimiento.localidad || "Sin informar"}</div>
                   <div className="col-span-2"><span className="block text-muted-foreground">Superficie total</span>{superficieLabel(establecimiento.superficie_total_ha)}</div>
+                  {access.isAdmin && (
+                    <div className="col-span-2 pt-2">
+                      <EstablecimientoActions establecimiento={establecimiento} disabled={setStatus.isPending} onEdit={setEditingEstablecimiento} onStatus={setStatusEstablecimiento} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -185,6 +294,7 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                     <TableHead>Localidad</TableHead>
                     <TableHead>Superficie total</TableHead>
                     <TableHead>Estado</TableHead>
+                    {access.isAdmin && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -196,6 +306,11 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                       <TableCell>{establecimiento.localidad || "Sin informar"}</TableCell>
                       <TableCell>{superficieLabel(establecimiento.superficie_total_ha)}</TableCell>
                       <TableCell><EstadoBadge activo={establecimiento.activo} /></TableCell>
+                      {access.isAdmin && (
+                        <TableCell>
+                          <EstablecimientoActions establecimiento={establecimiento} disabled={setStatus.isPending} onEdit={setEditingEstablecimiento} onStatus={setStatusEstablecimiento} />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
