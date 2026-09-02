@@ -6,6 +6,7 @@ type LoteRow = Database["public"]["Tables"]["campo_lotes"]["Row"];
 type LoteInsert = Database["public"]["Tables"]["campo_lotes"]["Insert"];
 type LoteUpdate = Database["public"]["Tables"]["campo_lotes"]["Update"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
+type OrdenTrabajoRow = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -26,6 +27,32 @@ export type CampoEstablecimientoListItem = Pick<
 };
 
 export type CampoEstadoFilter = "activos" | "inactivos" | "todos";
+
+export type CampoOrdenEstado =
+  | "borrador"
+  | "planificada"
+  | "en_progreso"
+  | "finalizada"
+  | "cancelada";
+
+export type CampoOrdenEstadoFilter = CampoOrdenEstado | "todas";
+
+export type CampoOrdenListItem = Pick<
+  OrdenTrabajoRow,
+  | "id"
+  | "numero"
+  | "codigo_interno"
+  | "estado"
+  | "fecha_inicio_planificada"
+  | "fecha_fin_planificada"
+  | "descripcion"
+  | "cliente_id"
+  | "establecimiento_id"
+  | "created_at"
+> & {
+  cliente: Pick<ClienteRow, "nombre" | "apellido"> | null;
+  establecimiento: Pick<EstablecimientoRow, "nombre"> | null;
+};
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,

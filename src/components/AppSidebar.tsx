@@ -33,7 +33,6 @@ const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modu
   { title: "Presupuestos", url: "/presupuestos", icon: ClipboardList, modulo: "presupuestos" },
   { title: "Cuenta Corriente", url: "/cuenta-corriente", icon: CreditCard, modulo: "cuenta_corriente" },
   { title: "Cartera de Cheques", url: "/cheques", icon: Receipt, modulo: "cheques" },
-  { title: "Vortex Campo", url: "/campo/establecimientos", icon: Sprout, modulo: "campo", activePrefix: "/campo" },
   { title: "Notificaciones", url: "/notificaciones", icon: Bell },
 ]
 
@@ -55,6 +54,11 @@ const listadosItems = [
   { title: "Cuenta Corriente", url: "/listados/cuenta-corriente", icon: CreditCard },
 ]
 
+const campoItems = [
+  { title: "Establecimientos", url: "/campo/establecimientos", icon: Sprout },
+  { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
+]
+
 export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar()
   const location = useLocation()
@@ -62,6 +66,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed"
   const [configuracionOpen, setConfiguracionOpen] = useState(false)
   const [listadosOpen, setListadosOpen] = useState(false)
+  const [campoOpen, setCampoOpen] = useState(currentPath.startsWith('/campo'))
   const { data: isAdmin } = useIsAppAdmin()
   const { comercio, isLoading: isComercioLoading } = useComercio()
   const { data: parametrizacion } = useComercioParametrizacion()
@@ -75,6 +80,7 @@ export function AppSidebar() {
     item.activePrefix ? currentPath === item.activePrefix || currentPath.startsWith(`${item.activePrefix}/`) : isActive(item.url)
   const isConfiguracionActive = currentPath === '/comercio' || enabledConfiguracionItems.some((item) => currentPath === item.url)
   const isListadosActive = parametrizacion.modulos.listados && currentPath.startsWith('/listados')
+  const isCampoActive = parametrizacion.modulos.campo && currentPath.startsWith('/campo')
   const closeMobileMenu = () => {
     if (isMobile) {
       setOpenMobile(false)
@@ -113,6 +119,41 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {parametrizacion.modulos.campo && (
+                <Collapsible open={campoOpen} onOpenChange={setCampoOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className={`mx-2 ${isCampoActive
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`}
+                      >
+                        <Sprout className="h-4 w-4" />
+                        {!collapsed && <span className="ml-3">Vortex Campo</span>}
+                        {!collapsed && <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${campoOpen ? 'rotate-180' : ''}`} />}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    {!collapsed && (
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {campoItems.map((item) => (
+                            <SidebarMenuSubItem key={item.title}>
+                              <SidebarMenuSubButton asChild className={isActive(item.url) ? 'bg-sidebar-accent/50' : ''}>
+                                <NavLink to={item.url} onClick={closeMobileMenu}>
+                                  <item.icon className="h-4 w-4" />
+                                  <span className="ml-2">{item.title}</span>
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    )}
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
 
               {isAdmin && (
                 <>
