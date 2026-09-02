@@ -4,6 +4,7 @@ type EstablecimientoRow = Database["public"]["Tables"]["campo_establecimientos"]
 type EstablecimientoInsert = Database["public"]["Tables"]["campo_establecimientos"]["Insert"];
 type LoteRow = Database["public"]["Tables"]["campo_lotes"]["Row"];
 type LoteInsert = Database["public"]["Tables"]["campo_lotes"]["Insert"];
+type LoteUpdate = Database["public"]["Tables"]["campo_lotes"]["Update"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
@@ -61,6 +62,25 @@ export type CampoLoteCreateParams = Omit<
   CampoLoteCreatePayload,
   "comercio_id" | "establecimiento_id"
 >;
+
+export type CampoLoteEditFormValues = CampoLoteFormValues;
+
+export type CampoLoteUpdatePayload = Required<Pick<
+  LoteUpdate,
+  "nombre" | "codigo_interno" | "superficie_ha" | "observaciones" | "activo"
+>>;
+
+export type CampoLoteUpdateParams = {
+  loteId: string;
+  payload: CampoLoteUpdatePayload;
+};
+
+export type CampoLoteStatusPayload = Required<Pick<LoteUpdate, "activo">>;
+
+export type CampoLoteStatusParams = {
+  loteId: string;
+  nuevoEstado: boolean;
+};
 
 export type CampoClienteOption = Pick<ClienteRow, "id" | "nombre" | "apellido" | "tipo_persona">;
 

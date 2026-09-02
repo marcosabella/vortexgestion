@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Pencil, Power, PowerOff, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +10,10 @@ import type { CampoEstadoFilter, CampoLoteListItem } from "@/types/campo";
 
 type LotesListProps = {
   lotes: CampoLoteListItem[];
+  canManage: boolean;
+  actionsDisabled: boolean;
+  onEdit: (lote: CampoLoteListItem) => void;
+  onStatus: (lote: CampoLoteListItem) => void;
 };
 
 const superficieFormatter = new Intl.NumberFormat("es-AR", {
@@ -23,7 +28,32 @@ function EstadoBadge({ activo }: { activo: boolean }) {
   return activo ? <Badge>Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>;
 }
 
-export function LotesList({ lotes }: LotesListProps) {
+function LoteActions({
+  lote,
+  disabled,
+  onEdit,
+  onStatus,
+}: {
+  lote: CampoLoteListItem;
+  disabled: boolean;
+  onEdit: (lote: CampoLoteListItem) => void;
+  onStatus: (lote: CampoLoteListItem) => void;
+}) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onEdit(lote)}>
+        <Pencil className="h-4 w-4" />
+        Editar
+      </Button>
+      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onStatus(lote)}>
+        {lote.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+        {lote.activo ? "Desactivar" : "Reactivar"}
+      </Button>
+    </div>
+  );
+}
+
+export function LotesList({ lotes, canManage, actionsDisabled, onEdit, onStatus }: LotesListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [estado, setEstado] = useState<CampoEstadoFilter>("activos");
 
@@ -102,6 +132,11 @@ export function LotesList({ lotes }: LotesListProps) {
                     <span className="block text-muted-foreground">Superficie</span>
                     {superficieLabel(lote.superficie_ha)}
                   </div>
+                  {canManage && (
+                    <div className="pt-2">
+                      <LoteActions lote={lote} disabled={actionsDisabled} onEdit={onEdit} onStatus={onStatus} />
+                    </div>
+                  )}
                   <div>
                     <span className="block text-muted-foreground">Observaciones</span>
                     <span className="whitespace-pre-wrap">{lote.observaciones || "Sin informar"}</span>
@@ -121,6 +156,7 @@ export function LotesList({ lotes }: LotesListProps) {
                     <TableHead>Superficie</TableHead>
                     <TableHead>Observaciones</TableHead>
                     <TableHead>Estado</TableHead>
+                    {canManage && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -131,6 +167,11 @@ export function LotesList({ lotes }: LotesListProps) {
                       <TableCell>{superficieLabel(lote.superficie_ha)}</TableCell>
                       <TableCell className="max-w-sm whitespace-pre-wrap">{lote.observaciones || "Sin informar"}</TableCell>
                       <TableCell><EstadoBadge activo={lote.activo} /></TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <LoteActions lote={lote} disabled={actionsDisabled} onEdit={onEdit} onStatus={onStatus} />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

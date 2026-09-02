@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Info, Plus, Rows3 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,9 +19,9 @@ import { LoteForm } from "@/components/campo/LoteForm";
 import { LotesList } from "@/components/campo/LotesList";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoEstablecimiento } from "@/hooks/useCampoEstablecimientos";
-import { useCampoLotes } from "@/hooks/useCampoLotes";
+import { useCampoLotes, useSetCampoLoteStatus } from "@/hooks/useCampoLotes";
 import { useComercio } from "@/hooks/useComercio";
-import type { CampoEstablecimientoDetail } from "@/types/campo";
+import type { CampoEstablecimientoDetail, CampoLoteListItem } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
 
 function clienteNombre(establecimiento: CampoEstablecimientoDetail) {
@@ -34,6 +44,8 @@ function PageMessage({ children, destructive = false }: { children: React.ReactN
 
 export default function CampoLotes() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingLote, setEditingLote] = useState<CampoLoteListItem | null>(null);
+  const [statusLote, setStatusLote] = useState<CampoLoteListItem | null>(null);
   const navigate = useNavigate();
   const { establecimientoId } = useParams<{ establecimientoId: string }>();
   const idValido = isCampoUuid(establecimientoId);
@@ -46,12 +58,51 @@ export default function CampoLotes() {
     access.perteneceAlComercio && idValido,
   );
   const establecimientoAutorizado = Boolean(establecimientoQuery.data);
+  const establecimientoActivo = Boolean(establecimientoQuery.data?.activo);
   const lotesQuery = useCampoLotes(
     comercioId,
     establecimientoId,
     access.perteneceAlComercio,
     establecimientoAutorizado,
   );
+  const canManage =
+    idValido &&
+    access.perteneceAlComercio &&
+    access.isAdmin &&
+    establecimientoAutorizado &&
+    establecimientoActivo;
+  const setLoteStatus = useSetCampoLoteStatus(
+    comercioId,
+    establecimientoId,
+    access.perteneceAlComercio,
+    access.isAdmin,
+    establecimientoAutorizado,
+    establecimientoActivo,
+  );
+
+  useEffect(() => {
+    setIsCreateDialogOpen(false);
+    setEditingLote(null);
+    setStatusLote(null);
+  }, [comercioId, establecimientoId]);
+
+  useEffect(() => {
+    if (!canManage) {
+      setIsCreateDialogOpen(false);
+      setEditingLote(null);
+      setStatusLote(null);
+    }
+  }, [canManage]);
+
+  const confirmStatusChange = async () => {
+    if (!statusLote) return;
+    try {
+      await setLoteStatus.mutateAsync({ loteId: statusLote.id, nuevoEstado: !statusLote.activo });
+      setStatusLote(null);
+    } catch {
+      // El hook mantiene la confirmación abierta y muestra un toast seguro.
+    }
+  };
 
   let content: React.ReactNode;
 
@@ -96,7 +147,7 @@ export default function CampoLotes() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {establecimiento.activo ? <Badge>Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
             <Badge variant="outline">{access.isAdmin ? "Administrador" : "Solo lectura"}</Badge>
-            {access.isAdmin && establecimiento.activo && (
+            {canManage && (
               <Button type="button" variant="new" onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4" />
                 Nuevo lote
@@ -105,13 +156,14 @@ export default function CampoLotes() {
           </div>
         </div>
 
-        {access.isAdmin && establecimiento.activo && (
+        {canManage && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Nuevo lote</DialogTitle>
               </DialogHeader>
               <LoteForm
+                mode="create"
                 comercioId={comercioId}
                 establecimientoId={establecimiento.id}
                 hasAccess={access.perteneceAlComercio}
@@ -124,6 +176,73 @@ export default function CampoLotes() {
           </Dialog>
         )}
 
+        {canManage && (
+          <Dialog
+            open={Boolean(editingLote)}
+            onOpenChange={(open) => {
+              if (!open) setEditingLote(null);
+            }}
+          >
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Editar lote</DialogTitle>
+              </DialogHeader>
+              {editingLote && (
+                <LoteForm
+                  key={editingLote.id}
+                  mode="edit"
+                  comercioId={comercioId}
+                  establecimientoId={establecimiento.id}
+                  hasAccess={access.perteneceAlComercio}
+                  isAdmin={access.isAdmin}
+                  establecimientoAutorizado={establecimientoAutorizado}
+                  establecimientoActivo={establecimiento.activo}
+                  lote={editingLote}
+                  onSuccess={() => setEditingLote(null)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {canManage && (
+          <AlertDialog
+            open={Boolean(statusLote)}
+            onOpenChange={(open) => {
+              if (!open && !setLoteStatus.isPending) setStatusLote(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {statusLote?.activo ? "Desactivar lote" : "Reactivar lote"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {statusLote?.activo
+                    ? "¿Desactivar este lote? Permanecerá guardado y podrá reactivarse."
+                    : "¿Reactivar este lote?"}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={setLoteStatus.isPending}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={setLoteStatus.isPending}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void confirmStatusChange();
+                  }}
+                >
+                  {setLoteStatus.isPending
+                    ? "Guardando..."
+                    : statusLote?.activo
+                      ? "Desactivar"
+                      : "Reactivar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
         {!establecimiento.activo && (
           <div className="flex items-start gap-3 rounded-md border border-border bg-muted/50 p-4 text-sm">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -131,7 +250,13 @@ export default function CampoLotes() {
           </div>
         )}
 
-        <LotesList lotes={lotesQuery.data ?? []} />
+        <LotesList
+          lotes={lotesQuery.data ?? []}
+          canManage={canManage}
+          actionsDisabled={setLoteStatus.isPending}
+          onEdit={setEditingLote}
+          onStatus={setStatusLote}
+        />
       </>
     );
   }

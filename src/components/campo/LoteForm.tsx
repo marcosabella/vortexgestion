@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,8 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateCampoLote } from "@/hooks/useCampoLotes";
-import type { CampoLoteCreateParams, CampoLoteFormValues } from "@/types/campo";
+import { useCreateCampoLote, useUpdateCampoLote } from "@/hooks/useCampoLotes";
+import type {
+  CampoLoteCreateParams,
+  CampoLoteEditFormValues,
+  CampoLoteFormValues,
+  CampoLoteListItem,
+  CampoLoteUpdatePayload,
+} from "@/types/campo";
 
 type SuperficieParseResult =
   | { valid: true; value: number }
@@ -44,12 +51,14 @@ const loteSchema: z.ZodType<CampoLoteFormValues> = z.object({
 });
 
 type LoteFormProps = {
+  mode: "create" | "edit";
   comercioId: string;
   establecimientoId: string;
   hasAccess: boolean;
   isAdmin: boolean;
   establecimientoAutorizado: boolean;
   establecimientoActivo: boolean;
+  lote?: CampoLoteListItem | null;
   onSuccess: () => void;
 };
 
@@ -61,21 +70,42 @@ const defaultValues: CampoLoteFormValues = {
   activo: true,
 };
 
+function formValues(lote?: CampoLoteListItem | null): CampoLoteEditFormValues {
+  if (!lote) return defaultValues;
+  return {
+    nombre: lote.nombre,
+    codigo_interno: lote.codigo_interno ?? "",
+    superficie_ha: lote.superficie_ha.toString(),
+    observaciones: lote.observaciones ?? "",
+    activo: lote.activo,
+  };
+}
+
 function nullableText(value: string) {
   const normalized = value.trim();
   return normalized === "" ? null : normalized;
 }
 
 export function LoteForm({
+  mode,
   comercioId,
   establecimientoId,
   hasAccess,
   isAdmin,
   establecimientoAutorizado,
   establecimientoActivo,
+  lote,
   onSuccess,
 }: LoteFormProps) {
   const createLote = useCreateCampoLote(
+    comercioId,
+    establecimientoId,
+    hasAccess,
+    isAdmin,
+    establecimientoAutorizado,
+    establecimientoActivo,
+  );
+  const updateLote = useUpdateCampoLote(
     comercioId,
     establecimientoId,
     hasAccess,
@@ -91,11 +121,16 @@ export function LoteForm({
     formState: { errors },
   } = useForm<CampoLoteFormValues>({
     resolver: zodResolver(loteSchema),
-    defaultValues,
+    defaultValues: formValues(mode === "edit" ? lote : null),
   });
 
+  useEffect(() => {
+    reset(formValues(mode === "edit" ? lote : null));
+  }, [lote, mode, reset]);
+
+  const isSaving = createLote.isPending || updateLote.isPending;
   const controlsDisabled =
-    createLote.isPending ||
+    isSaving ||
     !hasAccess ||
     !isAdmin ||
     !establecimientoAutorizado ||
@@ -105,7 +140,7 @@ export function LoteForm({
     const superficie = parseLoteSuperficie(values.superficie_ha);
     if (!superficie.valid) return;
 
-    const payload: CampoLoteCreateParams = {
+    const payload: CampoLoteUpdatePayload = {
       nombre: values.nombre.trim(),
       codigo_interno: nullableText(values.codigo_interno),
       superficie_ha: superficie.value,
@@ -114,7 +149,13 @@ export function LoteForm({
     };
 
     try {
-      await createLote.mutateAsync(payload);
+      if (mode === "edit") {
+        if (!lote) return;
+        await updateLote.mutateAsync({ loteId: lote.id, payload });
+      } else {
+        const createPayload: CampoLoteCreateParams = payload;
+        await createLote.mutateAsync(createPayload);
+      }
       reset(defaultValues);
       onSuccess();
     } catch {
@@ -193,7 +234,7 @@ export function LoteForm({
 
       <div className="flex justify-end">
         <Button type="submit" variant="success" disabled={controlsDisabled}>
-          {createLote.isPending ? "Guardando..." : "Crear lote"}
+          {isSaving ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear lote"}
         </Button>
       </div>
     </form>
