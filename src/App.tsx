@@ -55,6 +55,7 @@ import ListadoCaja from "./pages/listados/ListadoCaja";
 import CampoEstablecimientos from "./pages/CampoEstablecimientos";
 import CampoLotes from "./pages/CampoLotes";
 import CampoOrdenes from "./pages/CampoOrdenes";
+import CampoOrdenDetalle from "./pages/CampoOrdenDetalle";
 
 const queryClient = new QueryClient();
 
@@ -167,6 +168,7 @@ function AuthenticatedLayout() {
               <Route path="/campo/establecimientos" element={<ParametrizedRoute modulo="campo"><CampoEstablecimientos /></ParametrizedRoute>} />
               <Route path="/campo/establecimientos/:establecimientoId/lotes" element={<ParametrizedRoute modulo="campo"><CampoLotes /></ParametrizedRoute>} />
               <Route path="/campo/ordenes" element={<ParametrizedRoute modulo="campo"><CampoOrdenes /></ParametrizedRoute>} />
+              <Route path="/campo/ordenes/:ordenId" element={<ParametrizedRoute modulo="campo"><CampoOrdenDetalle /></ParametrizedRoute>} />
               <Route path="/listados/clientes" element={<ParametrizedRoute modulo="listados"><ListadoClientes /></ParametrizedRoute>} />
               <Route path="/listados/proveedores" element={<ParametrizedRoute modulo="listados"><ListadoProveedores /></ParametrizedRoute>} />
               <Route path="/listados/productos" element={<ParametrizedRoute modulo="listados"><ListadoProductos /></ParametrizedRoute>} />

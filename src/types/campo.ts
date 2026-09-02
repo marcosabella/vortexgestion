@@ -8,6 +8,7 @@ type LoteUpdate = Database["public"]["Tables"]["campo_lotes"]["Update"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 type OrdenTrabajoRow = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Row"];
 type OrdenTrabajoInsert = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Insert"];
+type OrdenTrabajoUpdate = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Update"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -78,6 +79,44 @@ export type CampoOrdenCreatePayload = Pick<
 >;
 
 export type CampoOrdenCreateParams = Omit<CampoOrdenCreatePayload, "comercio_id">;
+
+export type CampoOrdenDetail = Pick<
+  OrdenTrabajoRow,
+  | "id"
+  | "numero"
+  | "codigo_interno"
+  | "estado"
+  | "cliente_id"
+  | "establecimiento_id"
+  | "fecha_inicio_planificada"
+  | "fecha_fin_planificada"
+  | "descripcion"
+  | "observaciones"
+  | "iniciada_at"
+  | "finalizada_at"
+  | "cancelada_at"
+  | "created_at"
+  | "updated_at"
+> & {
+  cliente: Pick<ClienteRow, "nombre" | "apellido"> | null;
+  establecimiento: Pick<EstablecimientoRow, "nombre" | "activo"> | null;
+};
+
+export type CampoOrdenUpdatePayload = Required<Pick<
+  OrdenTrabajoUpdate,
+  | "cliente_id"
+  | "establecimiento_id"
+  | "codigo_interno"
+  | "fecha_inicio_planificada"
+  | "fecha_fin_planificada"
+  | "descripcion"
+  | "observaciones"
+>>;
+
+export type CampoOrdenUpdateParams = {
+  ordenId: string;
+  payload: CampoOrdenUpdatePayload;
+};
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,

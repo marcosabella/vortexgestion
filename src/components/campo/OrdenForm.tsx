@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCampoClientes } from "@/hooks/useCampoClientes";
 import { useCampoEstablecimientos } from "@/hooks/useCampoEstablecimientos";
+import { useUpdateCampoOrden } from "@/hooks/useCampoOrdenDetalle";
 import { useCreateCampoOrden } from "@/hooks/useCampoOrdenes";
-import type { CampoClienteOption, CampoOrdenCreateParams, CampoOrdenFormValues } from "@/types/campo";
+import type { CampoClienteOption, CampoOrdenCreateParams, CampoOrdenDetail, CampoOrdenFormValues, CampoOrdenUpdatePayload } from "@/types/campo";
 
 function isCivilDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -70,20 +71,36 @@ function clienteLabel(cliente: CampoClienteOption) {
 }
 
 type OrdenFormProps = {
+  mode: "create" | "edit";
   comercioId: string;
   hasAccess: boolean;
   isAdmin: boolean;
   onSuccess: () => void;
   onCancel: () => void;
   onSavingChange: (isSaving: boolean) => void;
+  orden?: CampoOrdenDetail | null;
 };
 
-export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel, onSavingChange }: OrdenFormProps) {
+function formValues(orden?: CampoOrdenDetail | null): CampoOrdenFormValues {
+  if (!orden) return defaultValues;
+  return {
+    cliente_id: orden.cliente_id,
+    establecimiento_id: orden.establecimiento_id,
+    codigo_interno: orden.codigo_interno ?? "",
+    fecha_inicio_planificada: orden.fecha_inicio_planificada ?? "",
+    fecha_fin_planificada: orden.fecha_fin_planificada ?? "",
+    descripcion: orden.descripcion ?? "",
+    observaciones: orden.observaciones ?? "",
+  };
+}
+
+export function OrdenForm({ mode, comercioId, hasAccess, isAdmin, onSuccess, onCancel, onSavingChange, orden }: OrdenFormProps) {
   const clientesQuery = useCampoClientes(comercioId, hasAccess);
   const establecimientosQuery = useCampoEstablecimientos(comercioId, hasAccess);
   const clientes = clientesQuery.data ?? [];
   const establecimientos = establecimientosQuery.data ?? [];
   const createOrden = useCreateCampoOrden(comercioId, hasAccess, isAdmin, clientes, establecimientos);
+  const updateOrden = useUpdateCampoOrden(comercioId, hasAccess, isAdmin, orden, clientes, establecimientos);
   const {
     control,
     register,
@@ -92,7 +109,7 @@ export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel,
     setValue,
     watch,
     formState: { errors },
-  } = useForm<CampoOrdenFormValues>({ resolver: zodResolver(ordenSchema), defaultValues });
+  } = useForm<CampoOrdenFormValues>({ resolver: zodResolver(ordenSchema), defaultValues: formValues(mode === "edit" ? orden : null) });
   const clienteId = watch("cliente_id");
   const establecimientoId = watch("establecimiento_id");
   const establecimientosDisponibles = useMemo(
@@ -101,6 +118,10 @@ export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel,
     ),
     [clienteId, establecimientosQuery.data],
   );
+
+  useEffect(() => {
+    reset(formValues(mode === "edit" ? orden : null));
+  }, [mode, orden, reset]);
 
   useEffect(() => {
     if (
@@ -113,17 +134,18 @@ export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel,
   }, [establecimientoId, establecimientosDisponibles, establecimientosQuery.isLoading, setValue]);
 
   useEffect(() => {
-    onSavingChange(createOrden.isPending);
-  }, [createOrden.isPending, onSavingChange]);
+    onSavingChange(createOrden.isPending || updateOrden.isPending);
+  }, [createOrden.isPending, onSavingChange, updateOrden.isPending]);
 
   const queriesLoading = clientesQuery.isLoading || establecimientosQuery.isLoading;
   const queriesError = Boolean(clientesQuery.error || establecimientosQuery.error);
-  const controlsDisabled = createOrden.isPending || !hasAccess || !isAdmin;
+  const isSaving = createOrden.isPending || updateOrden.isPending;
+  const controlsDisabled = isSaving || !hasAccess || !isAdmin || (mode === "edit" && orden?.estado !== "borrador");
   const noClients = !queriesLoading && !queriesError && clientes.length === 0;
   const noActiveEstablishments = Boolean(clienteId) && !queriesLoading && !queriesError && establecimientosDisponibles.length === 0;
 
   const onSubmit = async (values: CampoOrdenFormValues) => {
-    const params: CampoOrdenCreateParams = {
+    const payload: CampoOrdenUpdatePayload = {
       cliente_id: values.cliente_id,
       establecimiento_id: values.establecimiento_id,
       codigo_interno: nullableText(values.codigo_interno),
@@ -134,7 +156,13 @@ export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel,
     };
 
     try {
-      await createOrden.mutateAsync(params);
+      if (mode === "edit") {
+        if (!orden) return;
+        await updateOrden.mutateAsync({ ordenId: orden.id, payload });
+      } else {
+        const params: CampoOrdenCreateParams = payload;
+        await createOrden.mutateAsync(params);
+      }
       reset(defaultValues);
       onSuccess();
     } catch {
@@ -199,9 +227,9 @@ export function OrdenForm({ comercioId, hasAccess, isAdmin, onSuccess, onCancel,
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={createOrden.isPending}>Cancelar</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
         <Button type="submit" variant="success" disabled={controlsDisabled || queriesLoading || queriesError || noClients || noActiveEstablishments}>
-          {createOrden.isPending ? "Guardando..." : "Crear orden"}
+          {isSaving ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear orden"}
         </Button>
       </div>
     </form>

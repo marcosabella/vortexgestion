@@ -101,6 +101,7 @@ export default function CampoOrdenes() {
           >
             <DialogHeader><DialogTitle>Nueva orden</DialogTitle></DialogHeader>
             <OrdenForm
+              mode="create"
               comercioId={comercioId}
               hasAccess={hasConfirmedAccess}
               isAdmin={access.isAdmin}

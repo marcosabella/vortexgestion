@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -68,6 +70,7 @@ function EstadoBadge({ estado }: { estado: string }) {
 }
 
 export function OrdenesList({ ordenes }: OrdenesListProps) {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [estado, setEstado] = useState<CampoOrdenEstadoFilter>("todas");
 
@@ -137,6 +140,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                   <div><span className="block text-muted-foreground">Establecimiento</span>{orden.establecimiento?.nombre ?? "Establecimiento no disponible"}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Fechas planificadas</span>{fechasLabel(orden)}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Descripción</span><p className="line-clamp-2 whitespace-pre-wrap">{orden.descripcion || "Sin descripción"}</p></div>
+                  <div className="sm:col-span-2 pt-2"><Button type="button" variant="outline" size="sm" onClick={() => navigate(`/campo/ordenes/${orden.id}`)}><Eye className="h-4 w-4" />Ver detalle</Button></div>
                 </CardContent>
               </Card>
             ))}
@@ -145,7 +149,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
           <Card className="hidden md:block">
             <CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>Orden</TableHead><TableHead>Código</TableHead><TableHead>Cliente</TableHead><TableHead>Establecimiento</TableHead><TableHead>Estado</TableHead><TableHead>Fechas planificadas</TableHead><TableHead>Descripción</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Orden</TableHead><TableHead>Código</TableHead><TableHead>Cliente</TableHead><TableHead>Establecimiento</TableHead><TableHead>Estado</TableHead><TableHead>Fechas planificadas</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {ordenesFiltradas.map((orden) => (
                     <TableRow key={orden.id}>
@@ -156,6 +160,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                       <TableCell><EstadoBadge estado={orden.estado} /></TableCell>
                       <TableCell className="whitespace-nowrap">{fechasLabel(orden)}</TableCell>
                       <TableCell className="max-w-xs"><p className="line-clamp-2 whitespace-pre-wrap">{orden.descripcion || "Sin descripción"}</p></TableCell>
+                      <TableCell className="text-right"><Button type="button" variant="outline" size="sm" onClick={() => navigate(`/campo/ordenes/${orden.id}`)}><Eye className="h-4 w-4" />Ver detalle</Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
