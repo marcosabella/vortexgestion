@@ -77,7 +77,7 @@ export default function CampoOrdenDetalle() {
           {orden.establecimiento?.activo === false && <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">No pueden agregarse labores mientras el establecimiento esté inactivo.</p>}
           {laboresQuery.isLoading ? <p className="py-8 text-center text-muted-foreground">Cargando labores...</p>
             : laboresQuery.error ? <p className="py-8 text-center text-destructive">No se pudieron cargar las labores.</p>
-              : <OrdenLaboresList labores={labores ?? []} />}
+              : <OrdenLaboresList comercioId={comercioId} ordenId={ordenId} hasAccess={hasConfirmedAccess} isAdmin={access.isAdmin} orden={orden} labores={labores ?? []} />}
         </CardContent>
       </Card>
     </>

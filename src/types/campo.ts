@@ -11,6 +11,8 @@ type OrdenTrabajoInsert = Database["public"]["Tables"]["campo_ordenes_trabajo"][
 type OrdenTrabajoUpdate = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Update"];
 type OrdenLaborRow = Database["public"]["Tables"]["campo_orden_labores"]["Row"];
 type OrdenLaborInsert = Database["public"]["Tables"]["campo_orden_labores"]["Insert"];
+type OrdenLaborLoteRow = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Row"];
+type OrdenLaborLoteInsert = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Insert"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -150,6 +152,36 @@ export type CampoOrdenLaborCreatePayload = Pick<
 >;
 
 export type CampoOrdenLaborCreateParams = Omit<CampoOrdenLaborCreatePayload, "comercio_id" | "orden_id">;
+
+export type CampoOrdenLaborLoteListItem = Pick<
+  OrdenLaborLoteRow,
+  | "id"
+  | "orden_labor_id"
+  | "lote_id"
+  | "cantidad_planificada"
+  | "observaciones"
+  | "activo"
+  | "created_at"
+  | "updated_at"
+> & {
+  lote: Pick<LoteRow, "nombre" | "codigo_interno" | "superficie_ha" | "activo" | "establecimiento_id"> | null;
+};
+
+export type CampoOrdenLaborLoteFormValues = {
+  lote_id: string;
+  cantidad_planificada: string;
+  observaciones: string;
+};
+
+export type CampoOrdenLaborLoteCreatePayload = Pick<
+  OrdenLaborLoteInsert,
+  "comercio_id" | "orden_labor_id" | "lote_id" | "cantidad_planificada" | "observaciones"
+>;
+
+export type CampoOrdenLaborLoteCreateParams = Omit<
+  CampoOrdenLaborLoteCreatePayload,
+  "comercio_id" | "orden_labor_id"
+>;
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,
