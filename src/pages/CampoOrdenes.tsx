@@ -1,10 +1,15 @@
-import { ClipboardList } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ClipboardList, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { OrdenForm } from "@/components/campo/OrdenForm";
 import { OrdenesList } from "@/components/campo/OrdenesList";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoOrdenes } from "@/hooks/useCampoOrdenes";
 import { useComercio } from "@/hooks/useComercio";
+import { isCampoUuid } from "@/utils/campo";
 
 function PageMessage({ children, destructive = false }: { children: React.ReactNode; destructive?: boolean }) {
   return (
@@ -17,6 +22,8 @@ function PageMessage({ children, destructive = false }: { children: React.ReactN
 }
 
 export default function CampoOrdenes() {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreatePending, setIsCreatePending] = useState(false);
   const { comercio, isLoading: isComercioLoading } = useComercio();
   const comercioId = comercio?.id ?? null;
   const access = useCampoAccess(comercioId);
@@ -24,6 +31,12 @@ export default function CampoOrdenes() {
     access.perteneceAlComercio && !access.isLoading && !access.error;
   const ordenesQuery = useCampoOrdenes(comercioId, hasConfirmedAccess);
   const ordenes = hasConfirmedAccess ? (ordenesQuery.data ?? []) : [];
+  const canCreate = isCampoUuid(comercioId) && hasConfirmedAccess && access.isAdmin;
+  const closeCreateDialog = useCallback(() => setIsCreateDialogOpen(false), []);
+
+  useEffect(() => {
+    if (!canCreate) setIsCreateDialogOpen(false);
+  }, [canCreate]);
 
   let content: React.ReactNode;
   if (isComercioLoading) {
@@ -58,10 +71,46 @@ export default function CampoOrdenes() {
               : "Órdenes del comercio activo"}
           </p>
         </div>
-        {!isComercioLoading && !access.isLoading && !access.error && access.perteneceAlComercio && (
-          <Badge variant="outline">{access.isAdmin ? "Administrador" : "Solo lectura"}</Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {!isComercioLoading && !access.isLoading && !access.error && access.perteneceAlComercio && (
+            <Badge variant="outline">{access.isAdmin ? "Administrador" : "Solo lectura"}</Badge>
+          )}
+          {canCreate && (
+            <Button type="button" variant="new" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nueva orden
+            </Button>
+          )}
+        </div>
       </div>
+      {canCreate && comercioId && (
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={(open) => {
+            if (!isCreatePending) setIsCreateDialogOpen(open);
+          }}
+        >
+          <DialogContent
+            className="max-h-[90vh] max-w-2xl overflow-y-auto"
+            onEscapeKeyDown={(event) => {
+              if (isCreatePending) event.preventDefault();
+            }}
+            onInteractOutside={(event) => {
+              if (isCreatePending) event.preventDefault();
+            }}
+          >
+            <DialogHeader><DialogTitle>Nueva orden</DialogTitle></DialogHeader>
+            <OrdenForm
+              comercioId={comercioId}
+              hasAccess={hasConfirmedAccess}
+              isAdmin={access.isAdmin}
+              onSuccess={closeCreateDialog}
+              onCancel={closeCreateDialog}
+              onSavingChange={setIsCreatePending}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
       {content}
     </div>
   );

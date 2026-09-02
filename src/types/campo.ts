@@ -7,6 +7,7 @@ type LoteInsert = Database["public"]["Tables"]["campo_lotes"]["Insert"];
 type LoteUpdate = Database["public"]["Tables"]["campo_lotes"]["Update"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 type OrdenTrabajoRow = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Row"];
+type OrdenTrabajoInsert = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Insert"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -53,6 +54,30 @@ export type CampoOrdenListItem = Pick<
   cliente: Pick<ClienteRow, "nombre" | "apellido"> | null;
   establecimiento: Pick<EstablecimientoRow, "nombre"> | null;
 };
+
+export type CampoOrdenFormValues = {
+  cliente_id: string;
+  establecimiento_id: string;
+  codigo_interno: string;
+  fecha_inicio_planificada: string;
+  fecha_fin_planificada: string;
+  descripcion: string;
+  observaciones: string;
+};
+
+export type CampoOrdenCreatePayload = Pick<
+  OrdenTrabajoInsert,
+  | "comercio_id"
+  | "cliente_id"
+  | "establecimiento_id"
+  | "codigo_interno"
+  | "fecha_inicio_planificada"
+  | "fecha_fin_planificada"
+  | "descripcion"
+  | "observaciones"
+>;
+
+export type CampoOrdenCreateParams = Omit<CampoOrdenCreatePayload, "comercio_id">;
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,
