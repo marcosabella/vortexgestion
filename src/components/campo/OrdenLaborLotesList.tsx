@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Power, PowerOff } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OrdenLaborLoteForm } from "@/components/campo/OrdenLaborLoteForm";
 import { useCampoLotes } from "@/hooks/useCampoLotes";
-import { useCampoOrdenLaborLotes } from "@/hooks/useCampoOrdenLaborLotes";
-import type { CampoOrdenDetail, CampoOrdenLaborListItem, CampoOrdenLaborUnidad } from "@/types/campo";
+import { useCampoOrdenLaborLotes, useSetCampoOrdenLaborLoteStatus } from "@/hooks/useCampoOrdenLaborLotes";
+import type { CampoOrdenDetail, CampoOrdenLaborListItem, CampoOrdenLaborLoteListItem, CampoOrdenLaborUnidad } from "@/types/campo";
 
 const unidadCorta: Record<CampoOrdenLaborUnidad, string> = {
   ha: "ha",
@@ -31,6 +32,7 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
   const assignmentsQuery = useCampoOrdenLaborLotes(comercioId, ordenId, labor.id, hasAccess, orden, labor);
   const assignments = hasAccess && orden.id === ordenId && labor.orden_id === ordenId ? assignmentsQuery.data : undefined;
   const canCreateBase = hasAccess && isAdmin && orden.estado === "borrador" && orden.establecimiento?.activo === true && labor.activo;
+  const canWrite = hasAccess && isAdmin && orden.estado === "borrador" && orden.establecimiento?.activo === true;
   const lotsQuery = useCampoLotes(comercioId, orden.establecimiento_id, canCreateBase, Boolean(orden.establecimiento));
   const authorizedLots = useMemo(() => canCreateBase ? lotsQuery.data ?? [] : [], [canCreateBase, lotsQuery.data]);
   const assignedIds = useMemo(() => new Set((assignments ?? []).map((item) => item.lote_id)), [assignments]);
@@ -38,16 +40,31 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
   const canCreate = canCreateBase && !assignmentsQuery.isLoading && !assignmentsQuery.error && !lotsQuery.isLoading && !lotsQuery.error && availableLots.length > 0;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [editAssignment, setEditAssignment] = useState<CampoOrdenLaborLoteListItem | null>(null);
+  const [statusAssignment, setStatusAssignment] = useState<CampoOrdenLaborLoteListItem | null>(null);
+  const setStatus = useSetCampoOrdenLaborLoteStatus(comercioId, ordenId, hasAccess, isAdmin, orden, labor, statusAssignment);
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     setOpen(false);
     setPending(false);
+    setEditAssignment(null);
+    setStatusAssignment(null);
   }, [comercioId, ordenId, labor.id, hasAccess]);
 
   useEffect(() => {
     if (!canCreate) setOpen(false);
   }, [canCreate]);
+
+  const confirmStatus = async () => {
+    if (!statusAssignment) return;
+    try {
+      await setStatus.mutateAsync({ asignacionId: statusAssignment.id, loteId: statusAssignment.lote_id, nuevoEstado: !statusAssignment.activo });
+      setStatusAssignment(null);
+    } catch {
+      // El hook conserva la confirmación y muestra un mensaje seguro.
+    }
+  };
 
   return (
     <section className="space-y-3 rounded-md border bg-muted/20 p-3" aria-labelledby={`labor-lotes-${labor.id}`}>
@@ -68,6 +85,10 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
                   <div><span className="block text-muted-foreground">Superficie</span>{assignment.lote ? `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 }).format(assignment.lote.superficie_ha)} ha` : "No disponible"}</div>
                   <div className="col-span-2"><span className="block text-muted-foreground">Observaciones</span><p className="whitespace-pre-wrap">{assignment.observaciones || "Sin observaciones"}</p></div>
                   {assignment.lote?.activo === false && <p className="col-span-2 text-xs text-amber-700">El lote actualmente está inactivo.</p>}
+                  {canWrite && <div className="col-span-2 flex flex-wrap gap-2 pt-1">
+                    {labor.activo && <Button type="button" size="sm" variant="outline" onClick={() => setEditAssignment(assignment)}><Pencil className="h-4 w-4" />Editar cantidad</Button>}
+                    {(assignment.activo || (labor.activo && assignment.lote?.activo === true)) && <Button type="button" size="sm" variant="outline" onClick={() => setStatusAssignment(assignment)}>{assignment.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}{assignment.activo ? "Desactivar" : "Reactivar"}</Button>}
+                  </div>}
                 </CardContent>
               </Card>
             ))}</div>}
@@ -81,6 +102,7 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
             <DialogHeader><DialogTitle>Asignar lote a {labor.nombre}</DialogTitle></DialogHeader>
             <OrdenLaborLoteForm
               key={`${labor.id}-${labor.unidad}`}
+              mode="create"
               comercioId={comercioId}
               ordenId={ordenId}
               hasAccess={hasAccess}
@@ -96,6 +118,24 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {canWrite && editAssignment && labor.activo && (
+        <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen && !pending) setEditAssignment(null); }}>
+          <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto" onEscapeKeyDown={(event) => { if (pending) event.preventDefault(); }} onInteractOutside={(event) => { if (pending) event.preventDefault(); }}>
+            <DialogHeader><DialogTitle>Editar asignación</DialogTitle></DialogHeader>
+            <OrdenLaborLoteForm mode="edit" comercioId={comercioId} ordenId={ordenId} hasAccess={hasAccess} isAdmin={isAdmin} orden={orden} labor={labor} lotesAutorizados={authorizedLots} lotesDisponibles={availableLots} asignaciones={assignments ?? []} asignacion={editAssignment} onSuccess={() => setEditAssignment(null)} onCancel={() => setEditAssignment(null)} onSavingChange={setPending} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {canWrite && statusAssignment && (
+        <AlertDialog open onOpenChange={(nextOpen) => { if (!nextOpen && !setStatus.isPending) setStatusAssignment(null); }}>
+          <AlertDialogContent onEscapeKeyDown={(event) => { if (setStatus.isPending) event.preventDefault(); }} onInteractOutside={(event) => { if (setStatus.isPending) event.preventDefault(); }}>
+            <AlertDialogHeader><AlertDialogTitle>{statusAssignment.activo ? "Desactivar asignación" : "Reactivar asignación"}</AlertDialogTitle><AlertDialogDescription>{statusAssignment.activo ? "¿Desactivar esta asignación? Permanecerá guardada." : "¿Reactivar esta asignación?"}</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel disabled={setStatus.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={setStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatus(); }}>{setStatus.isPending ? "Guardando..." : statusAssignment.activo ? "Desactivar" : "Reactivar"}</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </section>
   );

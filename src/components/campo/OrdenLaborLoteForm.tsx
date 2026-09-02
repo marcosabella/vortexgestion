@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateCampoOrdenLaborLote } from "@/hooks/useCampoOrdenLaborLotes";
+import { useCreateCampoOrdenLaborLote, useUpdateCampoOrdenLaborLote } from "@/hooks/useCampoOrdenLaborLotes";
 import type {
   CampoLoteListItem,
   CampoOrdenDetail,
@@ -15,6 +15,7 @@ import type {
   CampoOrdenLaborLoteCreateParams,
   CampoOrdenLaborLoteFormValues,
   CampoOrdenLaborLoteListItem,
+  CampoOrdenLaborLoteUpdatePayload,
   CampoOrdenLaborUnidad,
 } from "@/types/campo";
 
@@ -46,6 +47,7 @@ const unidadLabels: Record<CampoOrdenLaborUnidad, string> = {
 };
 
 type OrdenLaborLoteFormProps = {
+  mode: "create" | "edit";
   comercioId: string;
   ordenId: string;
   hasAccess: boolean;
@@ -55,16 +57,22 @@ type OrdenLaborLoteFormProps = {
   lotesAutorizados: CampoLoteListItem[];
   lotesDisponibles: CampoLoteListItem[];
   asignaciones: CampoOrdenLaborLoteListItem[];
+  asignacion?: CampoOrdenLaborLoteListItem | null;
   onSuccess: () => void;
   onCancel: () => void;
   onSavingChange: (isSaving: boolean) => void;
 };
 
-function defaults(unidad: string): CampoOrdenLaborLoteFormValues {
-  return { lote_id: "", cantidad_planificada: unidad === "fijo" ? "1" : "", observaciones: "" };
+function defaults(unidad: string, assignment?: CampoOrdenLaborLoteListItem | null): CampoOrdenLaborLoteFormValues {
+  return {
+    lote_id: assignment?.lote_id ?? "",
+    cantidad_planificada: unidad === "fijo" ? "1" : assignment ? String(assignment.cantidad_planificada) : "",
+    observaciones: assignment?.observaciones ?? "",
+  };
 }
 
 export function OrdenLaborLoteForm({
+  mode,
   comercioId,
   ordenId,
   hasAccess,
@@ -74,6 +82,7 @@ export function OrdenLaborLoteForm({
   lotesAutorizados,
   lotesDisponibles,
   asignaciones,
+  asignacion,
   onSuccess,
   onCancel,
   onSavingChange,
@@ -88,23 +97,25 @@ export function OrdenLaborLoteForm({
     lotesAutorizados,
     asignaciones,
   );
+  const updateAssignment = useUpdateCampoOrdenLaborLote(comercioId, ordenId, hasAccess, isAdmin, orden, labor, asignacion);
   const { control, register, handleSubmit, reset, formState: { errors } } = useForm<CampoOrdenLaborLoteFormValues>({
     resolver: zodResolver(assignmentSchema),
-    defaultValues: defaults(labor.unidad),
+    defaultValues: defaults(labor.unidad, mode === "edit" ? asignacion : null),
   });
 
   useEffect(() => {
-    reset(defaults(labor.unidad));
-  }, [labor.id, labor.unidad, reset]);
+    reset(defaults(labor.unidad, mode === "edit" ? asignacion : null));
+  }, [asignacion, labor.id, labor.unidad, mode, reset]);
 
   useEffect(() => {
-    onSavingChange(createAssignment.isPending);
-  }, [createAssignment.isPending, onSavingChange]);
+    onSavingChange(createAssignment.isPending || updateAssignment.isPending);
+  }, [createAssignment.isPending, onSavingChange, updateAssignment.isPending]);
 
-  const disabled = createAssignment.isPending || !hasAccess || !isAdmin || orden.estado !== "borrador" || orden.establecimiento?.activo !== true || !labor.activo;
+  const isSaving = createAssignment.isPending || updateAssignment.isPending;
+  const disabled = isSaving || !hasAccess || !isAdmin || orden.estado !== "borrador" || orden.establecimiento?.activo !== true || !labor.activo || (mode === "edit" && !asignacion);
 
   const close = () => {
-    reset(defaults(labor.unidad));
+    reset(defaults(labor.unidad, mode === "edit" ? asignacion : null));
     onCancel();
   };
 
@@ -112,14 +123,19 @@ export function OrdenLaborLoteForm({
     const quantity = labor.unidad === "fijo" ? 1 : parseQuantity(values.cantidad_planificada);
     if (quantity === null || (labor.unidad === "fijo" && quantity !== 1)) return;
 
-    const payload: CampoOrdenLaborLoteCreateParams = {
-      lote_id: values.lote_id,
+    const payload: CampoOrdenLaborLoteUpdatePayload = {
       cantidad_planificada: quantity,
       observaciones: values.observaciones.trim() || null,
     };
 
     try {
-      await createAssignment.mutateAsync(payload);
+      if (mode === "edit") {
+        if (!asignacion) return;
+        await updateAssignment.mutateAsync({ asignacionId: asignacion.id, loteId: asignacion.lote_id, payload });
+      } else {
+        const createPayload: CampoOrdenLaborLoteCreateParams = { ...payload, lote_id: values.lote_id };
+        await createAssignment.mutateAsync(createPayload);
+      }
       reset(defaults(labor.unidad));
       onSuccess();
     } catch {
@@ -130,7 +146,9 @@ export function OrdenLaborLoteForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <p className="text-sm text-muted-foreground">Unidad de la labor: <span className="font-medium text-foreground">{unidadLabels[labor.unidad as CampoOrdenLaborUnidad] ?? labor.unidad}</span></p>
-      <div className="space-y-2">
+      {mode === "edit" ? (
+        <div className="rounded-md border p-3 text-sm"><span className="block text-muted-foreground">Lote</span><span className="font-medium">{asignacion?.lote?.nombre ?? "Lote no disponible"}</span></div>
+      ) : <div className="space-y-2">
         <Label htmlFor={`campo-asignacion-lote-${labor.id}`}>Lote *</Label>
         <Controller control={control} name="lote_id" render={({ field }) => (
           <Select value={field.value} onValueChange={field.onChange} disabled={disabled || lotesDisponibles.length === 0}>
@@ -139,7 +157,7 @@ export function OrdenLaborLoteForm({
           </Select>
         )} />
         {errors.lote_id && <p id={`campo-asignacion-lote-${labor.id}-error`} className="text-sm text-destructive">{errors.lote_id.message}</p>}
-      </div>
+      </div>}
       <div className="space-y-2">
         <Label htmlFor={`campo-asignacion-cantidad-${labor.id}`}>Cantidad planificada *</Label>
         <Input id={`campo-asignacion-cantidad-${labor.id}`} type="text" inputMode="decimal" {...register("cantidad_planificada")} disabled={disabled || labor.unidad === "fijo"} aria-invalid={Boolean(errors.cantidad_planificada)} aria-describedby={errors.cantidad_planificada ? `campo-asignacion-cantidad-${labor.id}-error` : undefined} />
@@ -150,8 +168,8 @@ export function OrdenLaborLoteForm({
         <Textarea id={`campo-asignacion-observaciones-${labor.id}`} rows={3} {...register("observaciones")} disabled={disabled} />
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={close} disabled={createAssignment.isPending}>Cancelar</Button>
-        <Button type="submit" variant="success" disabled={disabled || lotesDisponibles.length === 0}>{createAssignment.isPending ? "Guardando..." : "Asignar lote"}</Button>
+        <Button type="button" variant="outline" onClick={close} disabled={isSaving}>Cancelar</Button>
+        <Button type="submit" variant="success" disabled={disabled || (mode === "create" && lotesDisponibles.length === 0)}>{isSaving ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Asignar lote"}</Button>
       </div>
     </form>
   );

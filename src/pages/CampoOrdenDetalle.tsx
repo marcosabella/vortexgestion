@@ -116,6 +116,7 @@ export default function CampoOrdenDetalle() {
             <DialogHeader><DialogTitle>Nueva labor</DialogTitle></DialogHeader>
             <OrdenLaborForm
               key={orden.id}
+              mode="create"
               comercioId={comercioId}
               ordenId={ordenId}
               hasAccess={hasConfirmedAccess}

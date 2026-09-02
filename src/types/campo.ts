@@ -11,8 +11,10 @@ type OrdenTrabajoInsert = Database["public"]["Tables"]["campo_ordenes_trabajo"][
 type OrdenTrabajoUpdate = Database["public"]["Tables"]["campo_ordenes_trabajo"]["Update"];
 type OrdenLaborRow = Database["public"]["Tables"]["campo_orden_labores"]["Row"];
 type OrdenLaborInsert = Database["public"]["Tables"]["campo_orden_labores"]["Insert"];
+type OrdenLaborUpdate = Database["public"]["Tables"]["campo_orden_labores"]["Update"];
 type OrdenLaborLoteRow = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Row"];
 type OrdenLaborLoteInsert = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Insert"];
+type OrdenLaborLoteUpdate = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Update"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -153,6 +155,15 @@ export type CampoOrdenLaborCreatePayload = Pick<
 
 export type CampoOrdenLaborCreateParams = Omit<CampoOrdenLaborCreatePayload, "comercio_id" | "orden_id">;
 
+export type CampoOrdenLaborUpdatePayload = Required<Pick<
+  OrdenLaborUpdate,
+  "nombre" | "codigo_interno" | "descripcion" | "unidad" | "posicion"
+>>;
+
+export type CampoOrdenLaborUpdateParams = { laborId: string; payload: CampoOrdenLaborUpdatePayload };
+export type CampoOrdenLaborStatusPayload = Required<Pick<OrdenLaborUpdate, "activo">>;
+export type CampoOrdenLaborStatusParams = { laborId: string; nuevoEstado: boolean };
+
 export type CampoOrdenLaborLoteListItem = Pick<
   OrdenLaborLoteRow,
   | "id"
@@ -182,6 +193,20 @@ export type CampoOrdenLaborLoteCreateParams = Omit<
   CampoOrdenLaborLoteCreatePayload,
   "comercio_id" | "orden_labor_id"
 >;
+
+export type CampoOrdenLaborLoteUpdatePayload = Required<Pick<
+  OrdenLaborLoteUpdate,
+  "cantidad_planificada" | "observaciones"
+>>;
+
+export type CampoOrdenLaborLoteUpdateParams = {
+  asignacionId: string;
+  loteId: string;
+  payload: CampoOrdenLaborLoteUpdatePayload;
+};
+
+export type CampoOrdenLaborLoteStatusPayload = Required<Pick<OrdenLaborLoteUpdate, "activo">>;
+export type CampoOrdenLaborLoteStatusParams = { asignacionId: string; loteId: string; nuevoEstado: boolean };
 
 export type CampoEstablecimientoDetail = Pick<
   EstablecimientoRow,

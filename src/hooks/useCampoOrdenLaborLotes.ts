@@ -8,6 +8,10 @@ import type {
   CampoOrdenLaborLoteCreateParams,
   CampoOrdenLaborLoteCreatePayload,
   CampoOrdenLaborLoteListItem,
+  CampoOrdenLaborLoteStatusParams,
+  CampoOrdenLaborLoteStatusPayload,
+  CampoOrdenLaborLoteUpdateParams,
+  CampoOrdenLaborLoteUpdatePayload,
 } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
 
@@ -25,10 +29,11 @@ function assignmentErrorMessage(error: unknown) {
   if (message.includes("campo_lote_fuera_establecimiento")) return "El lote no pertenece al establecimiento de la orden.";
   if (message.includes("campo_lote_inactivo") || message.includes("lote está inactivo")) return "El lote seleccionado está inactivo.";
   if (message.includes("campo_lote_invalido") || message.includes("lote no está disponible")) return "El lote no fue encontrado o no está disponible para esta orden.";
+  if (message.includes("asignación no encontrada o sin acceso")) return "Asignación no encontrada o sin acceso.";
   if (message.includes("campo_establecimiento_inactivo") || message.includes("establecimiento está inactivo")) return "No se pueden asignar lotes mientras el establecimiento esté inactivo.";
   if (safeError.code === "PGRST116") return "No se pudo confirmar la asignación del lote.";
   if (safeError.code === "42501" || message.includes("row-level security") || message.includes("permission denied") || message.includes("no tenés permisos")) {
-    return "No tenés permisos para asignar lotes a esta labor.";
+    return "No tenés permisos para modificar asignaciones de esta labor.";
   }
   return "No se pudo asignar el lote. Revisá los datos e intentá nuevamente.";
 }
@@ -145,5 +150,88 @@ export function useCreateCampoOrdenLaborLote(
     onError: (error) => {
       toast({ title: "No se pudo asignar el lote", description: assignmentErrorMessage(error), variant: "destructive" });
     },
+  });
+}
+
+function assertAssignmentWrite(
+  comercioId: string | null | undefined,
+  ordenId: string | null | undefined,
+  hasAccess: boolean,
+  isAdmin: boolean,
+  orden: CampoOrdenDetail | null | undefined,
+  labor: CampoOrdenLaborListItem | null | undefined,
+  assignment: CampoOrdenLaborLoteListItem | null | undefined,
+  asignacionId: string,
+  loteId: string,
+) {
+  if (!isCampoUuid(comercioId) || !isCampoUuid(ordenId) || !isCampoUuid(labor?.id) || !isCampoUuid(asignacionId) || !isCampoUuid(loteId) || !hasAccess || !isAdmin) throw new Error("No tenés permisos para modificar esta asignación.");
+  if (!orden || orden.id !== ordenId) throw new Error("Orden no encontrada o sin acceso.");
+  if (orden.estado !== "borrador") throw new Error("La orden ya no está en borrador.");
+  if (orden.establecimiento?.activo !== true) throw new Error("El establecimiento está inactivo.");
+  if (!labor || labor.orden_id !== ordenId) throw new Error("campo_labor_invalida");
+  if (!assignment || assignment.id !== asignacionId || assignment.orden_labor_id !== labor.id || assignment.lote_id !== loteId) throw new Error("Asignación no encontrada o sin acceso.");
+}
+
+export function useUpdateCampoOrdenLaborLote(
+  comercioId: string | null | undefined,
+  ordenId: string | null | undefined,
+  hasAccess: boolean,
+  isAdmin: boolean,
+  orden: CampoOrdenDetail | null | undefined,
+  labor: CampoOrdenLaborListItem | null | undefined,
+  assignment: CampoOrdenLaborLoteListItem | null | undefined,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ asignacionId, loteId, payload: values }: CampoOrdenLaborLoteUpdateParams) => {
+      assertAssignmentWrite(comercioId, ordenId, hasAccess, isAdmin, orden, labor, assignment, asignacionId, loteId);
+      if (!labor?.activo) throw new Error("La labor está inactiva.");
+      if (!Number.isFinite(values.cantidad_planificada) || values.cantidad_planificada <= 0) throw new Error("La cantidad planificada no es válida.");
+      if (labor.unidad === "fijo" && values.cantidad_planificada !== 1) throw new Error("campo_cantidad_fijo_debe_ser_uno");
+      const payload: CampoOrdenLaborLoteUpdatePayload = {
+        cantidad_planificada: values.cantidad_planificada,
+        observaciones: values.observaciones?.trim() || null,
+      };
+      const { data, error } = await supabase.from("campo_orden_labor_lotes").update(payload)
+        .eq("id", asignacionId).eq("comercio_id", comercioId).eq("orden_labor_id", labor.id).eq("lote_id", loteId)
+        .select("id, cantidad_planificada, activo").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"] });
+      toast({ title: "Asignación actualizada" });
+    },
+    onError: (error) => toast({ title: "No se pudo actualizar la asignación", description: assignmentErrorMessage(error), variant: "destructive" }),
+  });
+}
+
+export function useSetCampoOrdenLaborLoteStatus(
+  comercioId: string | null | undefined,
+  ordenId: string | null | undefined,
+  hasAccess: boolean,
+  isAdmin: boolean,
+  orden: CampoOrdenDetail | null | undefined,
+  labor: CampoOrdenLaborListItem | null | undefined,
+  assignment: CampoOrdenLaborLoteListItem | null | undefined,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ asignacionId, loteId, nuevoEstado }: CampoOrdenLaborLoteStatusParams) => {
+      assertAssignmentWrite(comercioId, ordenId, hasAccess, isAdmin, orden, labor, assignment, asignacionId, loteId);
+      if (nuevoEstado && !labor?.activo) throw new Error("La labor está inactiva.");
+      if (nuevoEstado && assignment?.lote?.activo !== true) throw new Error("El lote está inactivo.");
+      const payload: CampoOrdenLaborLoteStatusPayload = { activo: nuevoEstado };
+      const { data, error } = await supabase.from("campo_orden_labor_lotes").update(payload)
+        .eq("id", asignacionId).eq("comercio_id", comercioId).eq("orden_labor_id", labor?.id).eq("lote_id", loteId)
+        .select("id, activo").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"] });
+      toast({ title: variables.nuevoEstado ? "Asignación reactivada" : "Asignación desactivada" });
+    },
+    onError: (error) => toast({ title: "No se pudo cambiar el estado de la asignación", description: assignmentErrorMessage(error), variant: "destructive" }),
   });
 }
