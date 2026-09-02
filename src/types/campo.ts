@@ -3,6 +3,7 @@ import type { Database } from "@/integrations/supabase/types";
 type EstablecimientoRow = Database["public"]["Tables"]["campo_establecimientos"]["Row"];
 type EstablecimientoInsert = Database["public"]["Tables"]["campo_establecimientos"]["Insert"];
 type LoteRow = Database["public"]["Tables"]["campo_lotes"]["Row"];
+type LoteInsert = Database["public"]["Tables"]["campo_lotes"]["Insert"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
@@ -35,6 +36,30 @@ export type CampoEstablecimientoDetail = Pick<
 export type CampoLoteListItem = Pick<
   LoteRow,
   "id" | "nombre" | "codigo_interno" | "superficie_ha" | "observaciones" | "activo"
+>;
+
+export type CampoLoteFormValues = {
+  nombre: string;
+  codigo_interno: string;
+  superficie_ha: string;
+  observaciones: string;
+  activo: boolean;
+};
+
+export type CampoLoteCreatePayload = Pick<
+  LoteInsert,
+  | "comercio_id"
+  | "establecimiento_id"
+  | "nombre"
+  | "codigo_interno"
+  | "superficie_ha"
+  | "observaciones"
+  | "activo"
+>;
+
+export type CampoLoteCreateParams = Omit<
+  CampoLoteCreatePayload,
+  "comercio_id" | "establecimiento_id"
 >;
 
 export type CampoClienteOption = Pick<ClienteRow, "id" | "nombre" | "apellido" | "tipo_persona">;

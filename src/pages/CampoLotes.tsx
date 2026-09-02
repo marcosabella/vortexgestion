@@ -1,8 +1,11 @@
-import { ArrowLeft, Info, Rows3 } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Info, Plus, Rows3 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LoteForm } from "@/components/campo/LoteForm";
 import { LotesList } from "@/components/campo/LotesList";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoEstablecimiento } from "@/hooks/useCampoEstablecimientos";
@@ -30,6 +33,7 @@ function PageMessage({ children, destructive = false }: { children: React.ReactN
 }
 
 export default function CampoLotes() {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { establecimientoId } = useParams<{ establecimientoId: string }>();
   const idValido = isCampoUuid(establecimientoId);
@@ -89,11 +93,36 @@ export default function CampoLotes() {
               <span>Cliente: {clienteNombre(establecimiento)}</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {establecimiento.activo ? <Badge>Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
             <Badge variant="outline">{access.isAdmin ? "Administrador" : "Solo lectura"}</Badge>
+            {access.isAdmin && establecimiento.activo && (
+              <Button type="button" variant="new" onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Nuevo lote
+              </Button>
+            )}
           </div>
         </div>
+
+        {access.isAdmin && establecimiento.activo && (
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nuevo lote</DialogTitle>
+              </DialogHeader>
+              <LoteForm
+                comercioId={comercioId}
+                establecimientoId={establecimiento.id}
+                hasAccess={access.perteneceAlComercio}
+                isAdmin={access.isAdmin}
+                establecimientoAutorizado={establecimientoAutorizado}
+                establecimientoActivo={establecimiento.activo}
+                onSuccess={() => setIsCreateDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
 
         {!establecimiento.activo && (
           <div className="flex items-start gap-3 rounded-md border border-border bg-muted/50 p-4 text-sm">
