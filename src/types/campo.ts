@@ -18,6 +18,7 @@ type OrdenLaborLoteUpdate = Database["public"]["Tables"]["campo_orden_labor_lote
 type OperarioRow = Database["public"]["Tables"]["campo_operarios"]["Row"];
 type MaquinariaRow = Database["public"]["Tables"]["campo_maquinarias"]["Row"];
 type InsumoRow = Database["public"]["Tables"]["campo_insumos"]["Row"];
+type ParteRow = Database["public"]["Tables"]["campo_partes_trabajo"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -46,6 +47,8 @@ export type CampoOperarioFormValues = { nombre: string; codigo_interno: string; 
 export type CampoMaquinariaFormValues = { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
 export type CampoInsumUnidad = "litro" | "kilogramo" | "tonelada" | "unidad" | "bolsa" | "metro" | "dosis";
 export type CampoInsumoFormValues = { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
+export type CampoParte = Pick<ParteRow, "id"|"orden_id"|"orden_labor_id"|"numero"|"estado"|"fecha_trabajo"|"hora_inicio"|"hora_fin"|"descripcion"|"observaciones"|"condiciones_climaticas"|"confirmado_at"|"anulado_at"|"motivo_anulacion"|"created_at"|"updated_at"> & { labor: { nombre:string; codigo_interno:string|null; unidad:string; activo:boolean }|null };
+export type CampoParteFormValues={orden_labor_id:string;fecha_trabajo:string;hora_inicio:string;hora_fin:string;descripcion:string;observaciones:string;condiciones_climaticas:string};
 
 export type CampoOrdenEstado =
   | "borrador"
@@ -135,13 +138,11 @@ export type CampoOrdenUpdateParams = {
   payload: CampoOrdenUpdatePayload;
 };
 
-export type CampoOrdenTransitionState = "borrador" | "planificada";
-export type CampoOrdenStatusPayload = Required<Pick<OrdenTrabajoUpdate, "estado">> & {
-  estado: CampoOrdenTransitionState;
-};
+export type CampoOrdenTransitionState = "borrador" | "planificada" | "finalizada" | "cancelada";
 export type CampoOrdenStatusParams = {
-  estadoActual: CampoOrdenTransitionState;
+  estadoActual: CampoOrdenEstado;
   nuevoEstado: CampoOrdenTransitionState;
+  motivo?: string | null;
 };
 
 export type CampoOrdenLaborUnidad = "ha" | "hora" | "km" | "tonelada" | "unidad" | "fijo";

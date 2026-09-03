@@ -12,6 +12,7 @@ type OrdenDetalleProps = {
   canReopen: boolean;
   onPlan: () => void;
   onReopen: () => void;
+  canFinalize: boolean; canCancel: boolean; onFinalize: () => void; onCancel: () => void;
 };
 
 const estadoLabels: Record<CampoOrdenEstado, string> = {
@@ -52,7 +53,7 @@ function DetailField({ label, children }: { label: string; children: React.React
   return <div><dt className="text-sm text-muted-foreground">{label}</dt><dd className="mt-1 whitespace-pre-wrap font-medium">{children}</dd></div>;
 }
 
-export function OrdenDetalle({ orden, canEdit, onEdit, canPlan, canReopen, onPlan, onReopen }: OrdenDetalleProps) {
+export function OrdenDetalle({ orden, canEdit, onEdit, canPlan, canReopen, onPlan, onReopen, canFinalize, canCancel, onFinalize, onCancel }: OrdenDetalleProps) {
   const inicio = civilDate(orden.fecha_inicio_planificada);
   const fin = civilDate(orden.fecha_fin_planificada);
   const fechas = inicio && fin ? `${inicio} – ${fin}` : inicio ? `Desde ${inicio}` : fin ? `Hasta ${fin}` : "Sin fechas planificadas";
@@ -65,9 +66,11 @@ export function OrdenDetalle({ orden, canEdit, onEdit, canPlan, canReopen, onPla
           <div className="flex flex-wrap items-center gap-2"><EstadoBadge estado={orden.estado} /><span className="text-sm text-muted-foreground">{orden.codigo_interno || "Sin código"}</span></div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          {canEdit && <Button type="button" variant="outline" onClick={onEdit}><Pencil className="h-4 w-4" />Editar cabecera</Button>}
+          {canEdit && <Button type="button" size="icon" variant="outline" onClick={onEdit} aria-label="Editar cabecera de la orden" title="Editar cabecera"><Pencil className="h-4 w-4" /></Button>}
           {canPlan && <Button type="button" variant="success" onClick={onPlan}><CalendarCheck className="h-4 w-4" />Planificar orden</Button>}
           {canReopen && <Button type="button" variant="outline" onClick={onReopen}><Undo2 className="h-4 w-4" />Reabrir como borrador</Button>}
+          {canFinalize && <Button type="button" variant="success" onClick={onFinalize}>Finalizar orden</Button>}
+          {canCancel && <Button type="button" variant="destructive" onClick={onCancel}>Cancelar orden</Button>}
         </div>
       </CardHeader>
       <CardContent>

@@ -1,0 +1,21 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ParteForm } from "./ParteForm";
+import { useCreateCampoParte } from "@/hooks/useCampoPartes";
+import type { CampoOrdenDetail, CampoOrdenLaborListItem, CampoParte } from "@/types/campo";
+
+export function PartesList({ comercioId, orden, labores, partes, isAdmin, access, isLoading, hasError }: { comercioId: string; orden: CampoOrdenDetail; labores: CampoOrdenLaborListItem[]; partes: CampoParte[]; isAdmin: boolean; access: boolean; isLoading: boolean; hasError: boolean }) {
+  const navigate = useNavigate(), [open, setOpen] = useState(false), [saving, setSaving] = useState(false);
+  const create = useCreateCampoParte(comercioId, orden.id, access && isAdmin, orden, labores);
+  const canCreate = access && isAdmin && labores.some((labor) => labor.activo) && ["planificada", "en_progreso"].includes(orden.estado);
+  return <Card><div className="flex flex-wrap items-center justify-between gap-3 border-b p-6"><h2 className="text-xl font-semibold">Partes de trabajo</h2>{canCreate && <Button type="button" onClick={() => setOpen(true)}>Nuevo parte</Button>}</div><CardContent className="pt-6">
+    {isLoading ? <p className="py-8 text-center text-muted-foreground">Cargando partes...</p> : hasError ? <p className="py-8 text-center text-destructive">No se pudieron cargar los partes.</p> : partes.length === 0 ? <p className="py-8 text-center text-muted-foreground">Todavía no hay partes.</p> : <><div className="grid gap-3 md:hidden">{partes.map((parte) => <Card key={parte.id}><CardContent className="grid grid-cols-2 gap-3 pt-4 text-sm"><div><span className="block text-muted-foreground">Parte</span>N.º {parte.numero}</div><div><span className="block text-muted-foreground">Estado</span><Badge variant={parte.estado === "anulado" ? "destructive" : parte.estado === "borrador" ? "secondary" : "default"}>{parte.estado}</Badge></div><div><span className="block text-muted-foreground">Labor</span>{parte.labor?.nombre ?? "—"}</div><div><span className="block text-muted-foreground">Fecha</span>{parte.fecha_trabajo}</div><div className="col-span-2 flex justify-end"><Button type="button" size="icon" variant="outline" onClick={() => navigate(`/campo/ordenes/${orden.id}/partes/${parte.id}`)} aria-label={`Ver detalle del parte número ${parte.numero}`} title="Ver detalle"><Eye className="h-4 w-4" /></Button></div></CardContent></Card>)}</div><div className="hidden overflow-x-auto md:block"><Table><TableHeader><TableRow><TableHead>N.º</TableHead><TableHead>Labor</TableHead><TableHead>Fecha</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>{partes.map((parte) => <TableRow key={parte.id}><TableCell>{parte.numero}</TableCell><TableCell>{parte.labor?.nombre ?? "—"}</TableCell><TableCell>{parte.fecha_trabajo}</TableCell><TableCell><Badge variant={parte.estado === "anulado" ? "destructive" : parte.estado === "borrador" ? "secondary" : "default"}>{parte.estado}</Badge></TableCell><TableCell className="text-right"><Button type="button" size="icon" variant="outline" onClick={() => navigate(`/campo/ordenes/${orden.id}/partes/${parte.id}`)} aria-label={`Ver detalle del parte número ${parte.numero}`} title="Ver detalle"><Eye className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div></>}
+    {canCreate && <Dialog open={open} onOpenChange={(value) => { if (!saving) setOpen(value); }}><DialogContent className="max-h-[90vh] overflow-y-auto" onEscapeKeyDown={(event) => { if (saving) event.preventDefault(); }} onInteractOutside={(event) => { if (saving) event.preventDefault(); }}><DialogHeader><DialogTitle>Nuevo parte</DialogTitle></DialogHeader><ParteForm labores={labores} pending={create.isPending} onSaving={setSaving} onSubmit={async (values) => { await create.mutateAsync(values); setOpen(false); }} /></DialogContent></Dialog>}
+  </CardContent></Card>;
+}

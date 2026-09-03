@@ -126,7 +126,10 @@ export function useCreateCampoOrdenLabor(
       return data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: "Labor creada" });
     },
     onError: (error) => {
@@ -183,7 +186,10 @@ export function useUpdateCampoOrdenLabor(
       return data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: "Labor actualizada" });
     },
     onError: (error) => toast({ title: "No se pudo actualizar la labor", description: laborErrorMessage(error), variant: "destructive" }),
@@ -210,7 +216,10 @@ export function useSetCampoOrdenLaborStatus(
       return data;
     },
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: variables.nuevoEstado ? "Labor reactivada" : "Labor desactivada" });
     },
     onError: (error) => toast({ title: "No se pudo cambiar el estado de la labor", description: laborErrorMessage(error), variant: "destructive" }),

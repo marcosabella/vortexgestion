@@ -144,7 +144,10 @@ export function useCreateCampoOrdenLaborLote(
       return data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", laborId, "lotes"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", laborId, "lotes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: "Lote asignado" });
     },
     onError: (error) => {
@@ -199,7 +202,10 @@ export function useUpdateCampoOrdenLaborLote(
       return data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: "Asignación actualizada" });
     },
     onError: (error) => toast({ title: "No se pudo actualizar la asignación", description: assignmentErrorMessage(error), variant: "destructive" }),
@@ -229,7 +235,10 @@ export function useSetCampoOrdenLaborLoteStatus(
       return data;
     },
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+      ]);
       toast({ title: variables.nuevoEstado ? "Asignación reactivada" : "Asignación desactivada" });
     },
     onError: (error) => toast({ title: "No se pudo cambiar el estado de la asignación", description: assignmentErrorMessage(error), variant: "destructive" }),

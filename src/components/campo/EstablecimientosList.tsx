@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Plus, Power, PowerOff, Search, Sprout } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Sprout } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoEstablecimientos, useSetCampoEstablecimientoStatus } from "@/hooks/useCampoEstablecimientos";
 import type { CampoEstablecimientoListItem, CampoEstadoFilter } from "@/types/campo";
@@ -68,20 +69,11 @@ function EstablecimientoActions({
 }: EstablecimientoActionsProps) {
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={() => onViewLotes(establecimiento.id)}>
-        <Eye className="h-4 w-4" />
-        Ver lotes
-      </Button>
+      <Button type="button" variant="outline" size="icon" onClick={() => onViewLotes(establecimiento.id)} aria-label={`Ver lotes de ${establecimiento.nombre}`} title="Ver lotes"><Eye className="h-4 w-4" /></Button>
       {isAdmin && (
         <>
-          <Button type="button" variant="outline" size="sm" disabled={statusDisabled} onClick={() => onEdit(establecimiento)}>
-            <Pencil className="h-4 w-4" />
-            Editar
-          </Button>
-          <Button type="button" variant="outline" size="sm" disabled={statusDisabled} onClick={() => onStatus(establecimiento)}>
-            {establecimiento.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-            {establecimiento.activo ? "Desactivar" : "Reactivar"}
-          </Button>
+          <Button type="button" variant="outline" size="icon" disabled={statusDisabled} onClick={() => onEdit(establecimiento)} aria-label={`Editar establecimiento ${establecimiento.nombre}`} title="Editar establecimiento"><Pencil className="h-4 w-4" /></Button>
+          <Switch checked={establecimiento.activo} onCheckedChange={() => onStatus(establecimiento)} disabled={statusDisabled} aria-label={`${establecimiento.activo ? "Desactivar" : "Reactivar"} establecimiento ${establecimiento.nombre}`} />
         </>
       )}
     </div>
@@ -227,7 +219,7 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
             <AlertDialogFooter>
               <AlertDialogCancel disabled={setStatus.isPending}>Cancelar</AlertDialogCancel>
               <AlertDialogAction disabled={setStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatusChange(); }}>
-                {setStatus.isPending ? "Guardando..." : statusEstablecimiento?.activo ? "Desactivar" : "Reactivar"}
+                {setStatus.isPending ? "Guardando..." : "Confirmar"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

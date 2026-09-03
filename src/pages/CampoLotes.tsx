@@ -232,11 +232,7 @@ export default function CampoLotes() {
                     void confirmStatusChange();
                   }}
                 >
-                  {setLoteStatus.isPending
-                    ? "Guardando..."
-                    : statusLote?.activo
-                      ? "Desactivar"
-                      : "Reactivar"}
+                  {setLoteStatus.isPending ? "Guardando..." : "Confirmar"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

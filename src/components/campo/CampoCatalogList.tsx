@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Power, PowerOff, Search } from "lucide-react";
+import { Pencil, Plus, Search } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -187,7 +188,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
             if (!o && !p.setStatus.isPending) setStatus(null);
           }}
         >
-          <AlertDialogContent>
+          <AlertDialogContent onEscapeKeyDown={(e) => { if (p.setStatus.isPending) e.preventDefault(); }} onInteractOutside={(e) => { if (p.setStatus.isPending) e.preventDefault(); }}>
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {status?.activo
@@ -210,11 +211,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                   void confirm();
                 }}
               >
-                {p.setStatus.isPending
-                  ? "Guardando..."
-                  : status?.activo
-                  ? "Desactivar"
-                  : "Reactivar"}
+                {p.setStatus.isPending ? "Guardando..." : "Confirmar"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -317,22 +314,15 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                     {p.access.isAdmin && (
                       <div className="flex justify-end gap-2">
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="outline"
                           onClick={() => setEditing(x)}
+                          aria-label={`Editar ${p.singular} ${x.nombre}`}
+                          title={`Editar ${p.singular}`}
                         >
-                          <Pencil className="h-4 w-4" />Editar
+                          <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setStatus(x)}
-                        >
-                          {x.activo
-                            ? <PowerOff className="h-4 w-4" />
-                            : <Power className="h-4 w-4" />}
-                          {x.activo ? "Desactivar" : "Reactivar"}
-                        </Button>
+                        <Switch checked={x.activo} onCheckedChange={() => setStatus(x)} disabled={p.setStatus.isPending} aria-label={`${x.activo ? "Desactivar" : "Reactivar"} ${p.singular} ${x.nombre}`} />
                       </div>
                     )}
                   </CardContent>
@@ -372,19 +362,15 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                           <TableCell>
                             <div className="flex justify-end gap-2">
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="outline"
                                 onClick={() => setEditing(x)}
+                                aria-label={`Editar ${p.singular} ${x.nombre}`}
+                                title={`Editar ${p.singular}`}
                               >
-                                Editar
+                                <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setStatus(x)}
-                              >
-                                {x.activo ? "Desactivar" : "Reactivar"}
-                              </Button>
+                              <Switch checked={x.activo} onCheckedChange={() => setStatus(x)} disabled={p.setStatus.isPending} aria-label={`${x.activo ? "Desactivar" : "Reactivar"} ${p.singular} ${x.nombre}`} />
                             </div>
                           </TableCell>
                         )}

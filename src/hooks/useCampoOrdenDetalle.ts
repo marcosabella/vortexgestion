@@ -8,7 +8,6 @@ import type {
   CampoOrdenUpdateParams,
   CampoOrdenUpdatePayload,
   CampoOrdenStatusParams,
-  CampoOrdenStatusPayload,
 } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
 
@@ -159,8 +158,8 @@ export function useUpdateCampoOrden(
     },
     onSuccess: async (_data, variables) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "ordenes"] }),
-        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", variables.ordenId] }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "ordenes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", variables.ordenId], exact: true }),
       ]);
       toast({ title: "Cabecera actualizada", description: "Los cambios de la orden se guardaron correctamente." });
     },
@@ -196,32 +195,36 @@ export function useSetCampoOrdenStatus(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ estadoActual, nuevoEstado }: CampoOrdenStatusParams) => {
+    mutationFn: async ({ estadoActual, nuevoEstado, motivo: rawMotivo }: CampoOrdenStatusParams) => {
       if (!isCampoUuid(comercioId) || !isCampoUuid(ordenId) || !hasAccess || !isAdmin) throw new Error("No tenés permisos para cambiar el estado de esta orden.");
       if (!orden || orden.id !== ordenId) throw new Error("La orden no está disponible o su estado cambió.");
       if (orden.estado !== estadoActual) throw new Error("El estado actual no coincide.");
-      const transitionAllowed = (estadoActual === "borrador" && nuevoEstado === "planificada") || (estadoActual === "planificada" && nuevoEstado === "borrador");
+      const transitionAllowed =
+        (estadoActual === "borrador" && nuevoEstado === "planificada") ||
+        (estadoActual === "planificada" && nuevoEstado === "borrador") ||
+        (estadoActual === "en_progreso" && nuevoEstado === "finalizada") ||
+        (["planificada", "en_progreso"].includes(estadoActual) && nuevoEstado === "cancelada");
       if (!transitionAllowed) throw new Error("campo_transicion_orden_no_habilitada");
       if (nuevoEstado === "planificada" && orden.establecimiento?.activo !== true) throw new Error("campo_establecimiento_no_disponible_planificar");
-
-      const payload: CampoOrdenStatusPayload = { estado: nuevoEstado };
-      const { data, error } = await supabase
-        .from("campo_ordenes_trabajo")
-        .update(payload)
-        .eq("id", ordenId)
-        .eq("comercio_id", comercioId)
-        .eq("estado", estadoActual)
-        .select("id, numero, estado")
-        .single();
+      const motivo = rawMotivo?.trim() || null;
+      if (nuevoEstado === "cancelada" && !motivo) throw new Error("campo_cancelacion_requiere_motivo");
+      const { data, error } = await supabase.rpc("campo_cambiar_estado_orden", {
+        p_orden_id: ordenId,
+        p_nuevo_estado: nuevoEstado,
+        p_motivo: motivo,
+      });
       if (error) throw error;
       return data;
     },
     onSuccess: async (data) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "ordenes"] }),
-        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId] }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "ordenes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "partes"], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
       ]);
-      toast({ title: data.estado === "planificada" ? `Orden N.º ${data.numero} planificada` : `Orden N.º ${data.numero} reabierta como borrador` });
+      const action = data.estado === "planificada" ? "planificada" : data.estado === "borrador" ? "reabierta como borrador" : data.estado === "finalizada" ? "finalizada" : "cancelada";
+      toast({ title: `Orden N.º ${data.numero} ${action}` });
     },
     onError: (error) => toast({ title: "No se pudo cambiar el estado", description: campoOrdenStatusErrorMessage(error), variant: "destructive" }),
   });

@@ -140,7 +140,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                   <div><span className="block text-muted-foreground">Establecimiento</span>{orden.establecimiento?.nombre ?? "Establecimiento no disponible"}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Fechas planificadas</span>{fechasLabel(orden)}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Descripción</span><p className="line-clamp-2 whitespace-pre-wrap">{orden.descripcion || "Sin descripción"}</p></div>
-                  <div className="sm:col-span-2 pt-2"><Button type="button" variant="outline" size="sm" onClick={() => navigate(`/campo/ordenes/${orden.id}`)}><Eye className="h-4 w-4" />Ver detalle</Button></div>
+                  <div className="flex justify-end sm:col-span-2 pt-2"><Button type="button" variant="outline" size="icon" onClick={() => navigate(`/campo/ordenes/${orden.id}`)} aria-label={`Ver detalle de la orden número ${orden.numero}`} title="Ver detalle"><Eye className="h-4 w-4" /></Button></div>
                 </CardContent>
               </Card>
             ))}
@@ -160,7 +160,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                       <TableCell><EstadoBadge estado={orden.estado} /></TableCell>
                       <TableCell className="whitespace-nowrap">{fechasLabel(orden)}</TableCell>
                       <TableCell className="max-w-xs"><p className="line-clamp-2 whitespace-pre-wrap">{orden.descripcion || "Sin descripción"}</p></TableCell>
-                      <TableCell className="text-right"><Button type="button" variant="outline" size="sm" onClick={() => navigate(`/campo/ordenes/${orden.id}`)}><Eye className="h-4 w-4" />Ver detalle</Button></TableCell>
+                      <TableCell className="text-right"><Button type="button" variant="outline" size="icon" onClick={() => navigate(`/campo/ordenes/${orden.id}`)} aria-label={`Ver detalle de la orden número ${orden.numero}`} title="Ver detalle"><Eye className="h-4 w-4" /></Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

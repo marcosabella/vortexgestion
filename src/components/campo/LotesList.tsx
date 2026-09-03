@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Pencil, Power, PowerOff, Search } from "lucide-react";
+import { Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import type { CampoEstadoFilter, CampoLoteListItem } from "@/types/campo";
 
 type LotesListProps = {
@@ -41,14 +42,8 @@ function LoteActions({
 }) {
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onEdit(lote)}>
-        <Pencil className="h-4 w-4" />
-        Editar
-      </Button>
-      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onStatus(lote)}>
-        {lote.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-        {lote.activo ? "Desactivar" : "Reactivar"}
-      </Button>
+      <Button type="button" variant="outline" size="icon" disabled={disabled} onClick={() => onEdit(lote)} aria-label={`Editar lote ${lote.nombre}`} title="Editar lote"><Pencil className="h-4 w-4" /></Button>
+      <Switch checked={lote.activo} onCheckedChange={() => onStatus(lote)} disabled={disabled} aria-label={`${lote.activo ? "Desactivar" : "Reactivar"} lote ${lote.nombre}`} />
     </div>
   );
 }

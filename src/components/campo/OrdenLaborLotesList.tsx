@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Power, PowerOff } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { OrdenLaborLoteForm } from "@/components/campo/OrdenLaborLoteForm";
 import { useCampoLotes } from "@/hooks/useCampoLotes";
 import { useCampoOrdenLaborLotes, useSetCampoOrdenLaborLoteStatus } from "@/hooks/useCampoOrdenLaborLotes";
@@ -26,9 +28,10 @@ type OrdenLaborLotesListProps = {
   isAdmin: boolean;
   orden: CampoOrdenDetail;
   labor: CampoOrdenLaborListItem;
+  onPendingChange?: (pending: boolean) => void;
 };
 
-export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, orden, labor }: OrdenLaborLotesListProps) {
+export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, orden, labor, onPendingChange }: OrdenLaborLotesListProps) {
   const assignmentsQuery = useCampoOrdenLaborLotes(comercioId, ordenId, labor.id, hasAccess, orden, labor);
   const assignments = hasAccess && orden.id === ordenId && labor.orden_id === ordenId ? assignmentsQuery.data : undefined;
   const canCreateBase = hasAccess && isAdmin && orden.estado === "borrador" && orden.establecimiento?.activo === true && labor.activo;
@@ -51,6 +54,8 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
     setEditAssignment(null);
     setStatusAssignment(null);
   }, [comercioId, ordenId, labor.id, hasAccess]);
+
+  useEffect(() => { onPendingChange?.(pending || setStatus.isPending); }, [onPendingChange, pending, setStatus.isPending]);
 
   useEffect(() => {
     if (!canCreate) setOpen(false);
@@ -76,7 +81,7 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
       {assignmentsQuery.isLoading ? <p className="text-sm text-muted-foreground">Cargando lotes asignados...</p>
         : assignmentsQuery.error ? <p className="text-sm text-destructive">No se pudieron cargar los lotes asignados.</p>
           : (assignments ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Esta labor todavía no tiene lotes asignados.</p>
-            : <div className="grid gap-3 lg:grid-cols-2">{(assignments ?? []).map((assignment) => (
+            : <><div className="grid gap-3 md:hidden">{(assignments ?? []).map((assignment) => (
               <Card key={assignment.id} className="shadow-none">
                 <CardContent className="grid grid-cols-2 gap-2 p-3 text-sm">
                   <div className="col-span-2 flex items-start justify-between gap-2"><span className="font-medium">{assignment.lote?.nombre ?? "Lote no disponible"}</span><Badge variant={assignment.activo ? "default" : "secondary"}>{assignment.activo ? "Activa" : "Inactiva"}</Badge></div>
@@ -85,13 +90,13 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
                   <div><span className="block text-muted-foreground">Superficie</span>{assignment.lote ? `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 }).format(assignment.lote.superficie_ha)} ha` : "No disponible"}</div>
                   <div className="col-span-2"><span className="block text-muted-foreground">Observaciones</span><p className="whitespace-pre-wrap">{assignment.observaciones || "Sin observaciones"}</p></div>
                   {assignment.lote?.activo === false && <p className="col-span-2 text-xs text-amber-700">El lote actualmente está inactivo.</p>}
-                  {canWrite && <div className="col-span-2 flex flex-wrap gap-2 pt-1">
-                    {labor.activo && <Button type="button" size="sm" variant="outline" onClick={() => setEditAssignment(assignment)}><Pencil className="h-4 w-4" />Editar cantidad</Button>}
-                    {(assignment.activo || (labor.activo && assignment.lote?.activo === true)) && <Button type="button" size="sm" variant="outline" onClick={() => setStatusAssignment(assignment)}>{assignment.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}{assignment.activo ? "Desactivar" : "Reactivar"}</Button>}
+                  {canWrite && <div className="col-span-2 flex items-center justify-end gap-3 pt-1">
+                    {labor.activo && <Button type="button" size="icon" variant="outline" onClick={() => setEditAssignment(assignment)} aria-label={`Editar asignación del lote ${assignment.lote?.nombre ?? "no disponible"}`} title="Editar asignación"><Pencil className="h-4 w-4" /></Button>}
+                    {(assignment.activo || (labor.activo && assignment.lote?.activo === true)) && <Switch checked={assignment.activo} onCheckedChange={() => setStatusAssignment(assignment)} disabled={setStatus.isPending} aria-label={`${assignment.activo ? "Desactivar" : "Reactivar"} asignación del lote ${assignment.lote?.nombre ?? "no disponible"}`} />}
                   </div>}
                 </CardContent>
               </Card>
-            ))}</div>}
+            ))}</div><div className="hidden overflow-x-auto md:block"><Table><TableHeader><TableRow><TableHead>Lote</TableHead><TableHead>Código</TableHead><TableHead className="text-right">Cantidad</TableHead><TableHead className="text-right">Superficie</TableHead><TableHead>Observaciones</TableHead><TableHead>Estado</TableHead>{canWrite && <TableHead className="text-right">Acciones</TableHead>}</TableRow></TableHeader><TableBody>{(assignments ?? []).map((assignment) => <TableRow key={assignment.id}><TableCell className="font-medium">{assignment.lote?.nombre ?? "Lote no disponible"}{assignment.lote?.activo === false && <p className="text-xs text-amber-700">Lote inactivo</p>}</TableCell><TableCell>{assignment.lote?.codigo_interno || "Sin código"}</TableCell><TableCell className="text-right">{new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 }).format(assignment.cantidad_planificada)} {unidadCorta[labor.unidad as CampoOrdenLaborUnidad] ?? labor.unidad}</TableCell><TableCell className="text-right">{assignment.lote ? `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 }).format(assignment.lote.superficie_ha)} ha` : "—"}</TableCell><TableCell className="max-w-xs whitespace-pre-wrap">{assignment.observaciones || "—"}</TableCell><TableCell><Badge variant={assignment.activo ? "default" : "secondary"}>{assignment.activo ? "Activa" : "Inactiva"}</Badge></TableCell>{canWrite && <TableCell><div className="flex items-center justify-end gap-3">{labor.activo && <Button type="button" size="icon" variant="outline" onClick={() => setEditAssignment(assignment)} aria-label={`Editar asignación del lote ${assignment.lote?.nombre ?? "no disponible"}`} title="Editar asignación"><Pencil className="h-4 w-4" /></Button>}{(assignment.activo || (labor.activo && assignment.lote?.activo === true)) && <Switch checked={assignment.activo} onCheckedChange={() => setStatusAssignment(assignment)} disabled={setStatus.isPending} aria-label={`${assignment.activo ? "Desactivar" : "Reactivar"} asignación del lote ${assignment.lote?.nombre ?? "no disponible"}`} />}</div></TableCell>}</TableRow>)}</TableBody></Table></div></>}
 
       {canCreateBase && !lotsQuery.isLoading && !lotsQuery.error && availableLots.length === 0 && <p className="text-sm text-muted-foreground">No hay lotes activos disponibles para asignar.</p>}
       {canCreateBase && lotsQuery.error && <p className="text-sm text-destructive">No se pudieron cargar los lotes disponibles.</p>}
@@ -133,7 +138,7 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
         <AlertDialog open onOpenChange={(nextOpen) => { if (!nextOpen && !setStatus.isPending) setStatusAssignment(null); }}>
           <AlertDialogContent onEscapeKeyDown={(event) => { if (setStatus.isPending) event.preventDefault(); }} onInteractOutside={(event) => { if (setStatus.isPending) event.preventDefault(); }}>
             <AlertDialogHeader><AlertDialogTitle>{statusAssignment.activo ? "Desactivar asignación" : "Reactivar asignación"}</AlertDialogTitle><AlertDialogDescription>{statusAssignment.activo ? "¿Desactivar esta asignación? Permanecerá guardada." : "¿Reactivar esta asignación?"}</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel disabled={setStatus.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={setStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatus(); }}>{setStatus.isPending ? "Guardando..." : statusAssignment.activo ? "Desactivar" : "Reactivar"}</AlertDialogAction></AlertDialogFooter>
+            <AlertDialogFooter><AlertDialogCancel disabled={setStatus.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={setStatus.isPending} onClick={(event) => { event.preventDefault(); void confirmStatus(); }}>{setStatus.isPending ? "Guardando..." : "Confirmar"}</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
