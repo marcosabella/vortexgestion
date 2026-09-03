@@ -57,6 +57,9 @@ const listadosItems = [
 const campoItems = [
   { title: "Establecimientos", url: "/campo/establecimientos", icon: Sprout },
   { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
+  { title: "Operarios", url: "/campo/operarios", icon: Users },
+  { title: "Maquinarias", url: "/campo/maquinarias", icon: Truck },
+  { title: "Insumos", url: "/campo/insumos", icon: Package },
 ]
 
 export function AppSidebar() {

@@ -15,6 +15,9 @@ type OrdenLaborUpdate = Database["public"]["Tables"]["campo_orden_labores"]["Upd
 type OrdenLaborLoteRow = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Row"];
 type OrdenLaborLoteInsert = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Insert"];
 type OrdenLaborLoteUpdate = Database["public"]["Tables"]["campo_orden_labor_lotes"]["Update"];
+type OperarioRow = Database["public"]["Tables"]["campo_operarios"]["Row"];
+type MaquinariaRow = Database["public"]["Tables"]["campo_maquinarias"]["Row"];
+type InsumoRow = Database["public"]["Tables"]["campo_insumos"]["Row"];
 
 export type CampoEstablecimientoListItem = Pick<
   EstablecimientoRow,
@@ -35,6 +38,14 @@ export type CampoEstablecimientoListItem = Pick<
 };
 
 export type CampoEstadoFilter = "activos" | "inactivos" | "todos";
+
+export type CampoOperario = Pick<OperarioRow, "id" | "nombre" | "codigo_interno" | "documento" | "telefono" | "observaciones" | "activo" | "created_at" | "updated_at">;
+export type CampoMaquinaria = Pick<MaquinariaRow, "id" | "nombre" | "codigo_interno" | "tipo" | "marca" | "modelo" | "identificacion" | "anio" | "observaciones" | "activo" | "created_at" | "updated_at">;
+export type CampoInsumo = Pick<InsumoRow, "id" | "nombre" | "codigo_interno" | "unidad" | "observaciones" | "activo" | "created_at" | "updated_at">;
+export type CampoOperarioFormValues = { nombre: string; codigo_interno: string; documento: string; telefono: string; observaciones: string };
+export type CampoMaquinariaFormValues = { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
+export type CampoInsumUnidad = "litro" | "kilogramo" | "tonelada" | "unidad" | "bolsa" | "metro" | "dosis";
+export type CampoInsumoFormValues = { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
 
 export type CampoOrdenEstado =
   | "borrador"
