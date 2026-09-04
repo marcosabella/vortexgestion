@@ -47,8 +47,43 @@ export type CampoOperarioFormValues = { nombre: string; codigo_interno: string; 
 export type CampoMaquinariaFormValues = { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
 export type CampoInsumUnidad = "litro" | "kilogramo" | "tonelada" | "unidad" | "bolsa" | "metro" | "dosis";
 export type CampoInsumoFormValues = { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
-export type CampoParte = Pick<ParteRow, "id"|"orden_id"|"orden_labor_id"|"numero"|"estado"|"fecha_trabajo"|"hora_inicio"|"hora_fin"|"descripcion"|"observaciones"|"condiciones_climaticas"|"confirmado_at"|"anulado_at"|"motivo_anulacion"|"created_at"|"updated_at"> & { labor: { nombre:string; codigo_interno:string|null; unidad:string; activo:boolean }|null };
+export type CampoParteEstado = "borrador" | "enviado" | "rechazado" | "confirmado" | "anulado" | "descartado";
+export type CampoParte = Pick<ParteRow, "id"|"orden_id"|"orden_labor_id"|"numero"|"estado"|"fecha_trabajo"|"hora_inicio"|"hora_fin"|"descripcion"|"observaciones"|"condiciones_climaticas"|"propietario_user_id"|"propietario_operario_id"|"enviado_at"|"rechazado_at"|"motivo_rechazo"|"confirmado_at"|"anulado_at"|"motivo_anulacion"|"descartado_at"|"motivo_descarte"|"created_at"|"updated_at"> & {
+  estado: CampoParteEstado;
+  labor: { nombre:string; codigo_interno:string|null; unidad:string; activo:boolean }|null;
+  propietario_operario: { nombre: string; codigo_interno: string | null } | null;
+};
 export type CampoParteFormValues={orden_labor_id:string;fecha_trabajo:string;hora_inicio:string;hora_fin:string;descripcion:string;observaciones:string;condiciones_climaticas:string};
+
+export type CampoPartePermissions = {
+  canEditParte: boolean;
+  canSendParte: boolean;
+  canReopenParte: boolean;
+  canDiscardParte: boolean;
+  canConfirmParte: boolean;
+  canRejectParte: boolean;
+  canAnnulParte: boolean;
+};
+
+export function getCampoPartePermissions(parte: CampoParte, access: { isAdmin: boolean; isOperador: boolean; operadorVinculado: boolean; userId: string | null }): CampoPartePermissions {
+  const propietarioOperador = access.isOperador && access.operadorVinculado && parte.propietario_user_id === access.userId;
+  const administrable = access.isAdmin || propietarioOperador;
+  return {
+    canEditParte: parte.estado === "borrador" && administrable,
+    canSendParte: parte.estado === "borrador" && administrable,
+    canReopenParte: parte.estado === "rechazado" && administrable,
+    canDiscardParte: (parte.estado === "borrador" || parte.estado === "rechazado") && administrable,
+    canConfirmParte: parte.estado === "enviado" && access.isAdmin,
+    canRejectParte: parte.estado === "enviado" && access.isAdmin,
+    canAnnulParte: parte.estado === "confirmado" && access.isAdmin,
+  };
+}
+
+export const CAMPO_PARTE_ESTADOS: CampoParteEstado[] = ["borrador", "enviado", "rechazado", "confirmado", "anulado", "descartado"];
+export const CAMPO_PARTE_ESTADO_LABEL: Record<CampoParteEstado, string> = {
+  borrador: "Borrador", enviado: "Enviado", rechazado: "Rechazado",
+  confirmado: "Confirmado", anulado: "Anulado", descartado: "Descartado",
+};
 
 export type CampoOrdenEstado =
   | "borrador"

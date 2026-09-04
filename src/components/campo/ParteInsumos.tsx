@@ -43,7 +43,7 @@ function InsumoForm({ item, candidates, pending, onSubmit }: { item: CampoParteI
   </form>;
 }
 
-export function ParteInsumos({ comercioId, ordenId, parteId, access, isAdmin, orden, parte }: { comercioId: string; ordenId: string; parteId: string; access: boolean; isAdmin: boolean; orden: CampoOrdenDetail; parte: CampoParte }) {
+export function ParteInsumos({ comercioId, ordenId, parteId, access, canEditParte, orden, parte }: { comercioId: string; ordenId: string; parteId: string; access: boolean; canEditParte: boolean; orden: CampoOrdenDetail; parte: CampoParte }) {
   const query = useCampoParteInsumos(comercioId, ordenId, parteId, access, orden, parte);
   const catalog = useCampoParteInsumoCandidates(comercioId, ordenId, parteId, access, orden, parte);
   const [editing, setEditing] = useState<CampoParteInsumo | null>(null);
@@ -51,10 +51,10 @@ export function ParteInsumos({ comercioId, ordenId, parteId, access, isAdmin, or
   const [status, setStatus] = useState<CampoParteInsumo | null>(null);
   const used = useMemo(() => new Set((query.data ?? []).map((item) => item.insumo_id)), [query.data]);
   const candidates = useMemo(() => (catalog.data ?? []).filter((item) => !used.has(item.id)), [catalog.data, used]);
-  const canWrite = access && isAdmin && parte.estado === "borrador" && !["finalizada", "cancelada"].includes(orden.estado);
-  const create = useCreateCampoParteInsumo(comercioId, ordenId, parteId, access, isAdmin, orden, parte, candidates);
-  const update = useUpdateCampoParteInsumo(comercioId, ordenId, parteId, access, isAdmin, orden, parte, editing);
-  const setState = useSetCampoParteInsumoStatus(comercioId, ordenId, parteId, access, isAdmin, orden, parte, status);
+  const canWrite = access && canEditParte && parte.estado === "borrador" && !["finalizada", "cancelada"].includes(orden.estado);
+  const create = useCreateCampoParteInsumo(comercioId, ordenId, parteId, access, canEditParte, orden, parte, candidates);
+  const update = useUpdateCampoParteInsumo(comercioId, ordenId, parteId, access, canEditParte, orden, parte, editing);
+  const setState = useSetCampoParteInsumoStatus(comercioId, ordenId, parteId, access, canEditParte, orden, parte, status);
   const formPending = create.isPending || update.isPending;
   useEffect(() => { setCreating(false); setEditing(null); setStatus(null); }, [comercioId, ordenId, parteId, access]);
   const submit = async (values: FormValues) => {

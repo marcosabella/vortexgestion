@@ -163,7 +163,7 @@ export function ParteOperarios({
   ordenId,
   parteId,
   access,
-  isAdmin,
+  canEditParte,
   orden,
   parte,
 }: {
@@ -171,7 +171,7 @@ export function ParteOperarios({
   ordenId: string;
   parteId: string;
   access: boolean;
-  isAdmin: boolean;
+  canEditParte: boolean;
   orden: CampoOrdenDetail;
   parte: CampoParte;
 }) {
@@ -187,14 +187,14 @@ export function ParteOperarios({
     [creating, setCreating] = useState(false),
     [status, setStatus] = useState<CampoParteOperario | null>(null),
     [saving, setSaving] = useState(false),
-    canWrite = access && isAdmin && parte.estado === "borrador" &&
+    canWrite = access && canEditParte && parte.estado === "borrador" &&
       !["finalizada", "cancelada"].includes(orden.estado),
     create = useCreateCampoParteOperario(
       comercioId,
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       query.data?.candidates ?? [],
@@ -204,7 +204,7 @@ export function ParteOperarios({
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       editing,
@@ -214,7 +214,7 @@ export function ParteOperarios({
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       status,

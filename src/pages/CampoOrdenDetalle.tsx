@@ -12,6 +12,7 @@ import { OrdenLaborForm } from "@/components/campo/OrdenLaborForm";
 import { OrdenLaboresList } from "@/components/campo/OrdenLaboresList";
 import { PartesList } from "@/components/campo/PartesList";
 import { OrdenAvance } from "@/components/campo/OrdenAvance";
+import { CampoOrdenHistory } from "@/components/campo/CampoParteStatus";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoOrdenDetalle, useSetCampoOrdenStatus } from "@/hooks/useCampoOrdenDetalle";
 import { useCampoOrdenLabores } from "@/hooks/useCampoOrdenLabores";
@@ -45,8 +46,9 @@ export default function CampoOrdenDetalle() {
   const canCreateLabor = Boolean(canEdit && orden?.establecimiento?.activo === true);
   const canPlan = Boolean(orden && actionsAdmin && orden.estado === "borrador" && orden.establecimiento?.activo === true);
   const canReopen = Boolean(orden && actionsAdmin && orden.estado === "planificada");
-  const canFinalize = Boolean(orden && actionsAdmin && orden.estado === "en_progreso");
-  const canCancel = Boolean(orden && actionsAdmin && ["planificada", "en_progreso"].includes(orden.estado));
+  const hasPendingPartes = (partesQuery.data ?? []).some((parte) => ["borrador", "enviado", "rechazado"].includes(parte.estado));
+  const canFinalize = Boolean(orden && actionsAdmin && !partesQuery.isLoading && orden.estado === "en_progreso" && !hasPendingPartes);
+  const canCancel = Boolean(orden && actionsAdmin && !partesQuery.isLoading && ["planificada", "en_progreso"].includes(orden.estado) && !hasPendingPartes);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditPending, setIsEditPending] = useState(false);
   const [isLaborOpen, setIsLaborOpen] = useState(false);
@@ -98,7 +100,7 @@ export default function CampoOrdenDetalle() {
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <div className="overflow-x-auto pb-1"><TabsList className="inline-flex h-auto min-w-max justify-start"><TabsTrigger value="orden">Orden</TabsTrigger><TabsTrigger value="labores">Labores planificadas</TabsTrigger><TabsTrigger value="partes">Partes de trabajo</TabsTrigger><TabsTrigger value="avance">Resumen de avance</TabsTrigger></TabsList></div>
       <TabsContent value="orden" forceMount className="data-[state=inactive]:hidden">
-        <OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} canPlan={canPlan} canReopen={canReopen} onPlan={() => setTargetStatus("planificada")} onReopen={() => setTargetStatus("borrador")} canFinalize={canFinalize} canCancel={canCancel} onFinalize={() => setTargetStatus("finalizada")} onCancel={() => setTargetStatus("cancelada")} />
+        <div className="space-y-4"><OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} canPlan={canPlan} canReopen={canReopen} onPlan={() => setTargetStatus("planificada")} onReopen={() => setTargetStatus("borrador")} canFinalize={canFinalize} canCancel={canCancel} onFinalize={() => setTargetStatus("finalizada")} onCancel={() => setTargetStatus("cancelada")} /><CampoOrdenHistory comercioId={comercioId} ordenId={ordenId!} access={hasConfirmedAccess} /></div>
       </TabsContent>
       <TabsContent value="labores" forceMount className="data-[state=inactive]:hidden"><Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-6">
@@ -112,7 +114,7 @@ export default function CampoOrdenDetalle() {
               : <OrdenLaboresList comercioId={comercioId} ordenId={ordenId} hasAccess={hasConfirmedAccess} isAdmin={actionsAdmin} orden={orden} labores={labores ?? []} />}
         </CardContent>
       </Card></TabsContent>
-      <TabsContent value="partes" forceMount className="data-[state=inactive]:hidden"><PartesList comercioId={comercioId} orden={orden} labores={labores ?? []} partes={partesQuery.data ?? []} isAdmin={access.isAdmin} access={hasConfirmedAccess} isLoading={partesQuery.isLoading} hasError={Boolean(partesQuery.error)} /></TabsContent>
+      <TabsContent value="partes" forceMount className="data-[state=inactive]:hidden"><PartesList comercioId={comercioId} orden={orden} labores={labores ?? []} partes={partesQuery.data ?? []} campoAccess={access} access={hasConfirmedAccess} isLoading={partesQuery.isLoading} hasError={Boolean(partesQuery.error)} /></TabsContent>
       <TabsContent value="avance" forceMount className="data-[state=inactive]:hidden"><OrdenAvance comercioId={comercioId} ordenId={ordenId!} access={hasConfirmedAccess} orden={orden} /></TabsContent>
     </Tabs>
   );
@@ -121,7 +123,7 @@ export default function CampoOrdenDetalle() {
     <div className="container mx-auto space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="outline" onClick={() => navigate("/campo/ordenes")}><ArrowLeft className="h-4 w-4" />Volver a órdenes</Button>
-        {hasConfirmedAccess && <Badge variant="outline">{access.isAdmin ? "Administrador" : "Solo lectura"}</Badge>}
+        {hasConfirmedAccess && <Badge variant="outline">{access.isAdmin ? "Administrador" : access.operadorVinculado ? "Operador" : "Solo lectura"}</Badge>}
       </div>
       {content}
 
@@ -169,7 +171,7 @@ export default function CampoOrdenDetalle() {
           <AlertDialogContent onEscapeKeyDown={(event) => { if (setOrdenStatus.isPending) event.preventDefault(); }} onInteractOutside={(event) => { if (setOrdenStatus.isPending) event.preventDefault(); }}>
             <AlertDialogHeader>
               <AlertDialogTitle>{targetStatus === "finalizada" ? "¿Finalizar esta orden?" : targetStatus === "cancelada" ? "¿Cancelar esta orden?" : targetStatus === "planificada" ? "¿Planificar esta orden?" : "¿Reabrir esta orden como borrador?"}</AlertDialogTitle>
-              <AlertDialogDescription>{targetStatus === "finalizada" ? "No debe haber partes borrador." : targetStatus === "cancelada" ? "No debe haber partes borrador y conservará todo el historial." : "La transición conservará los datos existentes."}</AlertDialogDescription>
+              <AlertDialogDescription>{targetStatus === "finalizada" ? "No debe haber partes borrador, enviados ni rechazados." : targetStatus === "cancelada" ? "No debe haber partes pendientes y conservará todo el historial." : "La transición conservará los datos existentes."}</AlertDialogDescription>
             </AlertDialogHeader>
             {targetStatus === "cancelada" && <Input value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="Motivo obligatorio" />}
             <AlertDialogFooter>

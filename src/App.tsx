@@ -60,6 +60,7 @@ import CampoOperarios from "./pages/CampoOperarios";
 import CampoMaquinarias from "./pages/CampoMaquinarias";
 import CampoInsumos from "./pages/CampoInsumos";
 import CampoParteDetalle from "./pages/CampoParteDetalle";
+import CampoPartesPendientes from "./pages/CampoPartesPendientes";
 
 const queryClient = new QueryClient();
 
@@ -174,6 +175,7 @@ function AuthenticatedLayout() {
               <Route path="/campo/ordenes" element={<ParametrizedRoute modulo="campo"><CampoOrdenes /></ParametrizedRoute>} />
               <Route path="/campo/ordenes/:ordenId" element={<ParametrizedRoute modulo="campo"><CampoOrdenDetalle /></ParametrizedRoute>} />
               <Route path="/campo/ordenes/:ordenId/partes/:parteId" element={<ParametrizedRoute modulo="campo"><CampoParteDetalle /></ParametrizedRoute>} />
+              <Route path="/campo/partes-pendientes" element={<ParametrizedRoute modulo="campo"><CampoPartesPendientes /></ParametrizedRoute>} />
               <Route path="/campo/operarios" element={<ParametrizedRoute modulo="campo"><CampoOperarios /></ParametrizedRoute>} />
               <Route path="/campo/maquinarias" element={<ParametrizedRoute modulo="campo"><CampoMaquinarias /></ParametrizedRoute>} />
               <Route path="/campo/insumos" element={<ParametrizedRoute modulo="campo"><CampoInsumos /></ParametrizedRoute>} />

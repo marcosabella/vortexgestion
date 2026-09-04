@@ -164,7 +164,7 @@ export function ParteLotes({
   ordenId,
   parteId,
   access,
-  isAdmin,
+  canEditParte,
   orden,
   parte,
 }: {
@@ -172,7 +172,7 @@ export function ParteLotes({
   ordenId: string;
   parteId: string;
   access: boolean;
-  isAdmin: boolean;
+  canEditParte: boolean;
   orden: CampoOrdenDetail;
   parte: CampoParte;
 }) {
@@ -188,7 +188,7 @@ export function ParteLotes({
     [creating, setCreating] = useState(false),
     [status, setStatus] = useState<CampoParteLote | null>(null),
     [saving, setSaving] = useState(false),
-    canWrite = access && isAdmin && parte.estado === "borrador" &&
+    canWrite = access && canEditParte && parte.estado === "borrador" &&
       !["finalizada", "cancelada"].includes(orden.estado) &&
     parte.labor?.activo === true,
     create = useCreateCampoParteLote(
@@ -196,7 +196,7 @@ export function ParteLotes({
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       query.data?.candidates ?? [],
@@ -206,7 +206,7 @@ export function ParteLotes({
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       editing,
@@ -216,7 +216,7 @@ export function ParteLotes({
       ordenId,
       parteId,
       access,
-      isAdmin,
+      canEditParte,
       orden,
       parte,
       status,

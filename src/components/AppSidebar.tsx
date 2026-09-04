@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
 import { useComercio } from "@/hooks/useComercio"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
+import { useCampoAccess } from "@/hooks/useCampoAccess"
 import { ModuloSistema } from "@/config/parametrizacion"
 
 import {
@@ -57,6 +58,7 @@ const listadosItems = [
 const campoItems = [
   { title: "Establecimientos", url: "/campo/establecimientos", icon: Sprout },
   { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
+  { title: "Partes pendientes", url: "/campo/partes-pendientes", icon: FileText, adminOnly: true },
   { title: "Operarios", url: "/campo/operarios", icon: Users },
   { title: "Maquinarias", url: "/campo/maquinarias", icon: Truck },
   { title: "Insumos", url: "/campo/insumos", icon: Package },
@@ -72,6 +74,7 @@ export function AppSidebar() {
   const [campoOpen, setCampoOpen] = useState(currentPath.startsWith('/campo'))
   const { data: isAdmin } = useIsAppAdmin()
   const { comercio, isLoading: isComercioLoading } = useComercio()
+  const campoAccess = useCampoAccess(comercio?.id)
   const { data: parametrizacion } = useComercioParametrizacion()
   const comercioName = comercio?.nombre_comercio || (isComercioLoading ? "Cargando..." : "Comercio")
   const isModuloEnabled = (modulo?: ModuloSistema) => !modulo || parametrizacion.modulos[modulo]
@@ -141,7 +144,7 @@ export function AppSidebar() {
                     {!collapsed && (
                       <CollapsibleContent>
                         <SidebarMenuSub>
-                          {campoItems.map((item) => (
+                          {campoItems.filter((item) => !("adminOnly" in item) || !item.adminOnly || campoAccess.isAdmin).map((item) => (
                             <SidebarMenuSubItem key={item.title}>
                               <SidebarMenuSubButton asChild className={isActive(item.url) ? 'bg-sidebar-accent/50' : ''}>
                                 <NavLink to={item.url} onClick={closeMobileMenu}>
