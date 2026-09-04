@@ -567,6 +567,57 @@ export type Database = {
           },
         ]
       }
+      campo_orden_estado_historial: {
+        Row: {
+          actor_user_id: string
+          comercio_id: string
+          created_at: string
+          estado_anterior: string | null
+          estado_nuevo: string
+          id: string
+          metadata: Json
+          motivo: string | null
+          orden_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          comercio_id: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          orden_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          comercio_id?: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo?: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          orden_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_estado_historial_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_historial_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
       campo_orden_labor_lotes: {
         Row: {
           activo: boolean
@@ -779,6 +830,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campo_establecimientos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_parte_estado_historial: {
+        Row: {
+          actor_user_id: string
+          comercio_id: string
+          created_at: string
+          estado_anterior: string | null
+          estado_nuevo: string
+          id: string
+          metadata: Json
+          motivo: string | null
+          parte_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          comercio_id: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          parte_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          comercio_id?: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo?: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          parte_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_estado_historial_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_historial_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
           },
         ]
       }
@@ -1063,17 +1165,27 @@ export type Database = {
           confirmado_by: string | null
           created_at: string
           created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
           descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
           estado: string
           fecha_trabajo: string
           hora_fin: string | null
           hora_inicio: string | null
           id: string
           motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
           numero: number
           observaciones: string | null
           orden_id: string
           orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
           updated_at: string
           updated_by: string
         }
@@ -1086,17 +1198,27 @@ export type Database = {
           confirmado_by?: string | null
           created_at?: string
           created_by?: string
+          descartado_at?: string | null
+          descartado_by?: string | null
           descripcion?: string | null
+          enviado_at?: string | null
+          enviado_by?: string | null
           estado?: string
           fecha_trabajo: string
           hora_fin?: string | null
           hora_inicio?: string | null
           id?: string
           motivo_anulacion?: string | null
+          motivo_descarte?: string | null
+          motivo_rechazo?: string | null
           numero?: number
           observaciones?: string | null
           orden_id: string
           orden_labor_id: string
+          propietario_operario_id?: string | null
+          propietario_user_id: string
+          rechazado_at?: string | null
+          rechazado_by?: string | null
           updated_at?: string
           updated_by?: string
         }
@@ -1109,17 +1231,27 @@ export type Database = {
           confirmado_by?: string | null
           created_at?: string
           created_by?: string
+          descartado_at?: string | null
+          descartado_by?: string | null
           descripcion?: string | null
+          enviado_at?: string | null
+          enviado_by?: string | null
           estado?: string
           fecha_trabajo?: string
           hora_fin?: string | null
           hora_inicio?: string | null
           id?: string
           motivo_anulacion?: string | null
+          motivo_descarte?: string | null
+          motivo_rechazo?: string | null
           numero?: number
           observaciones?: string | null
           orden_id?: string
           orden_labor_id?: string
+          propietario_operario_id?: string | null
+          propietario_user_id?: string
+          rechazado_at?: string | null
+          rechazado_by?: string | null
           updated_at?: string
           updated_by?: string
         }
@@ -1136,6 +1268,13 @@ export type Database = {
             columns: ["comercio_id", "orden_id"]
             isOneToOne: false
             referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_partes_propietario_operario_fkey"
+            columns: ["comercio_id", "propietario_operario_id"]
+            isOneToOne: false
+            referencedRelation: "campo_operarios"
             referencedColumns: ["comercio_id", "id"]
           },
           {
@@ -3741,17 +3880,27 @@ export type Database = {
           confirmado_by: string | null
           created_at: string
           created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
           descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
           estado: string
           fecha_trabajo: string
           hora_fin: string | null
           hora_inicio: string | null
           id: string
           motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
           numero: number
           observaciones: string | null
           orden_id: string
           orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
           updated_at: string
           updated_by: string
         }
@@ -3803,17 +3952,27 @@ export type Database = {
           confirmado_by: string | null
           created_at: string
           created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
           descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
           estado: string
           fecha_trabajo: string
           hora_fin: string | null
           hora_inicio: string | null
           id: string
           motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
           numero: number
           observaciones: string | null
           orden_id: string
           orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
           updated_at: string
           updated_by: string
         }
@@ -3823,6 +3982,249 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      campo_crear_parte: {
+        Args: {
+          p_condiciones_climaticas?: string
+          p_descripcion?: string
+          p_fecha_trabajo: string
+          p_hora_fin?: string
+          p_hora_inicio?: string
+          p_observaciones?: string
+          p_orden_id: string
+          p_orden_labor_id: string
+        }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_descartar_parte: {
+        Args: { p_motivo: string; p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_enviar_parte: {
+        Args: { p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_es_operador_vinculado: {
+        Args: { p_comercio_id: string }
+        Returns: boolean
+      }
+      campo_operario_actual: {
+        Args: { p_comercio_id: string }
+        Returns: string
+      }
+      campo_puede_crear_parte: {
+        Args: { p_comercio_id: string }
+        Returns: boolean
+      }
+      campo_puede_editar_parte: {
+        Args: { p_parte_id: string }
+        Returns: boolean
+      }
+      campo_reabrir_parte: {
+        Args: { p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_rechazar_parte: {
+        Args: { p_motivo: string; p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_validar_parte_detalles: {
+        Args: {
+          p_comercio_id: string
+          p_orden_labor_id: string
+          p_parte_id: string
+        }
+        Returns: undefined
       }
       confirmar_presupuesto: {
         Args: { p_presupuesto_id: string }
