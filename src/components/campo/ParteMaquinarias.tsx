@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   type CampoParteMaquinaria,
   type CampoParteMaquinariaValues,
@@ -335,7 +336,8 @@ export function ParteMaquinarias({
             </p>
           )
           : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <>
+            <div className="grid gap-3 md:hidden">
               {query.data.items.map((x) => (
                 <Card key={x.id}>
                   <CardContent className="grid gap-2 pt-4 sm:grid-cols-2">
@@ -379,6 +381,16 @@ export function ParteMaquinarias({
                 </Card>
               ))}
             </div>
+            <div className="hidden overflow-x-auto rounded-md border md:block">
+              <Table>
+                <TableHeader><TableRow><TableHead>Maquinaria</TableHead><TableHead>Identificación</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Horas</TableHead><TableHead>Lecturas</TableHead><TableHead>Observaciones</TableHead><TableHead>Estado</TableHead>{canWrite && <TableHead className="text-right">Acciones</TableHead>}</TableRow></TableHeader>
+                <TableBody>{query.data.items.map((x) => <TableRow key={x.id} className={!x.activo ? "opacity-70" : undefined}>
+                  <TableCell className="font-medium">{x.maquinaria?.nombre ?? "No disponible"}{x.maquinaria?.activo === false && <p className="text-xs text-amber-700">Catálogo inactivo</p>}</TableCell><TableCell>{x.maquinaria?.codigo_interno ?? x.maquinaria?.identificacion ?? "Sin identificación"}</TableCell><TableCell>{x.maquinaria?.tipo ?? "—"}</TableCell><TableCell className="text-right tabular-nums">{x.horas_uso ?? "—"}</TableCell><TableCell className="whitespace-nowrap">{x.lectura_inicial ?? "—"} / {x.lectura_final ?? "—"} {x.unidad_lectura ?? ""}</TableCell><TableCell className="max-w-xs whitespace-pre-wrap">{x.observaciones ?? "—"}</TableCell><TableCell><Badge variant={x.activo ? "default" : "secondary"}>{x.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
+                  {canWrite && <TableCell><div className="flex items-center justify-end gap-3"><Button size="icon" variant="outline" onClick={() => setEditing(x)} aria-label={`Editar uso de ${x.maquinaria?.nombre ?? "maquinaria"}`} title="Editar uso"><Pencil className="h-4 w-4" /></Button><Switch checked={x.activo} onCheckedChange={() => setStatus(x)} disabled={setState.isPending} aria-label={`${x.activo ? "Desactivar" : "Reactivar"} uso de ${x.maquinaria?.nombre ?? "maquinaria"}`} /></div></TableCell>}
+                </TableRow>)}</TableBody>
+              </Table>
+            </div>
+            </>
           )}
         <Dialog
           open={creating || Boolean(editing)}

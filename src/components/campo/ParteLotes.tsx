@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   type CampoParteLote,
   useCampoParteLotes,
@@ -268,7 +269,8 @@ export function ParteLotes({
             </p>
           )
           : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <>
+            <div className="grid gap-3 md:hidden">
               {query.data.items.map((x) => (
                 <Card key={x.id}>
                   <CardContent className="grid gap-2 pt-4 sm:grid-cols-2">
@@ -300,6 +302,20 @@ export function ParteLotes({
                 </Card>
               ))}
             </div>
+            <div className="hidden overflow-x-auto rounded-md border md:block">
+              <Table>
+                <TableHeader><TableRow><TableHead>Lote</TableHead><TableHead>Código</TableHead><TableHead className="text-right">Cantidad</TableHead><TableHead>Observaciones</TableHead><TableHead>Estado</TableHead>{canWrite && <TableHead className="text-right">Acciones</TableHead>}</TableRow></TableHeader>
+                <TableBody>{query.data.items.map((x) => <TableRow key={x.id} className={!x.activo ? "opacity-70" : undefined}>
+                  <TableCell className="font-medium">{x.asignacion?.lote?.nombre ?? "Lote no disponible"}{(!x.asignacion?.activo || !x.asignacion?.lote?.activo) && <p className="text-xs text-amber-700">Asignación o lote inactivo</p>}</TableCell>
+                  <TableCell>{x.asignacion?.lote?.codigo_interno ?? "Sin código"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{x.cantidad_ejecutada} {parte.labor?.unidad}</TableCell>
+                  <TableCell className="max-w-xs whitespace-pre-wrap">{x.observaciones ?? "—"}</TableCell>
+                  <TableCell><Badge variant={x.activo ? "default" : "secondary"}>{x.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
+                  {canWrite && <TableCell><div className="flex items-center justify-end gap-3"><Button size="icon" variant="outline" onClick={() => setEditing(x)} aria-label={`Editar avance de ${x.asignacion?.lote?.nombre ?? "lote"}`} title="Editar avance"><Pencil className="h-4 w-4" /></Button><Switch checked={x.activo} onCheckedChange={() => setStatus(x)} disabled={setState.isPending} aria-label={`${x.activo ? "Desactivar" : "Reactivar"} avance de ${x.asignacion?.lote?.nombre ?? "lote"}`} /></div></TableCell>}
+                </TableRow>)}</TableBody>
+              </Table>
+            </div>
+            </>
           )}
         <Dialog
           open={creating || Boolean(editing)}
