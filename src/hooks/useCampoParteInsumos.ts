@@ -1,3 +1,4 @@
+import { campoCostosKey } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -122,6 +123,7 @@ export function useCreateCampoParteInsumo(c: string | null, o: string | null, p:
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: key(c, o, p) });
+      await queryClient.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Insumo agregado" });
     },
     onError: (error) => toast({ title: "No se pudo guardar", description: safeMessage(error), variant: "destructive" }),
@@ -142,6 +144,7 @@ export function useUpdateCampoParteInsumo(c: string | null, o: string | null, p:
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: key(c, o, p) });
+      await queryClient.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Consumo actualizado" });
     },
     onError: (error) => toast({ title: "No se pudo guardar", description: safeMessage(error), variant: "destructive" }),
@@ -168,6 +171,7 @@ export function useSetCampoParteInsumoStatus(c: string | null, o: string | null,
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: key(c, o, p) });
+      await queryClient.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Estado actualizado" });
     },
     onError: (error) => toast({ title: "No se pudo cambiar el estado", description: safeMessage(error), variant: "destructive" }),

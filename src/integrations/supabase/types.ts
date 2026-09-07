@@ -344,9 +344,11 @@ export type Database = {
           activo: boolean
           codigo_interno: string | null
           comercio_id: string
+          costo_unitario: number | null
           created_at: string
           created_by: string
           id: string
+          moneda_costo: string | null
           nombre: string
           observaciones: string | null
           unidad: string
@@ -357,9 +359,11 @@ export type Database = {
           activo?: boolean
           codigo_interno?: string | null
           comercio_id: string
+          costo_unitario?: number | null
           created_at?: string
           created_by?: string
           id?: string
+          moneda_costo?: string | null
           nombre: string
           observaciones?: string | null
           unidad: string
@@ -370,9 +374,11 @@ export type Database = {
           activo?: boolean
           codigo_interno?: string | null
           comercio_id?: string
+          costo_unitario?: number | null
           created_at?: string
           created_by?: string
           id?: string
+          moneda_costo?: string | null
           nombre?: string
           observaciones?: string | null
           unidad?: string
@@ -455,12 +461,14 @@ export type Database = {
           anio: number | null
           codigo_interno: string | null
           comercio_id: string
+          costo_hora: number | null
           created_at: string
           created_by: string
           id: string
           identificacion: string | null
           marca: string | null
           modelo: string | null
+          moneda_costo: string | null
           nombre: string
           observaciones: string | null
           tipo: string
@@ -472,12 +480,14 @@ export type Database = {
           anio?: number | null
           codigo_interno?: string | null
           comercio_id: string
+          costo_hora?: number | null
           created_at?: string
           created_by?: string
           id?: string
           identificacion?: string | null
           marca?: string | null
           modelo?: string | null
+          moneda_costo?: string | null
           nombre: string
           observaciones?: string | null
           tipo: string
@@ -489,12 +499,14 @@ export type Database = {
           anio?: number | null
           codigo_interno?: string | null
           comercio_id?: string
+          costo_hora?: number | null
           created_at?: string
           created_by?: string
           id?: string
           identificacion?: string | null
           marca?: string | null
           modelo?: string | null
+          moneda_costo?: string | null
           nombre?: string
           observaciones?: string | null
           tipo?: string
@@ -516,10 +528,12 @@ export type Database = {
           activo: boolean
           codigo_interno: string | null
           comercio_id: string
+          costo_hora: number | null
           created_at: string
           created_by: string
           documento: string | null
           id: string
+          moneda_costo: string | null
           nombre: string
           observaciones: string | null
           telefono: string | null
@@ -531,10 +545,12 @@ export type Database = {
           activo?: boolean
           codigo_interno?: string | null
           comercio_id: string
+          costo_hora?: number | null
           created_at?: string
           created_by?: string
           documento?: string | null
           id?: string
+          moneda_costo?: string | null
           nombre: string
           observaciones?: string | null
           telefono?: string | null
@@ -546,10 +562,12 @@ export type Database = {
           activo?: boolean
           codigo_interno?: string | null
           comercio_id?: string
+          costo_hora?: number | null
           created_at?: string
           created_by?: string
           documento?: string | null
           id?: string
+          moneda_costo?: string | null
           nombre?: string
           observaciones?: string | null
           telefono?: string | null
@@ -914,10 +932,12 @@ export type Database = {
           activo: boolean
           cantidad: number
           comercio_id: string
+          costo_unitario_snapshot: number | null
           created_at: string
           created_by: string
           id: string
           insumo_id: string
+          moneda_costo_snapshot: string | null
           observaciones: string | null
           parte_id: string
           unidad: string
@@ -928,10 +948,12 @@ export type Database = {
           activo?: boolean
           cantidad: number
           comercio_id: string
+          costo_unitario_snapshot?: number | null
           created_at?: string
           created_by?: string
           id?: string
           insumo_id: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           parte_id: string
           unidad: string
@@ -942,10 +964,12 @@ export type Database = {
           activo?: boolean
           cantidad?: number
           comercio_id?: string
+          costo_unitario_snapshot?: number | null
           created_at?: string
           created_by?: string
           id?: string
           insumo_id?: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           parte_id?: string
           unidad?: string
@@ -1044,6 +1068,7 @@ export type Database = {
         Row: {
           activo: boolean
           comercio_id: string
+          costo_hora_snapshot: number | null
           created_at: string
           created_by: string
           horas_uso: number | null
@@ -1051,6 +1076,7 @@ export type Database = {
           lectura_final: number | null
           lectura_inicial: number | null
           maquinaria_id: string
+          moneda_costo_snapshot: string | null
           observaciones: string | null
           parte_id: string
           unidad_lectura: string | null
@@ -1060,6 +1086,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           comercio_id: string
+          costo_hora_snapshot?: number | null
           created_at?: string
           created_by?: string
           horas_uso?: number | null
@@ -1067,6 +1094,7 @@ export type Database = {
           lectura_final?: number | null
           lectura_inicial?: number | null
           maquinaria_id: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           parte_id: string
           unidad_lectura?: string | null
@@ -1076,6 +1104,7 @@ export type Database = {
         Update: {
           activo?: boolean
           comercio_id?: string
+          costo_hora_snapshot?: number | null
           created_at?: string
           created_by?: string
           horas_uso?: number | null
@@ -1083,6 +1112,7 @@ export type Database = {
           lectura_final?: number | null
           lectura_inicial?: number | null
           maquinaria_id?: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           parte_id?: string
           unidad_lectura?: string | null
@@ -1117,11 +1147,13 @@ export type Database = {
         Row: {
           activo: boolean
           comercio_id: string
+          costo_hora_snapshot: number | null
           created_at: string
           created_by: string
           funcion: string | null
           horas_trabajadas: number | null
           id: string
+          moneda_costo_snapshot: string | null
           observaciones: string | null
           operario_id: string
           parte_id: string
@@ -1131,11 +1163,13 @@ export type Database = {
         Insert: {
           activo?: boolean
           comercio_id: string
+          costo_hora_snapshot?: number | null
           created_at?: string
           created_by?: string
           funcion?: string | null
           horas_trabajadas?: number | null
           id?: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           operario_id: string
           parte_id: string
@@ -1145,11 +1179,13 @@ export type Database = {
         Update: {
           activo?: boolean
           comercio_id?: string
+          costo_hora_snapshot?: number | null
           created_at?: string
           created_by?: string
           funcion?: string | null
           horas_trabajadas?: number | null
           id?: string
+          moneda_costo_snapshot?: string | null
           observaciones?: string | null
           operario_id?: string
           parte_id?: string
@@ -1173,6 +1209,69 @@ export type Database = {
           },
           {
             foreignKeyName: "campo_parte_operarios_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_otros_costos: {
+        Row: {
+          activo: boolean
+          cantidad: number
+          comercio_id: string
+          concepto: string
+          costo_unitario: number
+          created_at: string
+          created_by: string
+          id: string
+          moneda: string
+          observaciones: string | null
+          parte_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad: number
+          comercio_id: string
+          concepto: string
+          costo_unitario: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda: string
+          observaciones?: string | null
+          parte_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad?: number
+          comercio_id?: string
+          concepto?: string
+          costo_unitario?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda?: string
+          observaciones?: string | null
+          parte_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_otros_costos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_otros_costos_parte_fkey"
             columns: ["comercio_id", "parte_id"]
             isOneToOne: false
             referencedRelation: "campo_partes_trabajo"
@@ -4133,6 +4232,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      campo_costos_insumos: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_maquinarias: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_operarios: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_parte: { Args: { p_parte_id: string }; Returns: Json }
       campo_crear_parte: {
         Args: {
           p_condiciones_climaticas?: string

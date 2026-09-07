@@ -1,3 +1,5 @@
+import { CostoFields } from "@/components/campo/CostoFields";
+import { campoCostoFields, validarParCosto, type CampoCostoCatalogo } from "@/utils/campoCostos";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +30,8 @@ const labels = {
   metro: "Metros",
   dosis: "Dosis",
 } as const;
-const schema: z.ZodType<CampoInsumoFormValues> = z.object({
+const schema = z.object({
+  ...campoCostoFields,
   nombre: z.string().trim().min(1, "Ingresá el nombre"),
   codigo_interno: z.string().trim(),
   unidad: z.enum([
@@ -41,8 +44,9 @@ const schema: z.ZodType<CampoInsumoFormValues> = z.object({
     "dosis",
   ]),
   observaciones: z.string().trim(),
-});
+}).superRefine(validarParCosto);
 export function InsumoForm({
+  costoInicial,
   mode,
   item,
   comercioId,
@@ -50,6 +54,7 @@ export function InsumoForm({
   onSuccess,
   onSaving,
 }: {
+  costoInicial: CampoCostoCatalogo | null;
   mode: "create" | "edit";
   item: CampoInsumo | null;
   comercioId: string;
@@ -60,10 +65,12 @@ export function InsumoForm({
   const [changed, setChanged] = useState(false),
     create = useCreateCampoInsumo(comercioId, allowed),
     update = useUpdateCampoInsumo(comercioId, allowed);
-  const { control, register, handleSubmit, reset, formState: { errors } } =
+  const { control, register, handleSubmit, reset, watch, setValue, formState: { errors } } =
     useForm<CampoInsumoFormValues>({
       resolver: zodResolver(schema),
       defaultValues: {
+        costo: costoInicial?.costo == null ? "" : String(costoInicial.costo),
+        moneda_costo: costoInicial?.moneda ?? "",
         nombre: item?.nombre ?? "",
         codigo_interno: item?.codigo_interno ?? "",
         unidad: (item?.unidad as CampoInsumoFormValues["unidad"]) ?? "litro",
@@ -138,6 +145,7 @@ export function InsumoForm({
           disabled={pending}
         />
       </div>
+      {allowed && <CostoFields costo={watch("costo")} moneda={watch("moneda_costo")} onCosto={v => setValue("costo", v, { shouldDirty: true, shouldValidate: true })} onMoneda={v => setValue("moneda_costo", v, { shouldDirty: true, shouldValidate: true })} disabled={pending} label="Costo unitario" error={errors.costo?.message ?? errors.moneda_costo?.message} />}
       <div className="flex justify-end">
         <Button type="submit" variant="success" disabled={pending || !allowed}>
           {pending ? "Guardando..." : "Guardar"}

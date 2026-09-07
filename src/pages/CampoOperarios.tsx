@@ -1,3 +1,4 @@
+import { CostoCatalogoLoader } from "@/components/campo/CostoCatalogoLoader";
 import { Users } from "lucide-react";
 import { CampoCatalogList } from "@/components/campo/CampoCatalogList";
 import { OperarioForm } from "@/components/campo/OperarioForm";
@@ -33,14 +34,15 @@ export default function CampoOperarios() {
       cells={(x) => [x.documento || "—", x.telefono || "—"]}
       setStatus={status}
       renderForm={(mode, item, done, saving) => (
-        <OperarioForm
+        <CostoCatalogoLoader comercioId={id!} categoria="operarios" itemId={item?.id} isAdmin={confirmed && access.isAdmin}>{costoInicial => <OperarioForm
+          costoInicial={costoInicial}
           mode={mode}
           item={item}
           comercioId={id!}
           allowed={confirmed && access.isAdmin}
           onSuccess={done}
           onSaving={saving}
-        />
+        />}</CostoCatalogoLoader>
       )}
     />
   );

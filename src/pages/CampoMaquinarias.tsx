@@ -1,3 +1,4 @@
+import { CostoCatalogoLoader } from "@/components/campo/CostoCatalogoLoader";
 import { Tractor } from "lucide-react";
 import { CampoCatalogList } from "@/components/campo/CampoCatalogList";
 import { MaquinariaForm } from "@/components/campo/MaquinariaForm";
@@ -45,14 +46,15 @@ export default function CampoMaquinarias() {
       ]}
       setStatus={status}
       renderForm={(mode, item, done, saving) => (
-        <MaquinariaForm
+        <CostoCatalogoLoader comercioId={id!} categoria="maquinarias" itemId={item?.id} isAdmin={confirmed && access.isAdmin}>{costoInicial => <MaquinariaForm
+          costoInicial={costoInicial}
           mode={mode}
           item={item}
           comercioId={id!}
           allowed={confirmed && access.isAdmin}
           onSuccess={done}
           onSaving={saving}
-        />
+        />}</CostoCatalogoLoader>
       )}
     />
   );

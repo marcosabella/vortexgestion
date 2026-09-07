@@ -1,3 +1,4 @@
+import { campoCostosKey } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -155,6 +156,7 @@ export function useCreateCampoParteOperario(
     },
     onSuccess: async () => {
       await q.invalidateQueries({ queryKey: key(c, o, p) });
+      await q.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Operario agregado" });
     },
     onError: (e) =>
@@ -212,6 +214,7 @@ export function useUpdateCampoParteOperario(
     },
     onSuccess: async () => {
       await q.invalidateQueries({ queryKey: key(c, o, p) });
+      await q.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Asignación actualizada" });
     },
     onError: (e) =>
@@ -253,6 +256,7 @@ export function useSetCampoParteOperarioStatus(
     },
     onSuccess: async () => {
       await q.invalidateQueries({ queryKey: key(c, o, p) });
+      await q.invalidateQueries({ queryKey: campoCostosKey(c, o, p), exact: true });
       toast({ title: "Estado actualizado" });
     },
     onError: (e) =>

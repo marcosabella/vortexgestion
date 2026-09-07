@@ -1,3 +1,5 @@
+import { ParteOtrosCostos } from "@/components/campo/ParteOtrosCostos";
+import { ParteCostosResumen } from "@/components/campo/ParteCostosResumen";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -68,6 +70,8 @@ export default function CampoParteDetalle() {
     <ParteOperarios comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
     <ParteMaquinarias comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
     <ParteInsumos comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
+    {access.isAdmin && <ParteOtrosCostos key={`otros-${c}-${parteId}`} comercioId={c!} ordenId={ordenId!} parteId={parteId!} isAdmin={ok && access.isAdmin} orden={orden} parte={parte} />}
+    {access.isAdmin && <ParteCostosResumen key={`costos-${c}-${parteId}`} comercioId={c!} ordenId={ordenId!} parteId={parteId!} isAdmin={ok && access.isAdmin} orden={orden} parte={parte} />}
     <CampoParteHistory comercioId={c!} ordenId={ordenId!} parte={parte} access={ok}/>
     <Dialog open={editing} onOpenChange={v=>{if(!editSaving)setEditing(v)}}><DialogContent className="max-h-[90vh] overflow-y-auto" onEscapeKeyDown={e=>{if(editSaving)e.preventDefault()}} onInteractOutside={e=>{if(editSaving)e.preventDefault()}}><DialogHeader><DialogTitle>Editar cabecera del parte</DialogTitle></DialogHeader><ParteForm labores={[{id:parte.orden_labor_id,nombre:parte.labor?.nombre??"Labor del parte",activo:true}]} initial={initialValues} pending={update.isPending} onSaving={setEditSaving} onSubmit={async values=>{await update.mutateAsync(values);setEditing(false)}}/></DialogContent></Dialog>
     <AlertDialog open={Boolean(action)} onOpenChange={v=>{if(!v&&!pending){setAction(null);setMotivo("")}}}><AlertDialogContent onEscapeKeyDown={e=>{if(pending)e.preventDefault()}} onInteractOutside={e=>{if(pending)e.preventDefault()}}><AlertDialogHeader><AlertDialogTitle>{action&&copy[action].title}</AlertDialogTitle><AlertDialogDescription>{action&&copy[action].description}</AlertDialogDescription></AlertDialogHeader>{action&&copy[action].needsReason&&<Input value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder="Motivo obligatorio" disabled={pending}/>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={pending||Boolean(action&&copy[action].needsReason&&!motivo.trim())} onClick={e=>{e.preventDefault();void run().catch(()=>undefined)}}>{pending?"Guardando...":"Confirmar"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

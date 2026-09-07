@@ -1,3 +1,4 @@
+import type { CampoCostoFormValues } from "@/utils/campoCostos";
 import type { Database } from "@/integrations/supabase/types";
 
 type EstablecimientoRow = Database["public"]["Tables"]["campo_establecimientos"]["Row"];
@@ -43,10 +44,10 @@ export type CampoEstadoFilter = "activos" | "inactivos" | "todos";
 export type CampoOperario = Pick<OperarioRow, "id" | "nombre" | "codigo_interno" | "documento" | "telefono" | "observaciones" | "activo" | "created_at" | "updated_at">;
 export type CampoMaquinaria = Pick<MaquinariaRow, "id" | "nombre" | "codigo_interno" | "tipo" | "marca" | "modelo" | "identificacion" | "anio" | "observaciones" | "activo" | "created_at" | "updated_at">;
 export type CampoInsumo = Pick<InsumoRow, "id" | "nombre" | "codigo_interno" | "unidad" | "observaciones" | "activo" | "created_at" | "updated_at">;
-export type CampoOperarioFormValues = { nombre: string; codigo_interno: string; documento: string; telefono: string; observaciones: string };
-export type CampoMaquinariaFormValues = { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
+export type CampoOperarioFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; documento: string; telefono: string; observaciones: string };
+export type CampoMaquinariaFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
 export type CampoInsumUnidad = "litro" | "kilogramo" | "tonelada" | "unidad" | "bolsa" | "metro" | "dosis";
-export type CampoInsumoFormValues = { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
+export type CampoInsumoFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
 export type CampoParteEstado = "borrador" | "enviado" | "rechazado" | "confirmado" | "anulado" | "descartado";
 export type CampoParte = Pick<ParteRow, "id"|"orden_id"|"orden_labor_id"|"numero"|"estado"|"fecha_trabajo"|"hora_inicio"|"hora_fin"|"descripcion"|"observaciones"|"condiciones_climaticas"|"propietario_user_id"|"propietario_operario_id"|"enviado_at"|"rechazado_at"|"motivo_rechazo"|"confirmado_at"|"anulado_at"|"motivo_anulacion"|"descartado_at"|"motivo_descarte"|"created_at"|"updated_at"> & {
   estado: CampoParteEstado;

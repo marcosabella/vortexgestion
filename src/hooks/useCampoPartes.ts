@@ -1,3 +1,4 @@
+import { campoCostosKey } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -54,6 +55,7 @@ export function useCampoParteHistorial(c?: string | null, o?: string | null, p?:
 export function useCampoOrdenHistorial(c?: string | null, o?: string | null, ok = false) { return useQuery({ queryKey: ordenHistoryKey(c,o), enabled: ok && isCampoUuid(c) && isCampoUuid(o), queryFn: async (): Promise<CampoOrdenHistorial[]> => { const {data,error}=await supabase.from("campo_orden_estado_historial").select("id,orden_id,estado_anterior,estado_nuevo,motivo,actor_user_id,created_at,metadata,comercio_id").eq("comercio_id",c!).eq("orden_id",o!).order("created_at",{ascending:true}).order("id",{ascending:true}); if(error) throw error; return data??[]; } }); }
 
 function useInvalidations(c?: string | null, o?: string | null, p?: string | null) { const q=useQueryClient(); return ()=>Promise.all([
+  ...(isCampoUuid(p) ? [q.invalidateQueries({queryKey:campoCostosKey(c,o,p),exact:true})] : []),
   q.invalidateQueries({queryKey:listKey(c,o),exact:true}), q.invalidateQueries({queryKey:detailKey(c,o,p),exact:true}), q.invalidateQueries({queryKey:parteHistoryKey(c,o,p),exact:true}),
   q.invalidateQueries({queryKey:pendingPartesKey(c),exact:true}), q.invalidateQueries({queryKey:["campo",c,"orden",o],exact:true}), q.invalidateQueries({queryKey:["campo",c,"ordenes"],exact:true}),
   q.invalidateQueries({queryKey:ordenHistoryKey(c,o),exact:true}), q.invalidateQueries({queryKey:["campo",c,"orden",o,"avance"],exact:true}),

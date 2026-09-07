@@ -1,3 +1,4 @@
+import { campoCostoPayload } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ export const campoInsumoUnidades: CampoInsumUnidad[] = [
 ];
 const key = (id?: string | null) => ["campo", id ?? null, "insumos"] as const;
 const normalized = (v: CampoInsumoFormValues) => {
+  const costo = campoCostoPayload(v);
   const nombre = v.nombre.trim();
   if (!nombre || !campoInsumoUnidades.includes(v.unidad)) {
     throw new Error("Nombre o unidad inválida");
@@ -28,6 +30,8 @@ const normalized = (v: CampoInsumoFormValues) => {
     codigo_interno: v.codigo_interno.trim() || null,
     unidad: v.unidad,
     observaciones: v.observaciones.trim() || null,
+    costo_unitario: costo.costo,
+    moneda_costo: costo.moneda,
   };
 };
 function guard(id: string | null | undefined, ok: boolean) {

@@ -1,3 +1,4 @@
+import { CostoCatalogoLoader } from "@/components/campo/CostoCatalogoLoader";
 import { Package } from "lucide-react";
 import { CampoCatalogList } from "@/components/campo/CampoCatalogList";
 import { InsumoForm } from "@/components/campo/InsumoForm";
@@ -47,14 +48,15 @@ export default function CampoInsumos() {
       cells={(x) => [labels[x.unidad as CampoInsumUnidad] ?? x.unidad]}
       setStatus={status}
       renderForm={(mode, item, done, saving) => (
-        <InsumoForm
+        <CostoCatalogoLoader comercioId={id!} categoria="insumos" itemId={item?.id} isAdmin={confirmed && access.isAdmin}>{costoInicial => <InsumoForm
+          costoInicial={costoInicial}
           mode={mode}
           item={item}
           comercioId={id!}
           allowed={confirmed && access.isAdmin}
           onSuccess={done}
           onSaving={saving}
-        />
+        />}</CostoCatalogoLoader>
       )}
     />
   );

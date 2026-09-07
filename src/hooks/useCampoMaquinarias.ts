@@ -1,3 +1,4 @@
+import { campoCostoPayload } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +8,7 @@ import { campoCatalogError } from "@/utils/campoCatalogErrors";
 const key = (id?: string | null) =>
   ["campo", id ?? null, "maquinarias"] as const;
 const normalized = (v: CampoMaquinariaFormValues) => {
+  const costo = campoCostoPayload(v);
   const nombre = v.nombre.trim(), tipo = v.tipo.trim(), anio = v.anio.trim();
   if (
     !nombre || !tipo ||
@@ -22,6 +24,8 @@ const normalized = (v: CampoMaquinariaFormValues) => {
     identificacion: v.identificacion.trim() || null,
     anio: anio ? Number(anio) : null,
     observaciones: v.observaciones.trim() || null,
+    costo_hora: costo.costo,
+    moneda_costo: costo.moneda,
   };
 };
 function guard(id: string | null | undefined, ok: boolean) {

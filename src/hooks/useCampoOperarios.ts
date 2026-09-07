@@ -1,3 +1,4 @@
+import { campoCostoPayload } from "@/utils/campoCostos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,13 +8,18 @@ import { campoCatalogError } from "@/utils/campoCatalogErrors";
 
 const key = (comercioId?: string | null) =>
   ["campo", comercioId ?? null, "operarios"] as const;
-const normalized = (v: CampoOperarioFormValues) => ({
-  nombre: v.nombre.trim(),
-  codigo_interno: v.codigo_interno.trim() || null,
-  documento: v.documento.trim() || null,
-  telefono: v.telefono.trim() || null,
-  observaciones: v.observaciones.trim() || null,
-});
+const normalized = (v: CampoOperarioFormValues) => {
+  const costo = campoCostoPayload(v);
+  return {
+    nombre: v.nombre.trim(),
+    codigo_interno: v.codigo_interno.trim() || null,
+    documento: v.documento.trim() || null,
+    telefono: v.telefono.trim() || null,
+    observaciones: v.observaciones.trim() || null,
+    costo_hora: costo.costo,
+    moneda_costo: costo.moneda,
+  };
+};
 function guard(comercioId: string | null | undefined, allowed: boolean) {
   if (!isCampoUuid(comercioId) || !allowed) {
     throw new Error("Sin permisos para operar sobre operarios.");
