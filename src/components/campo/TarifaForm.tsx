@@ -9,6 +9,8 @@ import { useCampoClientes } from "@/hooks/useCampoClientes";
 import { useCampoEstablecimientos } from "@/hooks/useCampoEstablecimientos";
 import { type CampoTarifa, useSaveCampoTarifa } from "@/hooks/useCampoTarifas";
 import {
+  monedaCampoLabel,
+  monedasCampo,
   nivelLabel,
   type TarifaFormValues,
   tarifaNiveles,
@@ -49,6 +51,7 @@ export function TarifaForm(
       establecimiento_id: item?.establecimiento_id ?? "",
       precio_unitario: item ? String(item.precio_unitario) : "",
       porcentaje_iva: item ? String(item.porcentaje_iva) : "21",
+      moneda: item?.moneda ?? "ARS",
       vigente_desde: item?.vigente_desde ?? "",
       vigente_hasta: item?.vigente_hasta ?? "",
       observaciones: item?.observaciones ?? "",
@@ -143,8 +146,19 @@ export function TarifaForm(
           {error("nivel")}
         </div>
         <div>
-          <Label htmlFor="tarifa-moneda">Moneda</Label>
-          <Input id="tarifa-moneda" value="ARS" readOnly />
+          <Label htmlFor="tarifa-moneda">Moneda *</Label>
+          <select
+            id="tarifa-moneda"
+            className={selectClass}
+            {...register("moneda")}
+          >
+            {monedasCampo.map((moneda) => (
+              <option key={moneda} value={moneda}>
+                {monedaCampoLabel[moneda]}
+              </option>
+            ))}
+          </select>
+          {error("moneda")}
         </div>
         {nivel !== "general" && (
           <div>

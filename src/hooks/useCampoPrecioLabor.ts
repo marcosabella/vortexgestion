@@ -8,7 +8,9 @@ import { toast } from "@/hooks/use-toast";
 import {
   campoComercialError,
   decimalComercial,
+  esMonedaCampo,
   ivaComercial,
+  monedaCampoSchema,
   numeroComercial,
 } from "@/utils/campoComercial";
 import { isCampoUuid } from "@/utils/campo";
@@ -20,6 +22,7 @@ export const precioLaborSchema = z.discriminatedUnion("modo", [
     modo: z.literal("manual"),
     precio: decimalComercial,
     iva: ivaComercial,
+    moneda: monedaCampoSchema,
   }),
 ]);
 export type PrecioLaborValues = z.infer<typeof precioLaborSchema>;
@@ -77,7 +80,8 @@ async function resolver(c: PrecioLaborContext) {
   if (!data || !data.id) return null;
   if (
     data.comercio_id !== c.comercioId || !isCampoUuid(data.id) ||
-    data.unidad !== c.labor.unidad || !data.activo || data.moneda !== "ARS"
+    data.unidad !== c.labor.unidad || !data.activo ||
+    !esMonedaCampo(data.moneda)
   ) throw new Error("campo_tarifa_no_disponible");
   const compatible = data.nivel === "general"
     ? data.cliente_id === null && data.establecimiento_id === null
@@ -152,6 +156,7 @@ export function useConfigurarCampoPrecio(
           p_facturable: true,
           p_precio_manual: numeroComercial(v.precio),
           p_porcentaje_iva_manual: numeroComercial(v.iva),
+          p_moneda_manual: v.moneda,
         };
       } else {
         const actual = await resolver(c);

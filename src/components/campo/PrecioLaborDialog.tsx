@@ -13,8 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   campoComercialError,
+  esMonedaCampo,
   fechaComercial,
   formatoComercial,
+  formatoMonetarioCampo,
+  monedaCampoLabel,
+  monedasCampo,
   nivelLabel,
 } from "@/utils/campoComercial";
 import {
@@ -45,6 +49,11 @@ export function PrecioLaborDialog(
       iva: context.labor.porcentaje_iva_snapshot === null
         ? ""
         : String(context.labor.porcentaje_iva_snapshot),
+      moneda: context.labor.precio_origen === "manual"
+        ? esMonedaCampo(context.labor.moneda_snapshot)
+          ? context.labor.moneda_snapshot
+          : undefined
+        : "ARS",
     },
   });
   const modo = watch("modo"),
@@ -111,7 +120,27 @@ export function PrecioLaborDialog(
             {modo === "manual" && (
               <>
                 <div>
-                  <Label htmlFor="labor-precio">Precio unitario (ARS)</Label>
+                  <Label htmlFor="labor-moneda">Moneda *</Label>
+                  <select
+                    id="labor-moneda"
+                    className="h-10 w-full rounded-md border bg-background px-3"
+                    {...register("moneda")}
+                  >
+                    <option value="" disabled>Elegí una moneda</option>
+                    {monedasCampo.map((moneda) => (
+                      <option key={moneda} value={moneda}>
+                        {monedaCampoLabel[moneda]}
+                      </option>
+                    ))}
+                  </select>
+                  {"moneda" in errors && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {errors.moneda?.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="labor-precio">Precio unitario</Label>
                   <Input
                     id="labor-precio"
                     inputMode="decimal"
@@ -163,8 +192,10 @@ export function PrecioLaborDialog(
                       <div>
                         <dt>Precio unitario</dt>
                         <dd>
-                          ARS {formatoComercial(tarifa.precio_unitario)} /{" "}
-                          {tarifa.unidad}
+                          {formatoMonetarioCampo(
+                            tarifa.precio_unitario,
+                            tarifa.moneda,
+                          )} / {tarifa.unidad}
                         </dd>
                       </div>
                       <div>

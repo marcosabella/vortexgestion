@@ -4,6 +4,19 @@ import type {
   CampoOrdenLaborLoteListItem,
 } from "@/types/campo";
 
+export const monedaCampoSchema = z.enum(["ARS", "USD"], {
+  errorMap: () => ({ message: "Elegí ARS o USD." }),
+});
+export type MonedaCampo = z.infer<typeof monedaCampoSchema>;
+export const monedasCampo = monedaCampoSchema.options;
+export const monedaCampoLabel: Record<MonedaCampo, string> = {
+  ARS: "ARS — Pesos argentinos",
+  USD: "USD — Dólares estadounidenses (U$S)",
+};
+export function esMonedaCampo(value: unknown): value is MonedaCampo {
+  return monedaCampoSchema.safeParse(value).success;
+}
+
 export const tarifaUnidades = z.enum([
   "ha",
   "hora",
@@ -12,7 +25,8 @@ export const tarifaUnidades = z.enum([
   "unidad",
   "fijo",
 ]).options;
-export const tarifaNiveles = z.enum(["general", "cliente", "establecimiento"]).options;
+export const tarifaNiveles =
+  z.enum(["general", "cliente", "establecimiento"]).options;
 export const nivelLabel: Record<string, string> = {
   general: "General",
   cliente: "Cliente",
@@ -61,6 +75,9 @@ export const formatoComercial = (v: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(v);
+// Código ISO inequívoco y separador inseparable; no convierte monedas.
+export const formatoMonetarioCampo = (v: number, moneda: MonedaCampo) =>
+  `${moneda}\u00a0${formatoComercial(v)}`;
 export const tarifaSchema = z.object({
   nombre: z.string().trim().min(1, "Ingresá el nombre."),
   codigo_interno: z.string().trim(),
@@ -70,6 +87,7 @@ export const tarifaSchema = z.object({
   establecimiento_id: z.string(),
   precio_unitario: decimalComercial,
   porcentaje_iva: ivaComercial,
+  moneda: monedaCampoSchema,
   vigente_desde: z.string().refine(esFechaCivil, "Ingresá una fecha válida."),
   vigente_hasta: z.string().refine(
     (v) => v === "" || esFechaCivil(v),
@@ -114,7 +132,7 @@ export function tarifaPayload(values: TarifaFormValues) {
       : null,
     precio_unitario: numeroComercial(v.precio_unitario),
     porcentaje_iva: numeroComercial(v.porcentaje_iva),
-    moneda: "ARS",
+    moneda: v.moneda,
     vigente_desde: v.vigente_desde,
     vigente_hasta: v.vigente_hasta || null,
     observaciones: v.observaciones || null,
@@ -125,6 +143,9 @@ export function campoComercialError(error: unknown): string {
   const e = typeof error === "object" && error !== null ? error : {};
   const m = "message" in e && typeof e.message === "string" ? e.message : "";
   const code = "code" in e && typeof e.code === "string" ? e.code : "";
+  if (m.includes("campo_moneda_manual_invalida")) {
+    return "La moneda del precio manual no es válida. Elegí ARS o USD.";
+  }
   if (m.includes("campo_labor_facturable_unidad_inmutable")) {
     return "Primero configurá la labor como no facturable para cambiar su unidad.";
   }
@@ -173,12 +194,18 @@ export function campoComercialError(error: unknown): string {
 export function importePrevisto(
   labor: CampoOrdenLaborListItem,
   asignaciones: CampoOrdenLaborLoteListItem[],
-): { estado: string } | { neto: number; iva: number; total: number } {
+): { estado: string } | {
+  moneda: MonedaCampo;
+  neto: number;
+  iva: number;
+  total: number;
+} {
   if (!labor.facturable) return { estado: "Labor no facturable." };
   if (!labor.activo) return { estado: "Labor inactiva: sin importe previsto." };
   if (
     labor.precio_unitario_snapshot === null ||
-    labor.porcentaje_iva_snapshot === null || !labor.moneda_snapshot
+    labor.porcentaje_iva_snapshot === null ||
+    !esMonedaCampo(labor.moneda_snapshot)
   ) return { estado: "Snapshot comercial incompleto." };
   const activas = asignaciones.filter((a) => a.activo);
   if (!activas.length) {
@@ -196,5 +223,5 @@ export function importePrevisto(
   if (![neto, iva, total].every(Number.isFinite)) {
     return { estado: "Importe fuera de rango." };
   }
-  return { neto, iva, total };
+  return { moneda: labor.moneda_snapshot, neto, iva, total };
 }

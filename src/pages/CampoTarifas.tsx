@@ -9,8 +9,12 @@ import {
   useSetCampoTarifaStatus,
 } from "@/hooks/useCampoTarifas";
 import {
+  esMonedaCampo,
   fechaComercial,
   formatoComercial,
+  formatoMonetarioCampo,
+  type MonedaCampo,
+  monedasCampo,
   nivelLabel,
   tarifaNiveles,
   tarifaUnidades,
@@ -29,6 +33,7 @@ export default function CampoTarifas() {
     rows,
   );
   const [unidad, setUnidad] = useState(""), [nivel, setNivel] = useState("");
+  const [moneda, setMoneda] = useState<MonedaCampo | "">("");
   return (
     <CampoCatalogList
       title="Tarifas comerciales"
@@ -50,9 +55,22 @@ export default function CampoTarifas() {
           x.establecimiento?.nombre,
         ].filter(Boolean).join(" ")}
       extraFilter={(x) =>
-        (!unidad || x.unidad === unidad) && (!nivel || x.nivel === nivel)}
+        (!unidad || x.unidad === unidad) && (!nivel || x.nivel === nivel) &&
+        (!moneda || x.moneda === moneda)}
       extraFilters={
         <>
+          <select
+            className="h-10 rounded-md border bg-background px-3"
+            aria-label="Filtrar tarifas por moneda"
+            value={moneda}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "" || esMonedaCampo(value)) setMoneda(value);
+            }}
+          >
+            <option value="">Todas las monedas</option>
+            {monedasCampo.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
           <select
             className="h-10 rounded-md border bg-background px-3"
             aria-label="Filtrar tarifas por unidad"
@@ -96,7 +114,7 @@ export default function CampoTarifas() {
         [x.cliente?.nombre, x.cliente?.apellido].filter(Boolean).join(" ") +
           (x.establecimiento ? ` · ${x.establecimiento.nombre}` : "") ||
         "General",
-        `${x.moneda} ${formatoComercial(x.precio_unitario)}`,
+        formatoMonetarioCampo(x.precio_unitario, x.moneda),
         `${formatoComercial(x.porcentaje_iva)} %`,
         `${fechaComercial(x.vigente_desde)} — ${
           fechaComercial(x.vigente_hasta)
@@ -109,7 +127,7 @@ export default function CampoTarifas() {
         id
           ? (
             <TarifaForm
-              key={item?.id ?? "nueva"}
+              key={`${id}-${_mode}-${item?.id ?? "nueva"}`}
               comercioId={id}
               allowed={confirmed && access.isAdmin && !query.error}
               item={item}

@@ -5,19 +5,21 @@ import { toast } from "@/hooks/use-toast";
 import { isCampoUuid } from "@/utils/campo";
 import {
   campoComercialError,
+  type MonedaCampo,
+  monedaCampoSchema,
   type TarifaFormValues,
   tarifaPayload,
 } from "@/utils/campoComercial";
 
 type TarifaRow = Database["public"]["Tables"]["campo_tarifas"]["Row"];
 export type CampoTarifa =
-  & Omit<TarifaRow, "comercio_id" | "created_by" | "updated_by">
+  & Omit<TarifaRow, "comercio_id" | "created_by" | "updated_by" | "moneda">
   & {
+    moneda: MonedaCampo;
     cliente: { nombre: string; apellido: string | null } | null;
     establecimiento: { nombre: string } | null;
   };
-export const campoTarifasKey = (id: string | null) =>
-  ["campo", id, "tarifas"];
+export const campoTarifasKey = (id: string | null) => ["campo", id, "tarifas"];
 export const campoTarifasSelect =
   "id,nombre,codigo_interno,unidad,nivel,cliente_id,establecimiento_id,precio_unitario,porcentaje_iva,moneda,vigente_desde,vigente_hasta,observaciones,activo,created_at,updated_at,cliente:clientes!campo_tarifas_cliente_fkey(nombre,apellido),establecimiento:campo_establecimientos!campo_tarifas_establecimiento_fkey(nombre)";
 
@@ -89,7 +91,10 @@ export function useCampoTarifas(comercioId: string | null, hasAccess: boolean) {
         .eq("comercio_id", comercioId).order("nombre", { ascending: true })
         .order("id", { ascending: true });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map((tarifa) => ({
+        ...tarifa,
+        moneda: monedaCampoSchema.parse(tarifa.moneda),
+      }));
     },
   });
 }

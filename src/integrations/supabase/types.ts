@@ -4057,6 +4057,7 @@ export type Database = {
       campo_configurar_precio_labor: {
         Args: {
           p_facturable?: boolean
+          p_moneda_manual?: string
           p_orden_labor_id: string
           p_porcentaje_iva_manual?: number
           p_precio_manual?: number

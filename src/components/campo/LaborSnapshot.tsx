@@ -3,7 +3,9 @@ import type {
   CampoOrdenLaborLoteListItem,
 } from "@/types/campo";
 import {
+  esMonedaCampo,
   formatoComercial,
+  formatoMonetarioCampo,
   importePrevisto,
   nivelLabel,
 } from "@/utils/campoComercial";
@@ -19,9 +21,12 @@ export function LaborSnapshot({ labor }: { labor: CampoOrdenLaborListItem }) {
           <p>
             Precio snapshot: {labor.precio_unitario_snapshot === null
               ? "Sin precio"
-              : `${labor.moneda_snapshot ?? "Moneda no disponible"} ${
-                formatoComercial(labor.precio_unitario_snapshot)
-              }`}
+              : esMonedaCampo(labor.moneda_snapshot)
+              ? formatoMonetarioCampo(
+                labor.precio_unitario_snapshot,
+                labor.moneda_snapshot,
+              )
+              : "Moneda no disponible"}
           </p>
           <p>
             IVA snapshot: {labor.porcentaje_iva_snapshot === null
@@ -49,10 +54,10 @@ export function LaborImportePrevisto(
       <h4 className="font-medium">Importe previsto orientativo</h4>
       {"estado" in importe ? <p>{importe.estado}</p> : (
         <>
-          <p>Neto: {labor.moneda_snapshot} {formatoComercial(importe.neto)}</p>
-          <p>IVA: {labor.moneda_snapshot} {formatoComercial(importe.iva)}</p>
+          <p>Neto: {formatoMonetarioCampo(importe.neto, importe.moneda)}</p>
+          <p>IVA: {formatoMonetarioCampo(importe.iva, importe.moneda)}</p>
           <p className="font-medium">
-            Total: {labor.moneda_snapshot} {formatoComercial(importe.total)}
+            Total: {formatoMonetarioCampo(importe.total, importe.moneda)}
           </p>
           <p className="text-xs text-muted-foreground">
             {labor.unidad === "fijo"
