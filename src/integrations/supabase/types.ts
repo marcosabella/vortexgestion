@@ -690,10 +690,16 @@ export type Database = {
           created_at: string
           created_by: string
           descripcion: string | null
+          facturable: boolean
           id: string
+          moneda_snapshot: string | null
           nombre: string
           orden_id: string
+          porcentaje_iva_snapshot: number | null
           posicion: number
+          precio_origen: string | null
+          precio_unitario_snapshot: number | null
+          tarifa_id: string | null
           unidad: string
           updated_at: string
           updated_by: string
@@ -705,10 +711,16 @@ export type Database = {
           created_at?: string
           created_by?: string
           descripcion?: string | null
+          facturable?: boolean
           id?: string
+          moneda_snapshot?: string | null
           nombre: string
           orden_id: string
+          porcentaje_iva_snapshot?: number | null
           posicion?: number
+          precio_origen?: string | null
+          precio_unitario_snapshot?: number | null
+          tarifa_id?: string | null
           unidad: string
           updated_at?: string
           updated_by?: string
@@ -720,10 +732,16 @@ export type Database = {
           created_at?: string
           created_by?: string
           descripcion?: string | null
+          facturable?: boolean
           id?: string
+          moneda_snapshot?: string | null
           nombre?: string
           orden_id?: string
+          porcentaje_iva_snapshot?: number | null
           posicion?: number
+          precio_origen?: string | null
+          precio_unitario_snapshot?: number | null
+          tarifa_id?: string | null
           unidad?: string
           updated_at?: string
           updated_by?: string
@@ -741,6 +759,13 @@ export type Database = {
             columns: ["comercio_id", "orden_id"]
             isOneToOne: false
             referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labores_tarifa_fkey"
+            columns: ["comercio_id", "tarifa_id"]
+            isOneToOne: false
+            referencedRelation: "campo_tarifas"
             referencedColumns: ["comercio_id", "id"]
           },
         ]
@@ -1282,6 +1307,94 @@ export type Database = {
             columns: ["comercio_id"]
             isOneToOne: false
             referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_tarifas: {
+        Row: {
+          activo: boolean
+          cliente_id: string | null
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          establecimiento_id: string | null
+          id: string
+          moneda: string
+          nivel: string
+          nombre: string
+          observaciones: string | null
+          porcentaje_iva: number
+          precio_unitario: number
+          unidad: string
+          updated_at: string
+          updated_by: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id?: string | null
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          establecimiento_id?: string | null
+          id?: string
+          moneda?: string
+          nivel: string
+          nombre: string
+          observaciones?: string | null
+          porcentaje_iva?: number
+          precio_unitario: number
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string | null
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          establecimiento_id?: string | null
+          id?: string
+          moneda?: string
+          nivel?: string
+          nombre?: string
+          observaciones?: string | null
+          porcentaje_iva?: number
+          precio_unitario?: number
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_tarifas_cliente_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_tarifas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_tarifas_establecimiento_fkey"
+            columns: ["establecimiento_id"]
+            isOneToOne: false
+            referencedRelation: "campo_establecimientos"
             referencedColumns: ["id"]
           },
         ]
@@ -3941,6 +4054,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      campo_configurar_precio_labor: {
+        Args: {
+          p_facturable?: boolean
+          p_orden_labor_id: string
+          p_porcentaje_iva_manual?: number
+          p_precio_manual?: number
+          p_tarifa_id?: string
+        }
+        Returns: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          facturable: boolean
+          id: string
+          moneda_snapshot: string | null
+          nombre: string
+          orden_id: string
+          porcentaje_iva_snapshot: number | null
+          posicion: number
+          precio_origen: string | null
+          precio_unitario_snapshot: number | null
+          tarifa_id: string | null
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_orden_labores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       campo_confirmar_parte: {
         Args: { p_parte_id: string }
         Returns: {
@@ -4214,6 +4363,36 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_resolver_tarifa_labor: {
+        Args: { p_fecha?: string; p_orden_labor_id: string }
+        Returns: {
+          activo: boolean
+          cliente_id: string | null
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          establecimiento_id: string | null
+          id: string
+          moneda: string
+          nivel: string
+          nombre: string
+          observaciones: string | null
+          porcentaje_iva: number
+          precio_unitario: number
+          unidad: string
+          updated_at: string
+          updated_by: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_tarifas"
           isOneToOne: true
           isSetofReturn: false
         }
