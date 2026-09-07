@@ -13,6 +13,7 @@ import type {
   CampoOrdenLaborUpdatePayload,
   CampoOrdenLaborUnidad,
 } from "@/types/campo";
+import { campoComercialError } from "@/utils/campoComercial";
 import { isCampoUuid } from "@/utils/campo";
 
 const unidades: CampoOrdenLaborUnidad[] = ["ha", "hora", "km", "tonelada", "unidad", "fijo"];
@@ -20,6 +21,7 @@ const unidades: CampoOrdenLaborUnidad[] = ["ha", "hora", "km", "tonelada", "unid
 function laborErrorMessage(error: unknown) {
   const safeError = error as { code?: string; message?: string };
   const message = safeError.message?.toLocaleLowerCase("es") ?? "";
+  if (message.includes("campo_labor_facturable_unidad_inmutable")) return campoComercialError(error);
 
   if (safeError.code === "23505" && message.includes("codigo")) return "Ya existe una labor con ese código dentro de la orden.";
   if (safeError.code === "23505" && message.includes("nombre")) return "Ya existe una labor con ese nombre dentro de la orden.";
@@ -60,6 +62,12 @@ export function useCampoOrdenLabores(
           codigo_interno,
           descripcion,
           unidad,
+          facturable,
+          tarifa_id,
+          precio_unitario_snapshot,
+          porcentaje_iva_snapshot,
+          moneda_snapshot,
+          precio_origen,
           posicion,
           activo,
           created_at,
@@ -167,6 +175,7 @@ export function useUpdateCampoOrdenLabor(
   return useMutation({
     mutationFn: async ({ laborId, payload: values }: CampoOrdenLaborUpdateParams) => {
       assertLaborWrite(comercioId, ordenId, laborId, hasAccess, isAdmin, orden, labor);
+      if (labor?.facturable && values.unidad !== labor.unidad) throw new Error("campo_labor_facturable_unidad_inmutable");
       if (values.unidad === "fijo" && labor?.unidad !== "fijo" && asignaciones.some((item) => item.cantidad_planificada !== 1)) {
         throw new Error("Para usar Fijo por lote, todas las asignaciones deben tener cantidad 1.");
       }

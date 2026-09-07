@@ -365,7 +365,7 @@ export function ParteMaquinarias({
                       </p>
                     )}
                     {canWrite && (
-                      <div className="flex gap-2 sm:col-span-2">
+                      <div className="flex items-center justify-end gap-2 sm:col-span-2">
                         <Button size="icon"
                           variant="outline"
                           onClick={() => setEditing(x)}

@@ -41,7 +41,7 @@ function LoteActions({
   onStatus: (lote: CampoLoteListItem) => void;
 }) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <Button type="button" variant="outline" size="icon" disabled={disabled} onClick={() => onEdit(lote)} aria-label={`Editar lote ${lote.nombre}`} title="Editar lote"><Pencil className="h-4 w-4" /></Button>
       <Switch checked={lote.activo} onCheckedChange={() => onStatus(lote)} disabled={disabled} aria-label={`${lote.activo ? "Desactivar" : "Reactivar"} lote ${lote.nombre}`} />
     </div>

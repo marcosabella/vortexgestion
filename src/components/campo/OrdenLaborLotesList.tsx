@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { LaborImportePrevisto } from "@/components/campo/LaborSnapshot";
 import { OrdenLaborLoteForm } from "@/components/campo/OrdenLaborLoteForm";
 import { useCampoLotes } from "@/hooks/useCampoLotes";
 import { useCampoOrdenLaborLotes, useSetCampoOrdenLaborLoteStatus } from "@/hooks/useCampoOrdenLaborLotes";
@@ -78,6 +79,7 @@ export function OrdenLaborLotesList({ comercioId, ordenId, hasAccess, isAdmin, o
         {canCreate && <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Asignar lote</Button>}
       </div>
 
+      {!assignmentsQuery.isLoading && !assignmentsQuery.error && assignments && <LaborImportePrevisto labor={labor} asignaciones={assignments} />}
       {assignmentsQuery.isLoading ? <p className="text-sm text-muted-foreground">Cargando lotes asignados...</p>
         : assignmentsQuery.error ? <p className="text-sm text-destructive">No se pudieron cargar los lotes asignados.</p>
           : (assignments ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Esta labor todavía no tiene lotes asignados.</p>

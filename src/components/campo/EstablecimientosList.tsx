@@ -68,7 +68,7 @@ function EstablecimientoActions({
   onStatus,
 }: EstablecimientoActionsProps) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <Button type="button" variant="outline" size="icon" onClick={() => onViewLotes(establecimiento.id)} aria-label={`Ver lotes de ${establecimiento.nombre}`} title="Ver lotes"><Eye className="h-4 w-4" /></Button>
       {isAdmin && (
         <>

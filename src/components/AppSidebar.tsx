@@ -56,6 +56,7 @@ const listadosItems = [
 ]
 
 const campoItems = [
+  { title: "Tarifas comerciales", url: "/campo/tarifas", icon: Banknote },
   { title: "Establecimientos", url: "/campo/establecimientos", icon: Sprout },
   { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
   { title: "Partes pendientes", url: "/campo/partes-pendientes", icon: FileText, adminOnly: true },

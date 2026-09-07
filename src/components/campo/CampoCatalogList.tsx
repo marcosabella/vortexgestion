@@ -60,6 +60,8 @@ type Props<T extends Base> = {
   query: { data?: T[]; isLoading: boolean; error: unknown };
   searchLabel: string;
   searchText: (item: T) => string;
+  extraFilters?: React.ReactNode;
+  extraFilter?: (item: T) => boolean;
   headers: string[];
   cells: (item: T) => React.ReactNode[];
   renderForm: (
@@ -94,6 +96,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
     const q = term.trim().toLocaleLowerCase("es");
     return (p.query.data ?? []).filter((x) =>
       (filter === "todos" || (filter === "activos" ? x.activo : !x.activo)) &&
+      (!p.extraFilter || p.extraFilter(x)) &&
       (!q || p.searchText(x).toLocaleLowerCase("es").includes(q))
     );
   }, [allowed, filter, p, term]);
@@ -159,7 +162,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
           }}
         >
           <DialogContent
-            className="max-h-[90vh] max-w-2xl overflow-y-auto"
+            className={`max-h-[90vh] max-w-2xl overflow-y-auto ${saving ? "[&>button]:hidden" : ""}`}
             onEscapeKeyDown={(e) => {
               if (saving) e.preventDefault();
             }}
@@ -175,7 +178,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
             {p.renderForm(
               editing ? "edit" : "create",
               editing,
-              close,
+              () => { setCreating(false); setEditing(null); },
               setSaving,
             )}
           </DialogContent>
@@ -218,7 +221,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
         </AlertDialog>
       )}
       {allowed && (
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col flex-wrap gap-3 sm:flex-row">
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -247,6 +250,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
+          {p.extraFilters}
         </div>
       )}
       {loading
@@ -279,7 +283,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                 No se encontraron {p.title.toLocaleLowerCase("es")}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {term || filter !== "todos"
+                {(p.query.data ?? []).length > 0
                   ? "Probá con otros filtros de búsqueda."
                   : "Todavía no hay registros disponibles."}
               </p>
@@ -312,7 +316,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                       </div>
                     ))}
                     {p.access.isAdmin && (
-                      <div className="flex justify-end gap-2">
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           size="icon"
                           variant="outline"
@@ -360,7 +364,7 @@ export function CampoCatalogList<T extends Base>(p: Props<T>) {
                         </TableCell>
                         {p.access.isAdmin && (
                           <TableCell>
-                            <div className="flex justify-end gap-2">
+                            <div className="flex items-center justify-end gap-2">
                               <Button
                                 size="icon"
                                 variant="outline"

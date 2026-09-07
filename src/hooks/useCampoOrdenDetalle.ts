@@ -9,11 +9,13 @@ import type {
   CampoOrdenUpdatePayload,
   CampoOrdenStatusParams,
 } from "@/types/campo";
+import { campoComercialError } from "@/utils/campoComercial";
 import { isCampoUuid } from "@/utils/campo";
 
 function campoOrdenUpdateErrorMessage(error: unknown) {
   const supabaseError = error as { code?: string; message?: string };
   const message = supabaseError.message?.toLocaleLowerCase("es") ?? "";
+  if (message.includes("campo_tarifa_alcance_incompatible")) return campoComercialError(error);
 
   if (supabaseError.code === "23505" && message.includes("codigo")) {
     return "Ya existe una orden con ese código interno en el comercio.";

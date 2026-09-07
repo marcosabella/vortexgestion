@@ -184,6 +184,12 @@ export type CampoOrdenLaborUnidad = "ha" | "hora" | "km" | "tonelada" | "unidad"
 
 export type CampoOrdenLaborListItem = Pick<
   OrdenLaborRow,
+  | "facturable"
+  | "tarifa_id"
+  | "precio_unitario_snapshot"
+  | "porcentaje_iva_snapshot"
+  | "moneda_snapshot"
+  | "precio_origen"
   | "id"
   | "orden_id"
   | "nombre"
