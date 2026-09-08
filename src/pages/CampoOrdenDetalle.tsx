@@ -13,6 +13,7 @@ import { OrdenLaboresList } from "@/components/campo/OrdenLaboresList";
 import { PartesList } from "@/components/campo/PartesList";
 import { OrdenAvance } from "@/components/campo/OrdenAvance";
 import { OrdenResumenEconomico } from "@/components/campo/OrdenResumenEconomico";
+import { OrdenFacturacion } from "@/components/campo/OrdenFacturacion";
 import { CampoOrdenHistory } from "@/components/campo/CampoParteStatus";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoOrdenDetalle, useSetCampoOrdenStatus } from "@/hooks/useCampoOrdenDetalle";
@@ -99,7 +100,7 @@ export default function CampoOrdenDetalle() {
   else if (!orden) content = <PageMessage>Orden no encontrada o sin acceso.</PageMessage>;
   else content = (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-      <div className="overflow-x-auto pb-1"><TabsList className="inline-flex h-auto min-w-max justify-start"><TabsTrigger value="orden">Orden</TabsTrigger><TabsTrigger value="labores">Labores planificadas</TabsTrigger><TabsTrigger value="partes">Partes de trabajo</TabsTrigger><TabsTrigger value="avance">Resumen de avance</TabsTrigger>{access.isAdmin && <TabsTrigger value="economico">Resumen económico</TabsTrigger>}</TabsList></div>
+      <div className="overflow-x-auto pb-1"><TabsList className="inline-flex h-auto min-w-max justify-start"><TabsTrigger value="orden">Orden</TabsTrigger><TabsTrigger value="labores">Labores planificadas</TabsTrigger><TabsTrigger value="partes">Partes de trabajo</TabsTrigger><TabsTrigger value="avance">Resumen de avance</TabsTrigger>{access.isAdmin && <TabsTrigger value="economico">Resumen económico</TabsTrigger>}{access.isAdmin && <TabsTrigger value="facturacion">Facturación</TabsTrigger>}</TabsList></div>
       <TabsContent value="orden" forceMount className="data-[state=inactive]:hidden">
         <div className="space-y-4"><OrdenDetalle orden={orden} canEdit={canEdit} onEdit={() => setIsEditOpen(true)} canPlan={canPlan} canReopen={canReopen} onPlan={() => setTargetStatus("planificada")} onReopen={() => setTargetStatus("borrador")} canFinalize={canFinalize} canCancel={canCancel} onFinalize={() => setTargetStatus("finalizada")} onCancel={() => setTargetStatus("cancelada")} /><CampoOrdenHistory comercioId={comercioId} ordenId={ordenId!} access={hasConfirmedAccess} /></div>
       </TabsContent>
@@ -118,6 +119,7 @@ export default function CampoOrdenDetalle() {
       <TabsContent value="partes" forceMount className="data-[state=inactive]:hidden"><PartesList comercioId={comercioId} orden={orden} labores={labores ?? []} partes={partesQuery.data ?? []} campoAccess={access} access={hasConfirmedAccess} isLoading={partesQuery.isLoading} hasError={Boolean(partesQuery.error)} /></TabsContent>
       <TabsContent value="avance" forceMount className="data-[state=inactive]:hidden"><OrdenAvance comercioId={comercioId} ordenId={ordenId!} access={hasConfirmedAccess} orden={orden} /></TabsContent>
       {access.isAdmin && <TabsContent value="economico" forceMount className="data-[state=inactive]:hidden"><OrdenResumenEconomico comercioId={comercioId} ordenId={ordenId!} isAdmin={access.isAdmin} /></TabsContent>}
+      {access.isAdmin && <TabsContent value="facturacion" forceMount className="data-[state=inactive]:hidden"><OrdenFacturacion comercioId={comercioId} ordenId={ordenId!} finalizada={orden.estado === "finalizada"} /></TabsContent>}
     </Tabs>
   );
 
