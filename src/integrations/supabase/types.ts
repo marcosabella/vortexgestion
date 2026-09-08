@@ -150,6 +150,7 @@ export type Database = {
           descripcion: string | null
           fecha_movimiento: string
           id: string
+          moneda: string
           monto: number
           tipo: string
           updated_at: string
@@ -163,6 +164,7 @@ export type Database = {
           descripcion?: string | null
           fecha_movimiento?: string
           id?: string
+          moneda?: string
           monto: number
           tipo: string
           updated_at?: string
@@ -176,6 +178,7 @@ export type Database = {
           descripcion?: string | null
           fecha_movimiento?: string
           id?: string
+          moneda?: string
           monto?: number
           tipo?: string
           updated_at?: string
@@ -1871,6 +1874,7 @@ export type Database = {
           cuotas: number | null
           fecha_movimiento: string
           id: string
+          moneda: string
           monto: number
           observaciones: string | null
           tarjeta_id: string | null
@@ -1886,6 +1890,7 @@ export type Database = {
           cuotas?: number | null
           fecha_movimiento?: string
           id?: string
+          moneda?: string
           monto?: number
           observaciones?: string | null
           tarjeta_id?: string | null
@@ -1901,6 +1906,7 @@ export type Database = {
           cuotas?: number | null
           fecha_movimiento?: string
           id?: string
+          moneda?: string
           monto?: number
           observaciones?: string | null
           tarjeta_id?: string | null
@@ -2861,6 +2867,7 @@ export type Database = {
           fecha_acreditacion: string | null
           id: string
           mercadopago_operacion_id: string | null
+          moneda: string
           monto: number
           monto_comision_estimado: number
           monto_comision_real: number | null
@@ -2886,6 +2893,7 @@ export type Database = {
           fecha_acreditacion?: string | null
           id?: string
           mercadopago_operacion_id?: string | null
+          moneda?: string
           monto?: number
           monto_comision_estimado?: number
           monto_comision_real?: number | null
@@ -2911,6 +2919,7 @@ export type Database = {
           fecha_acreditacion?: string | null
           id?: string
           mercadopago_operacion_id?: string | null
+          moneda?: string
           monto?: number
           monto_comision_estimado?: number
           monto_comision_real?: number | null
@@ -3806,6 +3815,7 @@ export type Database = {
       }
       venta_items: {
         Row: {
+          afecta_stock: boolean
           cantidad: number
           codigo_manual: string | null
           comercio_id: string | null
@@ -3826,6 +3836,7 @@ export type Database = {
           venta_id: string
         }
         Insert: {
+          afecta_stock?: boolean
           cantidad?: number
           codigo_manual?: string | null
           comercio_id?: string | null
@@ -3846,6 +3857,7 @@ export type Database = {
           venta_id: string
         }
         Update: {
+          afecta_stock?: boolean
           cantidad?: number
           codigo_manual?: string | null
           comercio_id?: string | null
@@ -3910,12 +3922,17 @@ export type Database = {
           cuotas: number | null
           fecha_venta: string
           id: string
+          idempotency_key: string | null
+          idempotency_payload: Json | null
+          moneda: string
           monto_descuento: number
           monto_recargo: number
           numero_comprobante: string
+          numero_secuencial: number | null
           observaciones: string | null
           porcentaje_descuento: number
           porcentaje_recargo: number
+          punto_venta: number | null
           recargo_cuotas: number | null
           subtotal: number
           tarjeta_id: string | null
@@ -3938,12 +3955,17 @@ export type Database = {
           cuotas?: number | null
           fecha_venta?: string
           id?: string
+          idempotency_key?: string | null
+          idempotency_payload?: Json | null
+          moneda?: string
           monto_descuento?: number
           monto_recargo?: number
           numero_comprobante: string
+          numero_secuencial?: number | null
           observaciones?: string | null
           porcentaje_descuento?: number
           porcentaje_recargo?: number
+          punto_venta?: number | null
           recargo_cuotas?: number | null
           subtotal?: number
           tarjeta_id?: string | null
@@ -3966,12 +3988,17 @@ export type Database = {
           cuotas?: number | null
           fecha_venta?: string
           id?: string
+          idempotency_key?: string | null
+          idempotency_payload?: Json | null
+          moneda?: string
           monto_descuento?: number
           monto_recargo?: number
           numero_comprobante?: string
+          numero_secuencial?: number | null
           observaciones?: string | null
           porcentaje_descuento?: number
           porcentaje_recargo?: number
+          punto_venta?: number | null
           recargo_cuotas?: number | null
           subtotal?: number
           tarjeta_id?: string | null
@@ -4008,6 +4035,38 @@ export type Database = {
             columns: ["tarjeta_id"]
             isOneToOne: false
             referencedRelation: "tarjetas_credito"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ventas_numeradores: {
+        Row: {
+          comercio_id: string
+          punto_venta: number
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero: number
+          updated_at: string
+        }
+        Insert: {
+          comercio_id: string
+          punto_venta: number
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Update: {
+          comercio_id?: string
+          punto_venta?: number
+          tipo_comprobante?: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_numeradores_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
             referencedColumns: ["id"]
           },
         ]
@@ -4703,6 +4762,65 @@ export type Database = {
         }
         Returns: undefined
       }
+      registrar_venta_transaccional: {
+        Args: {
+          p_cliente_id: string
+          p_cliente_nombre: string
+          p_comercio_id: string
+          p_fecha_venta?: string
+          p_idempotency_key: string
+          p_items: Json
+          p_modalidad: string
+          p_moneda: string
+          p_monto_descuento?: number
+          p_monto_recargo?: number
+          p_observaciones?: string
+          p_pagos: Json
+          p_porcentaje_descuento?: number
+          p_porcentaje_recargo?: number
+          p_punto_venta: number
+          p_tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+        }
+        Returns: {
+          banco_id: string | null
+          cae: string | null
+          cae_error: string | null
+          cae_solicitado_at: string | null
+          cae_vencimiento: string | null
+          cliente_id: string | null
+          cliente_nombre: string | null
+          comercio_id: string | null
+          created_at: string
+          cuotas: number | null
+          fecha_venta: string
+          id: string
+          idempotency_key: string | null
+          idempotency_payload: Json | null
+          moneda: string
+          monto_descuento: number
+          monto_recargo: number
+          numero_comprobante: string
+          numero_secuencial: number | null
+          observaciones: string | null
+          porcentaje_descuento: number
+          porcentaje_recargo: number
+          punto_venta: number | null
+          recargo_cuotas: number | null
+          subtotal: number
+          tarjeta_id: string | null
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          total: number
+          total_iva: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ventas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       user_belongs_to_comercio: {
         Args: { target_comercio_id: string }
         Returns: boolean
@@ -4710,6 +4828,14 @@ export type Database = {
       user_is_comercio_admin: {
         Args: { target_comercio_id: string }
         Returns: boolean
+      }
+      ventas_numero_secuencial_canonico: {
+        Args: { p_numero: string }
+        Returns: number
+      }
+      ventas_punto_venta_canonico: {
+        Args: { p_numero: string }
+        Returns: number
       }
     }
     Enums: {

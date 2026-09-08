@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -163,6 +163,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [qrCobro, setQrCobro] = useState<{ image: string; ventaId: string; operacionId: string; importe: number } | null>(null)
   const [ventaMercadoPagoPendienteId, setVentaMercadoPagoPendienteId] = useState("")
   const [cancelarMercadoPagoTarget, setCancelarMercadoPagoTarget] = useState<"qr" | "pendiente" | null>(null)
+  const idempotencyKeyRef = useRef<string | null>(null)
   const mercadoPagoData = mercadoPagoStatus.data || {}
   const mercadoPagoCajas = mercadoPagoData.cajas || []
   const mercadoPagoHabilitado = !esPresupuesto && !venta
@@ -256,26 +257,28 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     setItemMontoRecargo(0)
   }, [form, permiteAjustes])
 
-  // Generar número de comprobante automático cuando cambia el tipo
+  // Los presupuestos conservan su numeración propia. Las ventas reciben el número
+  // definitivo de la RPC, que lo reserva de forma concurrente.
   useEffect(() => {
     const generarNumeroComprobante = async () => {
       if (venta) return;
+
+      if (!esPresupuesto) {
+        form.setValue("numero_comprobante", "0001-PENDIENTE")
+        return
+      }
       
       const tipoComprobante = watchTipoComprobante;
       if (!tipoComprobante) return;
 
       try {
-        const puntoVenta = esPresupuesto ? "P" : "0001";
+        const puntoVenta = "P";
         
         // La tabla se incorpora en la migracion de presupuestos y aun no forma parte del tipo generado.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let numeroRequest = (supabase as any)
-          .from(esPresupuesto ? "presupuestos" : "ventas")
+        const numeroRequest = (supabase as any)
+          .from("presupuestos")
           .select("numero_comprobante");
-
-        if (!esPresupuesto) {
-          numeroRequest = numeroRequest.eq("tipo_comprobante", tipoComprobante);
-        }
 
         const { data, error } = await numeroRequest
           .like("numero_comprobante", `${puntoVenta}-%`)
@@ -640,7 +643,14 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         const pagosConfirmados = pagosVenta.filter(pago => pago.tipo_pago !== "mercado_pago")
         const nuevaVenta = ventaMercadoPagoPendienteId
           ? { id: ventaMercadoPagoPendienteId }
-          : await createVentaAsync({ venta: ventaData, items: ventaItems, pagos: pagosConfirmados })
+          : await createVentaAsync({
+              venta: ventaData,
+              items: ventaItems,
+              pagos: pagosConfirmados,
+              idempotencyKey: idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID()),
+              mercadoPago: Boolean(pagoMercadoPago),
+            })
+        idempotencyKeyRef.current = null
         if (pagoMercadoPago) {
           setVentaMercadoPagoPendienteId(nuevaVenta.id)
           try {

@@ -1,7 +1,48 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Venta, VentaItem } from "@/types/venta";
+import type { Json } from "@/integrations/supabase/types";
+import { PagoVenta, Venta, VentaItem } from "@/types/venta";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
+
+type VentaNueva = Omit<Venta, "id" | "created_at" | "updated_at">;
+type VentaItemNuevo = Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">;
+type PagoVentaNuevo = Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">;
+
+type CrearVentaPayload = {
+  venta: VentaNueva;
+  items: VentaItemNuevo[];
+  pagos?: PagoVentaNuevo[];
+  idempotencyKey: string;
+  mercadoPago?: boolean;
+};
+
+const getRpcErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("ventas_numeracion_no_disponible")) {
+    return "No se pudo asignar un número de comprobante. Intente nuevamente.";
+  }
+  if (message.includes("ventas_idempotency_conflicto")) {
+    return "Este intento de venta ya fue procesado con datos diferentes. Inicie una venta nueva.";
+  }
+  if (message.includes("Stock insuficiente")) {
+    return "Stock insuficiente para el producto seleccionado.";
+  }
+  if (message.includes("ventas_pago_") || message.includes("ventas_pagos_no_coinciden")) {
+    return "Los pagos informados no son válidos o no coinciden con el total calculado.";
+  }
+  if (
+    message.includes("ventas_no_disponible") ||
+    message.includes("ventas_auth_requerida") ||
+    message.includes("ventas_cliente_no_disponible") ||
+    message.includes("ventas_producto_no_disponible")
+  ) {
+    return "No tiene permisos para registrar esta venta o para usar los datos seleccionados.";
+  }
+
+  return message || "No se pudo registrar la venta.";
+};
 
 const assertVentaSinCAE = async (ventaId: string) => {
   const { data, error } = await supabase
@@ -20,6 +61,7 @@ const assertVentaSinCAE = async (ventaId: string) => {
 export const useVentas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
 
   const {
     data: ventas = [],
@@ -55,61 +97,116 @@ export const useVentas = () => {
   });
 
   const createVentaMutation = useMutation({
-    mutationFn: async ({ venta, items, pagos = [] }: { venta: Omit<Venta, "id" | "created_at" | "updated_at">; items: Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">[]; pagos?: any[] }) => {
-      const { data: ventaData, error: ventaError } = await supabase
-        .from("ventas")
-        .insert([venta])
-        .select()
-        .single();
+    mutationFn: async ({ venta, items, pagos = [], idempotencyKey, mercadoPago = false }: CrearVentaPayload) => {
+      // Mercado Pago conserva su alta previa: la venta se crea antes de solicitar
+      // el QR y ese flujo no forma parte de la RPC transaccional normal.
+      if (mercadoPago) {
+        const { data: ventaData, error: ventaError } = await supabase
+          .from("ventas")
+          .insert([venta])
+          .select()
+          .single();
 
-      if (ventaError) throw ventaError;
+        if (ventaError) throw ventaError;
 
-      if (items.length > 0) {
-        const itemsWithVentaId = items.map(item => ({
-          ...item,
-          venta_id: ventaData.id
-        }));
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from("venta_items")
+            .insert(items.map((item) => ({ ...item, venta_id: ventaData.id })));
 
-        const { error: itemsError } = await supabase
-          .from("venta_items")
-          .insert(itemsWithVentaId);
+          if (itemsError) throw itemsError;
+        }
 
-        if (itemsError) throw itemsError;
+        if (pagos.length > 0) {
+          const { error: pagosError } = await supabase
+            .from("pagos_venta")
+            .insert(pagos.map((pago) => ({ ...pago, venta_id: ventaData.id })));
+
+          if (pagosError) throw pagosError;
+
+          const pagosCuentaCorriente = pagos.filter((pago) => pago.tipo_pago === "cta_cte");
+          if (pagosCuentaCorriente.length > 0 && venta.cliente_id) {
+            const { error: cuentaError } = await supabase
+              .from("cuenta_corriente")
+              .insert(pagosCuentaCorriente.map((pago) => ({
+                cliente_id: venta.cliente_id,
+                tipo_movimiento: "debito",
+                monto: pago.monto,
+                concepto: "pago_cuenta_corriente",
+                venta_id: ventaData.id,
+                fecha_movimiento: venta.fecha_venta,
+              })));
+
+            if (cuentaError) throw cuentaError;
+          }
+        }
+
+        return ventaData;
       }
 
-      // Insertar pagos
-      if (pagos.length > 0) {
-        const pagosConVentaId = pagos.map(pago => ({
-          ...pago,
-          venta_id: ventaData.id
-        }));
+      if (!comercio?.id) throw new Error("Seleccione un comercio antes de registrar la venta.");
 
-        const { error: pagosError } = await supabase
-          .from("pagos_venta")
-          .insert(pagosConVentaId);
+      const pagosCuentaCorriente = pagos.filter((pago) => pago.tipo_pago === "cta_cte");
+      const esCuentaCorriente = pagosCuentaCorriente.length > 0;
+      if (esCuentaCorriente && pagosCuentaCorriente.length !== pagos.length) {
+        throw new Error("La cuenta corriente no puede combinarse con otros medios de pago.");
+      }
 
-        if (pagosError) throw pagosError;
+      const rpcItems: Json = items.map((item) => {
+        const productoId = item.producto_id || undefined;
+        const descripcionManual = item.descripcion_manual?.trim();
 
-        // Check if any payment is "cta_cte" and create debit movements
-        const pagosCuentaCorriente = pagos.filter(pago => pago.tipo_pago === 'cta_cte');
+        if (!productoId && !descripcionManual) {
+          throw new Error("Cada ítem manual debe incluir una descripción.");
+        }
 
-        if (pagosCuentaCorriente.length > 0 && venta.cliente_id) {
-          const movimientos = pagosCuentaCorriente.map(pago => ({
-            cliente_id: venta.cliente_id,
-            tipo_movimiento: 'debito',
-            monto: pago.monto,
-            concepto: 'pago_cuenta_corriente',
-            venta_id: ventaData.id,
-            fecha_movimiento: venta.fecha_venta,
+        return {
+          ...(productoId ? { producto_id: productoId } : { descripcion_manual: descripcionManual }),
+          ...(item.codigo_manual?.trim() ? { codigo_manual: item.codigo_manual.trim() } : {}),
+          cantidad: Number(item.cantidad),
+          precio_unitario: Number(item.precio_unitario),
+          porcentaje_iva: Number(item.porcentaje_iva),
+          porcentaje_descuento: Number(item.porcentaje_descuento || 0),
+          monto_descuento: Number(item.monto_descuento || 0),
+          porcentaje_recargo: Number(item.porcentaje_recargo || 0),
+          monto_recargo: Number(item.monto_recargo || 0),
+          afecta_stock: Boolean(productoId),
+        };
+      });
+
+      const rpcPagos: Json = esCuentaCorriente
+        ? []
+        : pagos.map((pago) => ({
+            tipo_pago: pago.tipo_pago,
+            monto: Number(pago.monto),
+            ...(pago.banco_id ? { banco_id: pago.banco_id } : {}),
+            ...(pago.tarjeta_id ? { tarjeta_id: pago.tarjeta_id } : {}),
+            ...(pago.cuotas ? { cuotas: Number(pago.cuotas) } : {}),
+            ...(pago.recargo_cuotas ? { recargo_cuotas: Number(pago.recargo_cuotas) } : {}),
+            ...(pago.cheque_id ? { cheque_id: pago.cheque_id } : {}),
           }));
 
-          const { error: cuentaError } = await supabase
-            .from("cuenta_corriente")
-            .insert(movimientos);
+      const { data: ventaData, error: ventaError } = await supabase.rpc("registrar_venta_transaccional", {
+        p_comercio_id: comercio.id,
+        p_tipo_comprobante: venta.tipo_comprobante,
+        p_punto_venta: 1,
+        p_cliente_id: venta.cliente_id || null,
+        p_cliente_nombre: venta.cliente_nombre,
+        p_moneda: "ARS",
+        p_modalidad: esCuentaCorriente ? "cta_cte" : "contado",
+        p_items: rpcItems,
+        p_pagos: rpcPagos,
+        p_idempotency_key: idempotencyKey,
+        p_fecha_venta: venta.fecha_venta,
+        p_observaciones: venta.observaciones || null,
+        p_porcentaje_descuento: Number(venta.porcentaje_descuento || 0),
+        p_monto_descuento: Number(venta.monto_descuento || 0),
+        p_porcentaje_recargo: Number(venta.porcentaje_recargo || 0),
+        p_monto_recargo: Number(venta.monto_recargo || 0),
+      });
 
-          if (cuentaError) throw cuentaError;
-        }
-      }
+      if (ventaError) throw new Error(getRpcErrorMessage(ventaError));
+      if (!ventaData) throw new Error("La venta no devolvió una confirmación.");
 
       return ventaData;
     },
@@ -124,10 +221,10 @@ export const useVentas = () => {
         description: "Venta registrada correctamente",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: `Error al registrar venta: ${error.message}`,
+        description: `Error al registrar venta: ${getRpcErrorMessage(error)}`,
         variant: "destructive",
       });
     },
