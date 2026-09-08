@@ -4,6 +4,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { PagoVenta, Venta, VentaItem } from "@/types/venta";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
+import { useAfipConfig } from "@/hooks/useAfipConfig";
 
 type VentaNueva = Omit<Venta, "id" | "created_at" | "updated_at">;
 type VentaItemNuevo = Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">;
@@ -62,6 +63,7 @@ export const useVentas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio();
+  const afipConfig = useAfipConfig();
 
   const {
     data: ventas = [],
@@ -145,6 +147,10 @@ export const useVentas = () => {
       }
 
       if (!comercio?.id) throw new Error("Seleccione un comercio antes de registrar la venta.");
+      const puntoVenta = afipConfig.data?.punto_venta;
+      if (typeof puntoVenta !== "number" || !Number.isInteger(puntoVenta) || puntoVenta <= 0) {
+        throw new Error("Configure un punto de venta activo y válido antes de registrar la venta.");
+      }
 
       const pagosCuentaCorriente = pagos.filter((pago) => pago.tipo_pago === "cta_cte");
       const esCuentaCorriente = pagosCuentaCorriente.length > 0;
@@ -189,7 +195,7 @@ export const useVentas = () => {
       const { data: ventaData, error: ventaError } = await supabase.rpc("registrar_venta_transaccional", {
         p_comercio_id: comercio.id,
         p_tipo_comprobante: venta.tipo_comprobante,
-        p_punto_venta: 1,
+        p_punto_venta: puntoVenta,
         p_cliente_id: venta.cliente_id || null,
         p_cliente_nombre: venta.cliente_nombre,
         p_moneda: "ARS",

@@ -32,6 +32,10 @@ import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
+import { useAfipConfig } from "@/hooks/useAfipConfig"
+import { useComercio } from "@/hooks/useComercio"
+import { useAuth } from "@/contexts/AuthContext"
+import { useQuery } from "@tanstack/react-query"
 import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
 import { Trash2, Plus, Search, QrCode } from "lucide-react"
@@ -128,6 +132,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const { createVentaAsync, updateVenta } = useVentas()
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
+  const { comercio } = useComercio()
+  const { user } = useAuth()
+  const afipConfig = useAfipConfig()
   const esPresupuesto = modo === "presupuesto"
   const nombreDocumento = esPresupuesto ? "presupuesto" : "venta"
   const { data: clientes = [] } = useClientes()
@@ -243,6 +250,43 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const watchMontoDescuento = form.watch("monto_descuento")
   const watchPorcentajeRecargo = form.watch("porcentaje_recargo")
   const watchMontoRecargo = form.watch("monto_recargo")
+  const puntoVenta = afipConfig.data?.punto_venta
+  const puntoVentaValido = typeof puntoVenta === "number" && Number.isInteger(puntoVenta) && puntoVenta > 0
+  const puedePrevisualizarNumero =
+    !venta &&
+    !esPresupuesto &&
+    Boolean(comercio?.id && user?.id && watchTipoComprobante && puntoVentaValido)
+  const numeroPreview = useQuery({
+    queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null],
+    enabled: puedePrevisualizarNumero,
+    queryFn: async () => {
+      if (!comercio?.id || !user?.id || !watchTipoComprobante || typeof puntoVenta !== "number" || !Number.isInteger(puntoVenta) || puntoVenta <= 0) {
+        throw new Error("La configuración de punto de venta no está disponible.")
+      }
+
+      const { data: membership, error: membershipError } = await supabase
+        .from("comercio_usuarios")
+        .select("rol")
+        .eq("comercio_id", comercio.id)
+        .eq("user_id", user.id)
+        .eq("activo", true)
+        .maybeSingle()
+
+      if (membershipError || membership?.rol !== "admin") {
+        throw new Error("No tiene permisos para consultar la numeración.")
+      }
+
+      const { data, error } = await supabase.rpc("previsualizar_numero_venta", {
+        p_comercio_id: comercio.id,
+        p_tipo_comprobante: watchTipoComprobante,
+        p_punto_venta: puntoVenta,
+      })
+
+      if (error || !data) throw error ?? new Error("No se pudo previsualizar la numeración.")
+      return data
+    },
+  })
+  const numeroPreviewEnCarga = afipConfig.isLoading || numeroPreview.isPending
 
   useEffect(() => {
     if (permiteAjustes) return
@@ -257,6 +301,12 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     setItemMontoRecargo(0)
   }, [form, permiteAjustes])
 
+  useEffect(() => {
+    if (!venta && !esPresupuesto && numeroPreview.data) {
+      form.setValue("numero_comprobante", numeroPreview.data, { shouldValidate: false })
+    }
+  }, [esPresupuesto, form, numeroPreview.data, venta])
+
   // Los presupuestos conservan su numeración propia. Las ventas reciben el número
   // definitivo de la RPC, que lo reserva de forma concurrente.
   useEffect(() => {
@@ -264,7 +314,6 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       if (venta) return;
 
       if (!esPresupuesto) {
-        form.setValue("numero_comprobante", "0001-PENDIENTE")
         return
       }
       
@@ -559,6 +608,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const onSubmit = async (data: VentaFormData) => {
+    if (!esPresupuesto && !venta && !puntoVentaValido) {
+      toast({
+        title: "Configuración requerida",
+        description: "Configurá un punto de venta activo antes de registrar la venta.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (ventaItems.length === 0) {
       toast({
         title: "Error",
@@ -651,6 +709,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
               mercadoPago: Boolean(pagoMercadoPago),
             })
         idempotencyKeyRef.current = null
+        if (!pagoMercadoPago && "numero_comprobante" in nuevaVenta && typeof nuevaVenta.numero_comprobante === "string") {
+          form.setValue("numero_comprobante", nuevaVenta.numero_comprobante)
+        }
         if (pagoMercadoPago) {
           setVentaMercadoPagoPendienteId(nuevaVenta.id)
           try {
@@ -745,8 +806,23 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   <FormItem>
                     <FormLabel>Número de Comprobante</FormLabel>
                     <FormControl>
-                      <Input {...field} readOnly className="bg-muted" />
+                      <Input
+                        {...(esPresupuesto || venta
+                          ? field
+                          : {
+                              value: numeroPreviewEnCarga
+                                ? "..."
+                                : numeroPreview.isError || !puntoVentaValido
+                                  ? "No disponible"
+                                  : numeroPreview.data ?? "...",
+                            })}
+                        readOnly
+                        className="bg-muted"
+                      />
                     </FormControl>
+                    {!esPresupuesto && !venta && !numeroPreviewEnCarga && (numeroPreview.isError || !puntoVentaValido) && (
+                      <p className="text-sm text-destructive">{numeroPreview.isError ? "No se pudo consultar la numeración." : "Configurá CUIT y un punto de venta activo y válido para registrar ventas."}</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

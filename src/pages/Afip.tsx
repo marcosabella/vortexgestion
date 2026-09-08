@@ -36,7 +36,7 @@ const Afip = () => {
   const { comercio } = useComercio();
   const { reset: resetConsultarUltimo } = consultarUltimo;
 
-  const [puntoVenta, setPuntoVenta] = useState(config?.punto_venta || 1);
+  const [puntoVenta, setPuntoVenta] = useState<number | ''>(config?.punto_venta ?? '');
   const [cuitEmisor, setCuitEmisor] = useState(config?.cuit_emisor || '');
   const [ambiente, setAmbiente] = useState<'homologacion' | 'produccion'>(config?.ambiente || 'homologacion');
   const [certificadoCrt, setCertificadoCrt] = useState(config?.certificado_crt || '');
@@ -99,7 +99,7 @@ const Afip = () => {
       return;
     }
 
-    setPuntoVenta(1);
+    setPuntoVenta('');
     setCuitEmisor('');
     setAmbiente('homologacion');
     setCertificadoCrt('');
@@ -178,33 +178,45 @@ const Afip = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!certificadoCrt || !certificadoKey) {
-      alert('Debe cargar ambos certificados (CRT y KEY)');
+    const cuitNormalizado = cuitEmisor.replace(/\D/g, '');
+    if (cuitNormalizado.length !== 11) {
+      toast.error('El CUIT debe contener exactamente 11 dígitos.');
       return;
     }
 
-    let vencimientoCertificado = '';
-    try {
-      vencimientoCertificado = extractCertificateExpirationDate(certificadoCrt);
-      setCertificadoVencimiento(vencimientoCertificado);
-      setCrtError('');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado';
-      setCrtError(message);
-      alert(message);
+    if (typeof puntoVenta !== 'number' || !Number.isInteger(puntoVenta) || puntoVenta < 1 || puntoVenta > 9999) {
+      toast.error('El punto de venta debe ser un entero entre 1 y 9999.');
       return;
     }
 
+    let vencimientoCertificado = certificadoVencimiento || config?.certificado_vencimiento || null;
+    if (certificadoCrt.trim()) {
+      try {
+        vencimientoCertificado = extractCertificateExpirationDate(certificadoCrt);
+        setCertificadoVencimiento(vencimientoCertificado);
+        setCrtError('');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado';
+        setCrtError(message);
+        toast.error(message);
+        return;
+      }
+    }
+
+    const certificadoCrtGuardado = certificadoCrt.trim() || config?.certificado_crt || null;
+    const certificadoKeyGuardada = certificadoKey.trim() || config?.certificado_key || null;
     const configData = {
       punto_venta: puntoVenta,
-      cuit_emisor: cuitEmisor,
+      cuit_emisor: cuitNormalizado,
       ambiente,
-      certificado_crt: certificadoCrt,
-      certificado_key: certificadoKey,
-      nombre_certificado_crt: nombreCertificadoCrt,
-      nombre_certificado_key: nombreCertificadoKey,
+      certificado_crt: certificadoCrtGuardado,
+      certificado_key: certificadoKeyGuardada,
+      nombre_certificado_crt: nombreCertificadoCrt || config?.nombre_certificado_crt || null,
+      nombre_certificado_key: nombreCertificadoKey || config?.nombre_certificado_key || null,
       certificado_vencimiento: vencimientoCertificado,
-      certificado_vigente: new Date(`${vencimientoCertificado}T23:59:59`).getTime() >= Date.now(),
+      certificado_vigente: vencimientoCertificado
+        ? new Date(`${vencimientoCertificado}T23:59:59`).getTime() >= Date.now()
+        : null,
       activo,
     };
 
@@ -254,7 +266,7 @@ const Afip = () => {
     }
 
     if (!config?.id || !certificadoCrt || !certificadoKey) {
-      toast.error('Debe guardar la configuración antes de consultar');
+      toast.error('Para consultar ARCA debés guardar la configuración y cargar certificado y clave privada.');
       return;
     }
     const requestedComercioId = comercio.id;
@@ -316,8 +328,10 @@ const Afip = () => {
                     id="puntoVenta"
                     type="number"
                     min="1"
+                    max="9999"
+                    step="1"
                     value={puntoVenta}
-                    onChange={(e) => setPuntoVenta(parseInt(e.target.value))}
+                    onChange={(e) => setPuntoVenta(e.target.value === '' ? '' : Number(e.target.value))}
                     required
                   />
                   <p className="text-xs text-muted-foreground">Número asignado por ARCA (1-9999)</p>
@@ -328,12 +342,15 @@ const Afip = () => {
                   <Input
                     id="cuitEmisor"
                     type="text"
-                    placeholder="XX-XXXXXXXX-X"
+                    inputMode="numeric"
+                    pattern="[0-9]{11}"
+                    maxLength={11}
+                    placeholder="11 dígitos"
                     value={cuitEmisor}
-                    onChange={(e) => setCuitEmisor(e.target.value)}
+                    onChange={(e) => setCuitEmisor(e.target.value.replace(/\D/g, '').slice(0, 11))}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">Formato: XX-XXXXXXXX-X</p>
+                  <p className="text-xs text-muted-foreground">Debe contener 11 dígitos.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -372,7 +389,7 @@ const Afip = () => {
                 <Alert className="mb-4">
                   <FileKey className="h-4 w-4" />
                   <AlertDescription>
-                    Cargue los archivos de certificado (.crt) y clave privada (.key) obtenidos de ARCA
+                    Opcional para guardar CUIT y punto de venta. Se requieren ambos únicamente al solicitar CAE.
                   </AlertDescription>
                 </Alert>
 
@@ -506,7 +523,7 @@ const Afip = () => {
                 <Button
                   type="submit"
                   variant="success"
-                  disabled={createConfig.isPending || updateConfig.isPending || !certificadoCrt || !certificadoKey}
+                  disabled={createConfig.isPending || updateConfig.isPending}
                 >
                   {createConfig.isPending || updateConfig.isPending ? (
                     <>
