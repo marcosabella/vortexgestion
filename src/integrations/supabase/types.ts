@@ -4081,6 +4081,14 @@ export type Database = {
         Args: { p_datos: Json }
         Returns: undefined
       }
+      campo_actualizar_operador_membresia: {
+        Args: { p_activo: boolean; p_comercio_id: string; p_user_id: string }
+        Returns: {
+          activo: boolean
+          rol: string
+          user_id: string
+        }[]
+      }
       campo_anular_parte: {
         Args: { p_motivo: string; p_parte_id: string }
         Returns: {
@@ -4396,6 +4404,17 @@ export type Database = {
         Args: { p_comercio_id: string }
         Returns: boolean
       }
+      campo_listar_operadores_comercio: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          activo: boolean
+          email: string
+          operario_activo: boolean
+          operario_id: string
+          operario_nombre: string
+          user_id: string
+        }[]
+      }
       campo_operario_actual: {
         Args: { p_comercio_id: string }
         Returns: string
@@ -4533,6 +4552,19 @@ export type Database = {
           p_parte_id: string
         }
         Returns: undefined
+      }
+      campo_vincular_operador: {
+        Args: {
+          p_comercio_id: string
+          p_operario_id?: string
+          p_user_id: string
+        }
+        Returns: {
+          operario_activo: boolean
+          operario_id: string
+          operario_nombre: string
+          user_id: string
+        }[]
       }
       confirmar_presupuesto: {
         Args: { p_presupuesto_id: string }

@@ -61,6 +61,7 @@ const campoItems = [
   { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
   { title: "Partes pendientes", url: "/campo/partes-pendientes", icon: FileText, adminOnly: true },
   { title: "Operarios", url: "/campo/operarios", icon: Users },
+  { title: "Usuarios y operadores", url: "/campo/operadores", icon: Shield, adminOnly: true },
   { title: "Maquinarias", url: "/campo/maquinarias", icon: Truck },
   { title: "Insumos", url: "/campo/insumos", icon: Package },
 ]
