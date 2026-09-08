@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { buildCajaResumen, CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
 import { Comercio } from "@/types/comercio";
-import { getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta, Venta } from "@/types/venta";
+import { esVentaCuentaCorriente, getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta, Venta } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -422,7 +422,9 @@ const buildVentaRows = (caja: CajaDiaria): VentaPdfRow[] => {
     hora: formatDate(venta.fecha_venta, "HH:mm") || "-",
     comprobante: venta.numero_comprobante || "-",
     cliente: getClienteVenta(venta),
-    formaPago: getVentaTipoPagoLabel({ tipo_pago: venta.tipo_pago, pagos_venta: getPagosVenta(venta) }),
+    formaPago: esVentaCuentaCorriente(venta)
+      ? "Cuenta Corriente (deuda pendiente)"
+      : getVentaTipoPagoLabel({ tipo_pago: venta.tipo_pago, pagos_venta: getPagosVenta(venta) }),
     total: formatMoney(getVentaTotalFinal(venta)),
   }));
 };

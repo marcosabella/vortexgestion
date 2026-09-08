@@ -24,7 +24,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useActualizarCierreCaja, useCajasDiarias, useEliminarCaja, useReabrirCaja } from "@/hooks/useCaja";
 import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
-import { getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta, Venta } from "@/types/venta";
+import { esImputacionCuentaCorriente, getPagosVenta, getPagosVentaEfectivos, getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta } from "@/types/venta";
 import { buildCajaDiariaPdfFile, buildCajaPdfFile } from "@/utils/cajaPdf";
 
 const formatCurrency = (amount: number) =>
@@ -33,23 +33,11 @@ const formatCurrency = (amount: number) =>
     currency: "ARS",
   }).format(amount || 0);
 
-const getPagosVenta = (venta: Venta): PagoVenta[] => {
-  if (venta.pagos_venta?.length) return venta.pagos_venta;
-
-  return [
-    {
-      tipo_pago: venta.tipo_pago,
-      monto: getVentaTotalFinal(venta),
-      banco_id: venta.banco_id,
-      tarjeta_id: venta.tarjeta_id,
-      cuotas: venta.cuotas,
-      recargo_cuotas: venta.recargo_cuotas || 0,
-    },
-  ];
-};
-
 const formatPagoDetalle = (pago: PagoVenta) => {
-  const partes = [getTipoPagoLabel(pago.tipo_pago), formatCurrency(Number(pago.monto || 0))];
+  const etiqueta = esImputacionCuentaCorriente(pago)
+    ? "Cuenta Corriente (deuda pendiente)"
+    : getTipoPagoLabel(pago.tipo_pago);
+  const partes = [etiqueta, formatCurrency(Number(pago.monto || 0))];
 
   if (pago.banco?.nombre_banco) partes.push(pago.banco.nombre_banco);
   if (pago.tarjeta?.nombre) partes.push(pago.tarjeta.nombre);
@@ -134,7 +122,7 @@ const ListadoCaja = () => {
         acc.totalVentas += ventas.reduce((sum, venta) => sum + getVentaTotalFinal(venta), 0);
 
         ventas.forEach((venta) => {
-          getPagosVenta(venta).forEach((pago) => {
+          getPagosVentaEfectivos(venta).forEach((pago) => {
             acumularPago(pago.tipo_pago, Number(pago.monto || 0));
           });
         });

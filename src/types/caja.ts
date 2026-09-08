@@ -1,4 +1,4 @@
-import { getVentaTotalFinal, PagoVenta, TipoPago, Venta } from "@/types/venta";
+import { getPagosVentaEfectivos, getVentaTotalFinal, TipoPago, Venta } from "@/types/venta";
 
 export type CajaEstado = "abierta" | "cerrada";
 export type CajaMovimientoTipo = "ingreso" | "egreso";
@@ -53,6 +53,7 @@ export type CajaResumen = {
   totalComisionTarjeta: number;
   totalNetoTarjeta: number;
   totalCheque: number;
+  // Compatibilidad con consumidores existentes: la deuda no integra caja.
   totalCuentaCorriente: number;
   ingresosManuales: number;
   egresosManuales: number;
@@ -74,15 +75,7 @@ export const buildCajaResumen = (
   ventas: Venta[],
 ): CajaResumen => {
   const pagos = ventas.flatMap((venta) => {
-    if (venta.pagos_venta?.length) return venta.pagos_venta;
-
-    return [
-      {
-        tipo_pago: venta.tipo_pago,
-        monto: getVentaTotalFinal(venta),
-        recargo_cuotas: venta.recargo_cuotas || 0,
-      } as PagoVenta,
-    ];
+    return getPagosVentaEfectivos(venta);
   });
 
   const pagosPorTipo = pagos.reduce<ResumenPago[]>((acc, pago) => {
@@ -130,7 +123,7 @@ export const buildCajaResumen = (
     totalComisionTarjeta,
     totalNetoTarjeta: totalPorTipo("tarjeta") - totalComisionTarjeta,
     totalCheque: totalPorTipo("cheque"),
-    totalCuentaCorriente: totalPorTipo("cta_cte"),
+    totalCuentaCorriente: 0,
     ingresosManuales,
     egresosManuales,
     totalSistema: Number(caja?.monto_apertura || 0) + totalContado + ingresosManuales - egresosManuales,

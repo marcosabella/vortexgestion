@@ -176,6 +176,36 @@ export const getVentaTotalFinal = (venta: Pick<Venta, "total" | "pagos_venta">) 
   return Number(venta.total || 0);
 };
 
+type VentaConPagos = Pick<Venta, "tipo_pago" | "total" | "pagos_venta" | "banco_id" | "tarjeta_id" | "cuotas" | "recargo_cuotas">;
+
+export const esImputacionCuentaCorriente = (pago: Pick<PagoVenta, "tipo_pago">) =>
+  pago.tipo_pago === "cta_cte";
+
+export const esPagoIngresoEfectivo = (pago: Pick<PagoVenta, "tipo_pago">) =>
+  !esImputacionCuentaCorriente(pago);
+
+export const getPagosVenta = (venta: VentaConPagos): PagoVenta[] => {
+  if (venta.pagos_venta?.length) return venta.pagos_venta;
+
+  return [{
+    tipo_pago: venta.tipo_pago,
+    monto: getVentaTotalFinal(venta),
+    banco_id: venta.banco_id,
+    tarjeta_id: venta.tarjeta_id,
+    cuotas: venta.cuotas,
+    recargo_cuotas: venta.recargo_cuotas || 0,
+  }];
+};
+
+export const esVentaCuentaCorriente = (venta: VentaConPagos) => {
+  const pagos = getPagosVenta(venta);
+  return venta.tipo_pago === "cta_cte"
+    || (pagos.length > 0 && pagos.every(esImputacionCuentaCorriente));
+};
+
+export const getPagosVentaEfectivos = (venta: VentaConPagos) =>
+  getPagosVenta(venta).filter(esPagoIngresoEfectivo);
+
 export const getVentaMontoContado = (venta: Pick<Venta, "tipo_pago" | "total" | "pagos_venta">) => {
   if (venta.pagos_venta?.length) {
     return venta.pagos_venta
