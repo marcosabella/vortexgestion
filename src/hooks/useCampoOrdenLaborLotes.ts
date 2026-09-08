@@ -14,6 +14,7 @@ import type {
   CampoOrdenLaborLoteUpdatePayload,
 } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 function assignmentErrorMessage(error: unknown) {
   const safeError = error as { code?: string; message?: string };
@@ -147,6 +148,7 @@ export function useCreateCampoOrdenLaborLote(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", laborId, "lotes"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: "Lote asignado" });
     },
@@ -205,6 +207,7 @@ export function useUpdateCampoOrdenLaborLote(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: "Asignación actualizada" });
     },
@@ -238,6 +241,7 @@ export function useSetCampoOrdenLaborLoteStatus(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labor", labor?.id, "lotes"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: variables.nuevoEstado ? "Asignación reactivada" : "Asignación desactivada" });
     },

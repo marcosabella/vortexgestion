@@ -4522,6 +4522,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      campo_resumen_economico_orden: {
+        Args: { p_orden_id: string }
+        Returns: Json
+      }
       campo_validar_parte_detalles: {
         Args: {
           p_comercio_id: string

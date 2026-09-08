@@ -5,6 +5,7 @@ import { toast } from "@/hooks/use-toast";
 import { isCampoUuid } from "@/utils/campo";
 import type { Database } from "@/integrations/supabase/types";
 import type { CampoOrdenDetail, CampoOrdenLaborListItem, CampoParte, CampoParteFormValues } from "@/types/campo";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 const listKey = (c?: string | null, o?: string | null) => ["campo", c ?? null, "orden", o ?? null, "partes"] as const;
 const detailKey = (c?: string | null, o?: string | null, p?: string | null) => ["campo", c ?? null, "orden", o ?? null, "parte", p ?? null] as const;
@@ -59,6 +60,7 @@ function useInvalidations(c?: string | null, o?: string | null, p?: string | nul
   q.invalidateQueries({queryKey:listKey(c,o),exact:true}), q.invalidateQueries({queryKey:detailKey(c,o,p),exact:true}), q.invalidateQueries({queryKey:parteHistoryKey(c,o,p),exact:true}),
   q.invalidateQueries({queryKey:pendingPartesKey(c),exact:true}), q.invalidateQueries({queryKey:["campo",c,"orden",o],exact:true}), q.invalidateQueries({queryKey:["campo",c,"ordenes"],exact:true}),
   q.invalidateQueries({queryKey:ordenHistoryKey(c,o),exact:true}), q.invalidateQueries({queryKey:["campo",c,"orden",o,"avance"],exact:true}),
+  invalidateCampoResumenEconomico(q,c,o),
 ]); }
 
 export function useCreateCampoParte(c:string|null,o:string|null,ok:boolean,orden:CampoOrdenDetail|null,labores:CampoOrdenLaborListItem[]) { const invalidate=useInvalidations(c,o); return useMutation({mutationFn:async(v:CampoParteFormValues)=>{const x=guard(c,o,ok,orden), labor=labores.find(item=>item.id===v.orden_labor_id&&item.activo); if(!orden||!["planificada","en_progreso"].includes(orden.estado)||!labor||labor.orden_id!==x.o) throw new Error("campo_orden_no_admite_partes"); const {data,error}=await supabase.rpc("campo_crear_parte",{p_orden_id:x.o,p_orden_labor_id:labor.id,...payloadValues(v)}); if(error) throw error; return data;},onSuccess:async()=>{await invalidate();toast({title:"Parte creado"});},onError:e=>toast({title:"No se pudo crear el parte",description:campoParteErrorMessage(e),variant:"destructive"})}); }

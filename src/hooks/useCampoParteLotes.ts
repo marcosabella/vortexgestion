@@ -3,6 +3,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampoOrdenDetail, CampoParte } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 export type CampoParteLote = {
   id: string;
@@ -186,6 +187,7 @@ export function useCreateCampoParteLote(
       await Promise.all([
         q.invalidateQueries({ queryKey: key(c, o, p) }),
         q.invalidateQueries({ queryKey: ["campo", c, "orden", o, "avance"] }),
+        invalidateCampoResumenEconomico(q, c, o),
       ]);
       toast({ title: "Avance agregado" });
     },
@@ -251,6 +253,7 @@ export function useUpdateCampoParteLote(
       await Promise.all([
         q.invalidateQueries({ queryKey: key(c, o, p) }),
         q.invalidateQueries({ queryKey: ["campo", c, "orden", o, "avance"] }),
+        invalidateCampoResumenEconomico(q, c, o),
       ]);
       toast({ title: "Avance actualizado" });
     },
@@ -296,6 +299,7 @@ export function useSetCampoParteLoteStatus(
       await Promise.all([
         q.invalidateQueries({ queryKey: key(c, o, p) }),
         q.invalidateQueries({ queryKey: ["campo", c, "orden", o, "avance"] }),
+        invalidateCampoResumenEconomico(q, c, o),
       ]);
       toast({ title: "Estado actualizado" });
     },

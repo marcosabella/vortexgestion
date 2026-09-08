@@ -14,6 +14,7 @@ import {
   numeroComercial,
 } from "@/utils/campoComercial";
 import { isCampoUuid } from "@/utils/campo";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 export const precioLaborSchema = z.discriminatedUnion("modo", [
   z.object({ modo: z.literal("no_facturable") }),
@@ -184,6 +185,7 @@ export function useConfigurarCampoPrecio(
         queryKey: ["campo", c.comercioId, "orden", c.orden.id, "labores"],
         exact: true,
       });
+      await invalidateCampoResumenEconomico(qc, c.comercioId, c.orden.id);
       toast({ title: "Precio de la labor configurado" });
     },
     onError: (error) =>

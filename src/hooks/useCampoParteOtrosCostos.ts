@@ -5,6 +5,7 @@ import type { CampoOrdenDetail, CampoParte } from "@/types/campo";
 import { isCampoUuid } from "@/utils/campo";
 import { campoCostosKey, campoOtroCostoSchema, type CampoOtroCostoValues } from "@/utils/campoCostos";
 import { toast } from "@/hooks/use-toast";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 export type CampoOtroCosto = Pick<Database["public"]["Tables"]["campo_parte_otros_costos"]["Row"],
   "id" | "concepto" | "cantidad" | "costo_unitario" | "moneda" | "observaciones" | "activo">;
@@ -56,6 +57,7 @@ export function useGuardarCampoParteOtroCosto(x: CampoOtrosCostosContext) {
     await Promise.all([
       qc.invalidateQueries({ queryKey: key(x), exact: true }),
       qc.invalidateQueries({ queryKey: campoCostosKey(x.comercioId, x.ordenId, x.parteId), exact: true }),
+      invalidateCampoResumenEconomico(qc, x.comercioId, x.ordenId),
     ]);
     toast({ title: "Costo actualizado" });
   }, onError: () => toast({ title: "No se pudo guardar", description: "Revisá los datos. Se requiere un parte en borrador, una orden no terminal y permiso de administrador.", variant: "destructive" }) });

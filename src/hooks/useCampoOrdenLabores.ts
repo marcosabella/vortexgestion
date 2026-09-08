@@ -15,6 +15,7 @@ import type {
 } from "@/types/campo";
 import { campoComercialError } from "@/utils/campoComercial";
 import { isCampoUuid } from "@/utils/campo";
+import { invalidateCampoResumenEconomico } from "@/hooks/useCampoResumenEconomico";
 
 const unidades: CampoOrdenLaborUnidad[] = ["ha", "hora", "km", "tonelada", "unidad", "fijo"];
 
@@ -137,6 +138,7 @@ export function useCreateCampoOrdenLabor(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: "Labor creada" });
     },
@@ -198,6 +200,7 @@ export function useUpdateCampoOrdenLabor(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: "Labor actualizada" });
     },
@@ -228,6 +231,7 @@ export function useSetCampoOrdenLaborStatus(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "labores"], exact: true }),
         queryClient.invalidateQueries({ queryKey: ["campo", comercioId, "orden", ordenId, "avance"], exact: true }),
+        invalidateCampoResumenEconomico(queryClient, comercioId, ordenId),
       ]);
       toast({ title: variables.nuevoEstado ? "Labor reactivada" : "Labor desactivada" });
     },
