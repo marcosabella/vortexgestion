@@ -342,6 +342,137 @@ export type Database = {
           },
         ]
       }
+      campo_gps_puntos: {
+        Row: {
+          client_id: string
+          comercio_id: string
+          created_at: string
+          id: string
+          latitud: number
+          longitud: number
+          precision_metros: number
+          registrado_at: string
+          secuencia: number
+          sesion_id: string
+        }
+        Insert: {
+          client_id: string
+          comercio_id: string
+          created_at?: string
+          id?: string
+          latitud: number
+          longitud: number
+          precision_metros: number
+          registrado_at: string
+          secuencia: number
+          sesion_id: string
+        }
+        Update: {
+          client_id?: string
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          latitud?: number
+          longitud?: number
+          precision_metros?: number
+          registrado_at?: string
+          secuencia?: number
+          sesion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_gps_puntos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_gps_puntos_sesion_fkey"
+            columns: ["comercio_id", "sesion_id"]
+            isOneToOne: false
+            referencedRelation: "campo_gps_sesiones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_gps_sesiones: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          estado?: string
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          pausada_at?: string | null
+          segundos_pausados?: number
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          estado?: string
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string
+          operador_id?: string
+          orden_id?: string
+          parte_id?: string
+          pausada_at?: string | null
+          segundos_pausados?: number
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_gps_sesiones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_operador_fkey"
+            columns: ["comercio_id", "operador_id"]
+            isOneToOne: false
+            referencedRelation: "campo_operarios"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
       campo_insumos: {
         Row: {
           activo: boolean
@@ -4541,6 +4672,82 @@ export type Database = {
           total_iva: number
           venta: Database["public"]["Tables"]["ventas"]["Row"]
         }[]
+      }
+      campo_gps_autorizar_operador: {
+        Args: { p_parte_id: string }
+        Returns: {
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_cambiar_estado: {
+        Args: { p_accion: string; p_sesion_id: string }
+        Returns: {
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_iniciar_sesion: {
+        Args: { p_parte_id: string }
+        Returns: {
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_registrar_puntos: {
+        Args: { p_puntos: Json; p_sesion_id: string }
+        Returns: number
       }
       campo_listar_operadores_comercio: {
         Args: { p_comercio_id: string }

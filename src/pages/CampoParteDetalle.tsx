@@ -14,6 +14,7 @@ import { ParteOperarios } from "@/components/campo/ParteOperarios";
 import { ParteMaquinarias } from "@/components/campo/ParteMaquinarias";
 import { ParteInsumos } from "@/components/campo/ParteInsumos";
 import { CampoParteBadge, CampoParteHistory, ParteLifecycleDetails } from "@/components/campo/CampoParteStatus";
+import { ParteGpsSeguimiento } from "@/components/campo/ParteGpsSeguimiento";
 import { useComercio } from "@/hooks/useComercio";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useCampoOrdenDetalle } from "@/hooks/useCampoOrdenDetalle";
@@ -66,6 +67,7 @@ export default function CampoParteDetalle() {
         {permissions.canAnnulParte&&<Button variant="destructive" disabled={pending} onClick={()=>openAction("annul")}>Anular parte</Button>}
       </div>
     </CardContent></Card>
+    <ParteGpsSeguimiento comercioId={c!} ordenId={ordenId!} parteId={parteId!} canView={Boolean(access.isAdmin||(access.isOperador&&access.operadorVinculado&&parte.propietario_user_id===access.userId))} canTrack={Boolean(access.isOperador&&access.operadorVinculado&&parte.propietario_user_id===access.userId&&parte.estado==="borrador"&&["planificada","en_progreso"].includes(orden.estado))}/>
     <ParteLotes comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
     <ParteOperarios comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
     <ParteMaquinarias comercioId={c!} ordenId={ordenId!} parteId={parteId!} access={ok} canEditParte={permissions.canEditParte} orden={orden} parte={parte}/>
