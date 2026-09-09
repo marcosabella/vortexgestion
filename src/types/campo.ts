@@ -42,10 +42,10 @@ export type CampoEstablecimientoListItem = Pick<
 export type CampoEstadoFilter = "activos" | "inactivos" | "todos";
 
 export type CampoOperario = Pick<OperarioRow, "id" | "nombre" | "codigo_interno" | "documento" | "telefono" | "observaciones" | "activo" | "created_at" | "updated_at">;
-export type CampoMaquinaria = Pick<MaquinariaRow, "id" | "nombre" | "codigo_interno" | "tipo" | "marca" | "modelo" | "identificacion" | "anio" | "observaciones" | "activo" | "created_at" | "updated_at">;
+export type CampoMaquinaria = Pick<MaquinariaRow, "id" | "nombre" | "codigo_interno" | "tipo" | "marca" | "modelo" | "identificacion" | "anio" | "ancho_trabajo_m" | "observaciones" | "activo" | "created_at" | "updated_at">;
 export type CampoInsumo = Pick<InsumoRow, "id" | "nombre" | "codigo_interno" | "unidad" | "observaciones" | "activo" | "created_at" | "updated_at">;
 export type CampoOperarioFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; documento: string; telefono: string; observaciones: string };
-export type CampoMaquinariaFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; observaciones: string };
+export type CampoMaquinariaFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; tipo: string; marca: string; modelo: string; identificacion: string; anio: string; ancho_trabajo_m: string; observaciones: string };
 export type CampoInsumUnidad = "litro" | "kilogramo" | "tonelada" | "unidad" | "bolsa" | "metro" | "dosis";
 export type CampoInsumoFormValues = CampoCostoFormValues & { nombre: string; codigo_interno: string; unidad: CampoInsumUnidad; observaciones: string };
 export type CampoParteEstado = "borrador" | "enviado" | "rechazado" | "confirmado" | "anulado" | "descartado";

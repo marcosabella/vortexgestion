@@ -15,6 +15,8 @@ const normalized = (v: CampoMaquinariaFormValues) => {
     (anio !== "" &&
       (!/^\d{4}$/.test(anio) || Number(anio) < 1900 || Number(anio) > 2100))
   ) throw new Error("Nombre, tipo o año inválido");
+  const anchoRaw=v.ancho_trabajo_m.trim().replace(",", "."), ancho=anchoRaw?Number(anchoRaw):null;
+  if(ancho!==null&&(!Number.isFinite(ancho)||ancho<=0||ancho>100))throw new Error("Ancho de trabajo inválido");
   return {
     nombre,
     codigo_interno: v.codigo_interno.trim() || null,
@@ -26,6 +28,7 @@ const normalized = (v: CampoMaquinariaFormValues) => {
     observaciones: v.observaciones.trim() || null,
     costo_hora: costo.costo,
     moneda_costo: costo.moneda,
+    ancho_trabajo_m: ancho,
   };
 };
 function guard(id: string | null | undefined, ok: boolean) {
@@ -41,7 +44,7 @@ export function useCampoMaquinarias(id?: string | null, access = false) {
     queryFn: async (): Promise<CampoMaquinaria[]> => {
       const cid = guard(id, access);
       const { data, error } = await supabase.from("campo_maquinarias").select(
-        "id,nombre,codigo_interno,tipo,marca,modelo,identificacion,anio,observaciones,activo,created_at,updated_at",
+        "id,nombre,codigo_interno,tipo,marca,modelo,identificacion,anio,ancho_trabajo_m,observaciones,activo,created_at,updated_at",
       ).eq("comercio_id", cid).order("nombre").order("id");
       if (error) throw error;
       return data ?? [];

@@ -37,12 +37,13 @@ export default function CampoMaquinarias() {
           x.identificacion,
           x.anio,
         ].filter((v) => v !== null).join(" ")}
-      headers={["Tipo", "Marca / modelo", "Identificación", "Año"]}
+      headers={["Tipo", "Marca / modelo", "Identificación", "Año", "Ancho"]}
       cells={(x) => [
         x.tipo,
         [x.marca, x.modelo].filter(Boolean).join(" ") || "—",
         x.identificacion || "—",
         x.anio ?? "—",
+        x.ancho_trabajo_m == null ? "No configurado" : `${x.ancho_trabajo_m} m`,
       ]}
       setStatus={status}
       renderForm={(mode, item, done, saving) => (

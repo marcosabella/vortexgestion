@@ -29,6 +29,7 @@ const schema = z.object({
     "El año debe estar entre 1900 y 2100",
   ),
   observaciones: z.string().trim(),
+  ancho_trabajo_m: z.string().trim().refine(v=>!v||(/^\d+([.,]\d+)?$/.test(v)&&Number(v.replace(",","."))>0&&Number(v.replace(",","."))<=100),"Ingresá un ancho entre 0 y 100"),
 }).superRefine(validarParCosto);
 export function MaquinariaForm({
   costoInicial,
@@ -63,6 +64,7 @@ export function MaquinariaForm({
       modelo: item?.modelo ?? "",
       identificacion: item?.identificacion ?? "",
       anio: item?.anio ? String(item.anio) : "",
+      ancho_trabajo_m: item?.ancho_trabajo_m == null ? "" : String(item.ancho_trabajo_m),
       observaciones: item?.observaciones ?? "",
     },
   });
@@ -88,6 +90,7 @@ export function MaquinariaForm({
     ["modelo", "Modelo"],
     ["identificacion", "Identificación/patente"],
     ["anio", "Año"],
+    ["ancho_trabajo_m", "Ancho de trabajo (m)"],
   ];
   return (
     <form className="space-y-4" onSubmit={handleSubmit(submit)}>
@@ -97,7 +100,7 @@ export function MaquinariaForm({
             <Label htmlFor={`maq-${name}`}>{label}{required ? " *" : ""}</Label>
             <Input
               id={`maq-${name}`}
-              inputMode={name === "anio" ? "numeric" : undefined}
+              inputMode={name === "anio" || name === "ancho_trabajo_m" ? "decimal" : undefined}
               {...register(name)}
               disabled={pending}
             />
