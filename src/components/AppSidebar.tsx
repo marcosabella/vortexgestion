@@ -1,4 +1,4 @@
-import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database, QrCode, Sprout } from "lucide-react"
+import { Users, Truck, Package, ShoppingCart, ShoppingBag, CreditCard, Building2, FileText, ChevronDown, Settings, Store, FileKey, Receipt, Shield, KeyRound, Banknote, ClipboardList, Bell, Database, QrCode, Sprout, Activity } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useIsAppAdmin } from "@/hooks/useAdminComercios"
@@ -64,6 +64,7 @@ const campoItems = [
   { title: "Usuarios y operadores", url: "/campo/operadores", icon: Shield, adminOnly: true },
   { title: "Maquinarias", url: "/campo/maquinarias", icon: Truck },
   { title: "Insumos", url: "/campo/insumos", icon: Package },
+  { title: "Telemetría", url: "/campo/telemetria", icon: Activity, adminOnly: true },
 ]
 
 export function AppSidebar() {

@@ -1709,6 +1709,197 @@ export type Database = {
           },
         ]
       }
+      campo_telemetria_importaciones: {
+        Row: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancelada_at?: string | null
+          cantidad_descartadas?: number
+          cantidad_muestras?: number
+          cantidad_validas?: number
+          comercio_id: string
+          created_at?: string
+          estado?: string
+          fin_at?: string | null
+          finalizada_at?: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo?: string | null
+          imported_by: string
+          inicio_at?: string | null
+          maquinaria_id: string
+          nombre_archivo?: string | null
+          orden_id?: string | null
+          origen: string
+          parte_id?: string | null
+          proveedor?: string | null
+          sesion_gps_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancelada_at?: string | null
+          cantidad_descartadas?: number
+          cantidad_muestras?: number
+          cantidad_validas?: number
+          comercio_id?: string
+          created_at?: string
+          estado?: string
+          fin_at?: string | null
+          finalizada_at?: string | null
+          formato?: string
+          hash_sha256?: string
+          id?: string
+          identificador_externo?: string | null
+          imported_by?: string
+          inicio_at?: string | null
+          maquinaria_id?: string
+          nombre_archivo?: string | null
+          orden_id?: string | null
+          origen?: string
+          parte_id?: string | null
+          proveedor?: string | null
+          sesion_gps_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_telemetria_importaciones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_maquinaria_fkey"
+            columns: ["comercio_id", "maquinaria_id"]
+            isOneToOne: false
+            referencedRelation: "campo_maquinarias"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_sesion_fkey"
+            columns: ["comercio_id", "sesion_gps_id"]
+            isOneToOne: false
+            referencedRelation: "campo_gps_sesiones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_telemetria_muestras: {
+        Row: {
+          altitud_m: number | null
+          combustible_litros: number | null
+          comercio_id: string
+          created_at: string
+          datos_adicionales: Json
+          distancia_acumulada_km: number | null
+          horas_motor: number | null
+          id: string
+          identificador_externo: string | null
+          importacion_id: string
+          latitud: number | null
+          longitud: number | null
+          motor_encendido: boolean | null
+          precision_m: number | null
+          rumbo_grados: number | null
+          secuencia: number
+          superficie_acumulada_ha: number | null
+          timestamp_at: string
+          trabajando: boolean | null
+          velocidad_kmh: number | null
+        }
+        Insert: {
+          altitud_m?: number | null
+          combustible_litros?: number | null
+          comercio_id: string
+          created_at?: string
+          datos_adicionales?: Json
+          distancia_acumulada_km?: number | null
+          horas_motor?: number | null
+          id?: string
+          identificador_externo?: string | null
+          importacion_id: string
+          latitud?: number | null
+          longitud?: number | null
+          motor_encendido?: boolean | null
+          precision_m?: number | null
+          rumbo_grados?: number | null
+          secuencia: number
+          superficie_acumulada_ha?: number | null
+          timestamp_at: string
+          trabajando?: boolean | null
+          velocidad_kmh?: number | null
+        }
+        Update: {
+          altitud_m?: number | null
+          combustible_litros?: number | null
+          comercio_id?: string
+          created_at?: string
+          datos_adicionales?: Json
+          distancia_acumulada_km?: number | null
+          horas_motor?: number | null
+          id?: string
+          identificador_externo?: string | null
+          importacion_id?: string
+          latitud?: number | null
+          longitud?: number | null
+          motor_encendido?: boolean | null
+          precision_m?: number | null
+          rumbo_grados?: number | null
+          secuencia?: number
+          superficie_acumulada_ha?: number | null
+          timestamp_at?: string
+          trabajando?: boolean | null
+          velocidad_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_telemetria_muestras_importacion_fkey"
+            columns: ["comercio_id", "importacion_id"]
+            isOneToOne: false
+            referencedRelation: "campo_telemetria_importaciones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
       cheques: {
         Row: {
           banco_emisor: string
@@ -4928,6 +5119,136 @@ export type Database = {
       }
       campo_resumen_economico_orden: {
         Args: { p_orden_id: string }
+        Returns: Json
+      }
+      campo_telemetria_admin: {
+        Args: { p_comercio: string }
+        Returns: undefined
+      }
+      campo_telemetria_autorizar_lectura: {
+        Args: { p_importacion_id: string; p_operativo?: boolean }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_cargar_muestras: {
+        Args: { p_importacion_id: string; p_muestras: Json }
+        Returns: number
+      }
+      campo_telemetria_estado_importacion: {
+        Args: { p_importacion_id: string }
+        Returns: Json
+      }
+      campo_telemetria_finalizar_importacion: {
+        Args: { p_cancelar?: boolean; p_importacion_id: string }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_iniciar_importacion: {
+        Args: {
+          p_formato?: string
+          p_hash_sha256?: string
+          p_id: string
+          p_identificador_externo?: string
+          p_maquinaria_id: string
+          p_nombre_archivo?: string
+          p_orden_id?: string
+          p_origen?: string
+          p_parte_id?: string
+          p_proveedor?: string
+          p_sesion_gps_id?: string
+        }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_resumen_importacion: {
+        Args: { p_importacion_id: string }
         Returns: Json
       }
       campo_validar_parte_detalles: {
