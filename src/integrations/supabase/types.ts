@@ -398,6 +398,7 @@ export type Database = {
       }
       campo_gps_sesiones: {
         Row: {
+          ancho_trabajo_m_snapshot: number | null
           comercio_id: string
           created_at: string
           estado: string
@@ -407,12 +408,14 @@ export type Database = {
           operador_id: string
           orden_id: string
           parte_id: string
+          parte_maquinaria_id: string | null
           pausada_at: string | null
           segundos_pausados: number
           updated_at: string
           usuario_id: string
         }
         Insert: {
+          ancho_trabajo_m_snapshot?: number | null
           comercio_id: string
           created_at?: string
           estado?: string
@@ -422,12 +425,14 @@ export type Database = {
           operador_id: string
           orden_id: string
           parte_id: string
+          parte_maquinaria_id?: string | null
           pausada_at?: string | null
           segundos_pausados?: number
           updated_at?: string
           usuario_id: string
         }
         Update: {
+          ancho_trabajo_m_snapshot?: number | null
           comercio_id?: string
           created_at?: string
           estado?: string
@@ -437,6 +442,7 @@ export type Database = {
           operador_id?: string
           orden_id?: string
           parte_id?: string
+          parte_maquinaria_id?: string | null
           pausada_at?: string | null
           segundos_pausados?: number
           updated_at?: string
@@ -469,6 +475,13 @@ export type Database = {
             columns: ["comercio_id", "parte_id"]
             isOneToOne: false
             referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_parte_maquinaria_fkey"
+            columns: ["comercio_id", "parte_maquinaria_id"]
+            isOneToOne: false
+            referencedRelation: "campo_parte_maquinarias"
             referencedColumns: ["comercio_id", "id"]
           },
         ]
@@ -592,6 +605,7 @@ export type Database = {
       campo_maquinarias: {
         Row: {
           activo: boolean
+          ancho_trabajo_m: number | null
           anio: number | null
           codigo_interno: string | null
           comercio_id: string
@@ -611,6 +625,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          ancho_trabajo_m?: number | null
           anio?: number | null
           codigo_interno?: string | null
           comercio_id: string
@@ -630,6 +645,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          ancho_trabajo_m?: number | null
           anio?: number | null
           codigo_interno?: string | null
           comercio_id?: string
@@ -4676,6 +4692,7 @@ export type Database = {
       campo_gps_autorizar_operador: {
         Args: { p_parte_id: string }
         Returns: {
+          ancho_trabajo_m_snapshot: number | null
           comercio_id: string
           created_at: string
           estado: string
@@ -4685,6 +4702,7 @@ export type Database = {
           operador_id: string
           orden_id: string
           parte_id: string
+          parte_maquinaria_id: string | null
           pausada_at: string | null
           segundos_pausados: number
           updated_at: string
@@ -4700,6 +4718,7 @@ export type Database = {
       campo_gps_cambiar_estado: {
         Args: { p_accion: string; p_sesion_id: string }
         Returns: {
+          ancho_trabajo_m_snapshot: number | null
           comercio_id: string
           created_at: string
           estado: string
@@ -4709,6 +4728,7 @@ export type Database = {
           operador_id: string
           orden_id: string
           parte_id: string
+          parte_maquinaria_id: string | null
           pausada_at: string | null
           segundos_pausados: number
           updated_at: string
@@ -4731,8 +4751,9 @@ export type Database = {
         Returns: number
       }
       campo_gps_iniciar_sesion: {
-        Args: { p_parte_id: string }
+        Args: { p_parte_id: string; p_parte_maquinaria_id?: string }
         Returns: {
+          ancho_trabajo_m_snapshot: number | null
           comercio_id: string
           created_at: string
           estado: string
@@ -4742,6 +4763,7 @@ export type Database = {
           operador_id: string
           orden_id: string
           parte_id: string
+          parte_maquinaria_id: string | null
           pausada_at: string | null
           segundos_pausados: number
           updated_at: string
@@ -4755,6 +4777,10 @@ export type Database = {
         }
       }
       campo_gps_metricas_sesion: {
+        Args: { p_sesion_id: string }
+        Returns: Json
+      }
+      campo_gps_metricas_sesion_base: {
         Args: { p_sesion_id: string }
         Returns: Json
       }
