@@ -4721,6 +4721,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      campo_gps_haversine_metros: {
+        Args: {
+          p_lat_1: number
+          p_lat_2: number
+          p_lon_1: number
+          p_lon_2: number
+        }
+        Returns: number
+      }
       campo_gps_iniciar_sesion: {
         Args: { p_parte_id: string }
         Returns: {
@@ -4745,6 +4754,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      campo_gps_metricas_sesion: {
+        Args: { p_sesion_id: string }
+        Returns: Json
+      }
+      campo_gps_metricas_umbrales: { Args: never; Returns: Json }
       campo_gps_registrar_puntos: {
         Args: { p_puntos: Json; p_sesion_id: string }
         Returns: number
