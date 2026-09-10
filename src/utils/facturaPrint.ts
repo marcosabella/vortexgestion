@@ -555,7 +555,6 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               : `<div class="comercio-nombre">${escapeHtml(comercio?.nombre_comercio || "COMERCIO")}</div>`
           }
           <div class="comercio-datos">
-            ${logoUrl ? `<div class="info-line">${escapeHtml(comercio?.nombre_comercio || "N/A")}</div>` : ""}
             ${comercioDireccion ? `<div class="info-line">${escapeHtml(comercioDireccion)}</div>` : ""}
             <div class="info-line">${escapeHtml(comercioCondicionIva)}</div>
           </div>

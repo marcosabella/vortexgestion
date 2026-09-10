@@ -361,7 +361,8 @@ const drawTable = <TRow extends PrintableRow>(
   columns.forEach((column) => {
     const headerX =
       column.align === "center" ? column.x + column.width / 2 : column.align === "right" ? column.x + column.width - 8 : column.x + 6;
-    ops.push(opText(column.label, headerX, top + 9.95, 8.35, "F1", column.align, column.width - 12));
+    const lines = column.label.split("\n");
+    lines.forEach((line, index) => ops.push(opText(line, headerX, top + (lines.length > 1 ? 6.2 + index * 7 : 9.95), lines.length > 1 ? 6.8 : 8.35, "F1", column.align, column.width - 12)));
   });
 
   ops.push(
