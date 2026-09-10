@@ -45,6 +45,8 @@ import Notificaciones from "./pages/Notificaciones";
 import Seguridad from "./pages/Seguridad";
 import PedidosOnline from "./pages/PedidosOnline";
 import MercadoPago from "./pages/MercadoPago";
+import Extintores from "./pages/Extintores";
+import OrdenesTrabajoExtintores from "./pages/OrdenesTrabajoExtintores";
 import NotFound from "./pages/NotFound";
 import ListadoClientes from "./pages/listados/ListadoClientes";
 import ListadoProveedores from "./pages/listados/ListadoProveedores";
@@ -138,6 +140,8 @@ function AuthenticatedLayout() {
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
               <Route path="/pedidos-online" element={<ParametrizedRoute modulo="pedidos_online"><PedidosOnline /></ParametrizedRoute>} />
               <Route path="/mercado-pago" element={<ParametrizedRoute modulo="mercado_pago"><MercadoPago /></ParametrizedRoute>} />
+              <Route path="/extintores" element={<ParametrizedRoute modulo="extintores"><Extintores /></ParametrizedRoute>} />
+              <Route path="/extintores/ordenes-trabajo" element={<ParametrizedRoute modulo="extintores"><OrdenesTrabajoExtintores /></ParametrizedRoute>} />
               <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />
               <Route path="/ventas/:ventaId/editar" element={<ParametrizedRoute modulo="ventas"><EditarVenta /></ParametrizedRoute>} />
               <Route path="/presupuestos" element={<ParametrizedRoute modulo="presupuestos"><Presupuestos /></ParametrizedRoute>} />

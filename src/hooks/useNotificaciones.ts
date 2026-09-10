@@ -62,13 +62,13 @@ export const prioridadLabels: Record<NotificacionPrioridad, string> = {
   alta: "Alta",
 };
 
-export function useNotificaciones() {
+export function useNotificaciones(incluirPedidosOnline = false) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { comercio } = useComercio();
 
   const notificacionesQuery = useQuery({
-    queryKey: ["notificaciones", comercio?.id],
+    queryKey: ["notificaciones", comercio?.id, incluirPedidosOnline],
     enabled: Boolean(comercio?.id),
     // El envio se realiza desde otra sesion (la del administrador), por lo que
     // invalidar la cache alli no actualiza automaticamente el navegador del
@@ -123,7 +123,11 @@ export function useNotificaciones() {
         categoria: notificacion.categoria as NotificacionCategoria,
         prioridad: notificacion.prioridad as NotificacionPrioridad,
         leida: leidas.has(notificacion.id),
-      })) as Notificacion[];
+      })).filter((notificacion) => {
+        const metadata = notificacion.metadata;
+        const esPedidoOnline = typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) && metadata.tipo === "pedido_online";
+        return incluirPedidosOnline || !esPedidoOnline;
+      }) as Notificacion[];
     },
   });
 

@@ -14,6 +14,7 @@ export function usePedidosOnline() {
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("pedidos_online")
         .select("*, pedido_online_items(*), cliente:clientes(id,nombre,apellido,email,telefono)").eq("comercio_id", comercio!.id)
+        .in("estado_pago", ["no_iniciado", "aprobado"])
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];

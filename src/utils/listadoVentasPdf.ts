@@ -46,8 +46,8 @@ const CLIENTE_COLUMNS = [
 ] as const;
 
 type PdfFont = "F1" | "F2" | "F3";
-type PrintableRow = Record<string, string>;
-type PrintableSection<TRow extends PrintableRow = PrintableRow> = {
+export type PrintableRow = Record<string, string>;
+export type PrintableSection<TRow extends PrintableRow = PrintableRow> = {
   title: string;
   rows: TRow[];
   columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[];
@@ -58,6 +58,7 @@ type PdfImage = { bytes: Uint8Array; width: number; height: number };
 type ListadoVentasPdfOptions = {
   comercio?: Comercio | null;
   rango: string;
+  titulo?: string;
 };
 
 const moneyFormatter = new Intl.NumberFormat("es-AR", {
@@ -191,7 +192,7 @@ const drawHeader = (
     comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
     comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
     opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
-    opText("REPORTE DE VENTAS", 363, 56, 14.5, "F2", "left", 206),
+    opText(options.titulo || "REPORTE DE VENTAS", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),
     opText(fechaEmision, 452, 82, 8.5, "F1"),
     opText("CUIT:", 363, 96, 8.5, "F2"),
@@ -557,5 +558,14 @@ export const buildListadoVentasPdfFile = (ventas: Venta[], options: ListadoVenta
     const filename = `reporte-ventas-${sanitizeFilename(options.rango) || "reporte"}.pdf`;
 
     return new File([blob], filename, { type: "application/pdf" });
+  });
+};
+
+export const buildReportePdfFile = (sections: PrintableSection[], options: ListadoVentasPdfOptions) => {
+  const pages = paginateSections(sections);
+  return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
+    const contents = pages.map((page, index) => createPageContent(options, page, index + 1, pages.length || 1, logoImage));
+    const blob = createPdfBlob(contents.length ? contents : [createPageContent(options, { sections }, 1, 1, logoImage)], logoImage);
+    return new File([blob], `reporte-${sanitizeFilename(options.titulo || "ordenes-trabajo")}.pdf`, { type: "application/pdf" });
   });
 };

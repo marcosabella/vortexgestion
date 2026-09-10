@@ -1,9 +1,11 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import VentaForm from "@/components/VentaForm";
 import { Button } from "@/components/ui/button";
 
 const NuevaVenta = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const ordenTrabajoInicial = (location.state as { ordenTrabajoInicial?: { clienteId: string; productos: Array<{ productoId?: string | null; cantidad: number; descripcion?: string | null }> } } | null)?.ordenTrabajoInicial;
 
   return (
     <div className="p-6">
@@ -17,7 +19,7 @@ const NuevaVenta = () => {
             Volver al listado
           </Button>
         </div>
-        <VentaForm onSuccess={() => navigate("/ventas")} showTitle={false} />
+        <VentaForm onSuccess={() => navigate("/ventas")} showTitle={false} ordenTrabajoInicial={ordenTrabajoInicial} />
       </div>
     </div>
   );

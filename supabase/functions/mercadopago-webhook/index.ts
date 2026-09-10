@@ -85,6 +85,9 @@ Deno.serve(async (req) => {
         p_cuotas: payment.installments || 1,
         p_raw: remote,
       });
+      await db.rpc("notificar_pedido_online_pagado", {
+        p_operacion_id: op.id,
+      });
     } else {
       await db.from("mercadopago_operaciones").update({
         estado: localStatus,
@@ -93,9 +96,16 @@ Deno.serve(async (req) => {
         raw_response: remote,
       }).eq("id", op.id);
       if (op.pedido_online_id) {
-        await db.from("pedidos_online").update({
-          estado_pago: localStatus === "procesando" ? "pendiente" : localStatus,
-        }).eq("id", op.pedido_online_id);
+        if (["rechazado", "cancelado", "vencido"].includes(localStatus)) {
+          await db.rpc("cancelar_pedido_online_no_pagado", {
+            p_operacion_id: op.id,
+            p_estado_pago: localStatus,
+          });
+        } else {
+          await db.from("pedidos_online").update({
+            estado_pago: localStatus === "procesando" ? "pendiente" : localStatus,
+          }).eq("id", op.pedido_online_id);
+        }
       }
     }
     await db.from("mercadopago_webhook_eventos").update({

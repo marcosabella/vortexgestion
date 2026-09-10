@@ -64,6 +64,7 @@ type VentaFormProps = {
   onSuccess: () => void
   showTitle?: boolean
   modo?: "venta" | "presupuesto"
+  ordenTrabajoInicial?: { clienteId: string; productos: Array<{ productoId?: string | null; cantidad: number; descripcion?: string | null }> }
 }
 
 type VentaItemDraft = Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">;
@@ -123,7 +124,7 @@ const calcularTotalesVenta = (
   }
 }
 
-const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta" }) => {
+const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta", ordenTrabajoInicial }) => {
   const { toast } = useToast()
   const { createVentaAsync, updateVenta } = useVentas()
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
@@ -235,6 +236,24 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       observaciones: "",
     },
   })
+
+  useEffect(() => {
+    if (venta || !ordenTrabajoInicial || !clientes.length) return
+    const cliente = clientes.find((item) => item.id === ordenTrabajoInicial.clienteId)
+    if (!cliente) return
+    const items = ordenTrabajoInicial.productos.map((item) => {
+      const producto = productos.find((p) => p.id === item.productoId)
+      const cantidad = Number(item.cantidad || 1)
+      const precio = Number(producto?.precio_venta || 0)
+      const iva = Number(producto?.porcentaje_iva || 0)
+      const ajustes = calcularItemVenta({ cantidad, precio_unitario: precio, porcentaje_iva: iva, porcentaje_descuento: 0, monto_descuento: 0, porcentaje_recargo: 0, monto_recargo: 0 })
+      return { producto_id: producto?.id || null, descripcion_manual: producto ? null : item.descripcion || "Producto de orden de trabajo", codigo_manual: null, cantidad, precio_unitario: precio, porcentaje_iva: iva, porcentaje_descuento: 0, monto_descuento: 0, porcentaje_recargo: 0, monto_recargo: 0, ...ajustes }
+    })
+    setSelectedCliente({ id: cliente.id!, nombre: cliente.nombre, apellido: cliente.apellido, cuit: cliente.cuit || "" })
+    setVentaItems(items)
+    const totals = calcularTotalesVenta(items)
+    form.reset({ ...form.getValues(), cliente_id: cliente.id, cliente_nombre: `${cliente.nombre} ${cliente.apellido}`, ...totals, observaciones: "Generada desde orden de trabajo finalizada." })
+  }, [venta, ordenTrabajoInicial, clientes, productos])
 
   const watchTipoComprobante = form.watch("tipo_comprobante")
   const discriminaIva = discriminaIvaEnComprobante(watchTipoComprobante)
