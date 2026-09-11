@@ -14,6 +14,7 @@ export type ModuloSistema =
   | "listados"
   | "pedidos_online"
   | "mercado_pago"
+  | "gastos_egresos"
   | "extintores";
 
 export type FuncionSistema =
@@ -53,6 +54,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "listados", label: "Listados", description: "Reportes imprimibles y exportables." },
   { key: "pedidos_online", label: "Pedidos online", description: "Gestion de pedidos recibidos desde la tienda online." },
   { key: "mercado_pago", label: "Mercado Pago", description: "Checkout online, cobros QR y conciliacion por comercio." },
+  { key: "gastos_egresos", label: "Gastos y egresos", description: "Registro de gastos, pagos y obligaciones del comercio." },
   { key: "extintores", label: "Extintores", description: "Asignacion y seguimiento de extintores por cliente." },
 ];
 

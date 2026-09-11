@@ -54,6 +54,8 @@ import ListadoProductos from "./pages/listados/ListadoProductos";
 import ListadoVentas from "./pages/listados/ListadoVentas";
 import ListadoCuentaCorriente from "./pages/listados/ListadoCuentaCorriente";
 import ListadoCaja from "./pages/listados/ListadoCaja";
+import GastosEgresos from "./pages/GastosEgresos";
+import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
 
 const queryClient = new QueryClient();
 
@@ -148,6 +150,7 @@ function AuthenticatedLayout() {
               <Route path="/presupuestos/nuevo" element={<ParametrizedRoute modulo="presupuestos"><NuevoPresupuesto /></ParametrizedRoute>} />
               <Route path="/presupuestos/:presupuestoId/editar" element={<ParametrizedRoute modulo="presupuestos"><EditarPresupuesto /></ParametrizedRoute>} />
               <Route path="/caja" element={<ParametrizedRoute modulo="caja"><CajaDiaria /></ParametrizedRoute>} />
+              <Route path="/gastos-egresos" element={<ParametrizedRoute modulo="gastos_egresos"><GastosEgresos /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="/comercio" element={<Comercio />} />
@@ -169,6 +172,7 @@ function AuthenticatedLayout() {
               <Route path="/listados/productos" element={<ParametrizedRoute modulo="listados"><ListadoProductos /></ParametrizedRoute>} />
               <Route path="/listados/ventas" element={<ParametrizedRoute modulo="listados"><ListadoVentas /></ParametrizedRoute>} />
               <Route path="/listados/caja" element={<ParametrizedRoute modulo="listados"><ListadoCaja /></ParametrizedRoute>} />
+              <Route path="/listados/gastos-egresos" element={<ParametrizedRoute modulo="listados"><ListadoGastosEgresos /></ParametrizedRoute>} />
               <Route path="/listados/cuenta-corriente" element={<ParametrizedRoute modulo="listados"><ListadoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

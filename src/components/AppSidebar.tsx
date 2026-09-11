@@ -13,6 +13,7 @@ import {
   Package,
   QrCode,
   Receipt,
+  ReceiptText,
   Settings,
   Shield,
   ShoppingBag,
@@ -55,6 +56,7 @@ const menuItems: Array<
   { title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema }
 > = [
   { title: "Caja Diaria", url: "/caja", icon: Banknote, modulo: "caja" },
+  { title: "Gastos y egresos", url: "/gastos-egresos", icon: ReceiptText, modulo: "gastos_egresos" },
   { title: "Clientes", url: "/clientes", icon: Users, modulo: "clientes" },
   {
     title: "Proveedores",
@@ -118,6 +120,7 @@ const listadosItems = [
   { title: "Productos", url: "/listados/productos", icon: Package },
   { title: "Ventas", url: "/listados/ventas", icon: ShoppingCart },
   { title: "Caja", url: "/listados/caja", icon: Banknote },
+  { title: "Gastos y egresos", url: "/listados/gastos-egresos", icon: ReceiptText },
   {
     title: "Cuenta Corriente",
     url: "/listados/cuenta-corriente",

@@ -165,7 +165,6 @@ const drawHeader = (
   const comercio = options.comercio;
   const fechaEmision = formatDate(new Date().toISOString());
   const comercioDireccion = getComercioDireccionLineas(comercio);
-  const razonSocial = logoImage ? `Razon Social: ${comercio?.nombre_comercio || "N/A"}` : "";
 
   return [
     "0 0 0 rg",
@@ -177,10 +176,9 @@ const drawHeader = (
     opLine(594, 28, 594, 142),
     opLine(347, 28, 347, 142),
     ...drawComercioIdentity(comercio, logoImage),
-    razonSocial && opText(razonSocial, 34, 96, 8.5, "F1", "left", 296),
     comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
     comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
-    opText("Responsable Inscripto", 34, 136, 8.5, "F1", "left", 296),
+    opText(comercio?.situacion_afip || "Condicion frente a ARCA no informada", 34, 136, 8.5, "F1", "left", 296),
     opText("REPORTE DE PRODUCTOS", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),
     opText(fechaEmision, 452, 82, 8.5, "F1"),
