@@ -56,6 +56,7 @@ import ListadoCuentaCorriente from "./pages/listados/ListadoCuentaCorriente";
 import ListadoCaja from "./pages/listados/ListadoCaja";
 import GastosEgresos from "./pages/GastosEgresos";
 import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
+import WhatsApp from "./pages/WhatsApp";
 
 const queryClient = new QueryClient();
 
@@ -154,6 +155,7 @@ function AuthenticatedLayout() {
               <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="/comercio" element={<Comercio />} />
+              <Route path="/whatsapp" element={<ParametrizedRoute modulo="whatsapp"><WhatsApp /></ParametrizedRoute>} />
               <Route path="/bancos" element={<ParametrizedRoute modulo="bancos"><Bancos /></ParametrizedRoute>} />
               <Route path="/bancos/nuevo" element={<ParametrizedRoute modulo="bancos"><NuevoBanco /></ParametrizedRoute>} />
               <Route path="/tarjetas" element={<ParametrizedRoute modulo="tarjetas"><Tarjetas /></ParametrizedRoute>} />

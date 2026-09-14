@@ -14,6 +14,7 @@ export type ModuloSistema =
   | "listados"
   | "pedidos_online"
   | "mercado_pago"
+  | "whatsapp"
   | "gastos_egresos"
   | "extintores";
 
@@ -26,7 +27,8 @@ export type FuncionSistema =
   | "imagenes_productos"
   | "publicacion_tienda_online"
   | "descripcion_enriquecida_productos"
-  | "exportacion_pdf";
+  | "exportacion_pdf"
+  | "whatsapp_envio_automatico_comprobantes";
 
 export type FormatoComprobante = "a4" | "58mm";
 
@@ -54,6 +56,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "listados", label: "Listados", description: "Reportes imprimibles y exportables." },
   { key: "pedidos_online", label: "Pedidos online", description: "Gestion de pedidos recibidos desde la tienda online." },
   { key: "mercado_pago", label: "Mercado Pago", description: "Checkout online, cobros QR y conciliacion por comercio." },
+  { key: "whatsapp", label: "WhatsApp API", description: "Envio oficial de comprobantes mediante WhatsApp Business." },
   { key: "gastos_egresos", label: "Gastos y egresos", description: "Registro de gastos, pagos y obligaciones del comercio." },
   { key: "extintores", label: "Extintores", description: "Asignacion y seguimiento de extintores por cliente." },
 ];
@@ -68,6 +71,7 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
   { key: "publicacion_tienda_online", label: "Publicacion en tienda online", description: "Permite indicar si un producto se muestra en la tienda online." },
   { key: "descripcion_enriquecida_productos", label: "Descripcion enriquecida de productos", description: "Permite editar la descripcion publica con formato para la tienda online." },
   { key: "exportacion_pdf", label: "Exportacion PDF", description: "Permite generar PDFs de comprobantes y listados." },
+  { key: "whatsapp_envio_automatico_comprobantes", label: "Envio automatico de comprobantes por WhatsApp", description: "Envia el comprobante al guardar una venta si el cliente tiene telefono registrado." },
 ];
 
 export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
@@ -78,6 +82,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     ),
     pedidos_online: false,
     mercado_pago: true,
+    whatsapp: false,
     extintores: false,
   },
   funciones: {
@@ -87,6 +92,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     ),
     publicacion_tienda_online: false,
     descripcion_enriquecida_productos: false,
+    whatsapp_envio_automatico_comprobantes: false,
   },
   impresion: {
     formato_comprobante: "a4",

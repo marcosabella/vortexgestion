@@ -31,9 +31,14 @@ import { usePresupuestos } from "@/hooks/usePresupuestos"
 import { useClientes } from "@/hooks/useClientes"
 import { useProductos } from "@/hooks/useProductos"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
+import { useComercio } from "@/hooks/useComercio"
+import { useAfipConfig } from "@/hooks/useAfipConfig"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
+import { generarQRAfip } from "@/utils/afipQr"
+import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf"
+import { enviarComprobantePorWhatsApp } from "@/hooks/useWhatsAppComprobante"
 import { Trash2, Plus, Search, QrCode } from "lucide-react"
 import { PagosVentaManager } from "@/components/PagosVentaManager"
 
@@ -134,8 +139,47 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const { data: clientes = [] } = useClientes()
   const { productos } = useProductos()
   const { data: parametrizacion } = useComercioParametrizacion()
+  const { comercio } = useComercio()
+  const { data: afipConfig } = useAfipConfig()
   const permiteItemsManuales = esPresupuesto || parametrizacion.funciones.venta_items_manuales
   const permiteAjustes = parametrizacion.funciones.descuentos_recargos
+
+  const enviarComprobanteAutomatico = async (ventaId: string) => {
+    if (!parametrizacion.modulos.whatsapp || !parametrizacion.funciones.whatsapp_envio_automatico_comprobantes || !comercio?.id) return
+    try {
+      const { data: ventaCompleta, error } = await supabase.from("ventas").select(`
+        *, cliente:clientes(nombre, apellido, cuit, calle, numero, codigo_postal, localidad, provincia, telefono, situacion_afip, tipo_persona),
+        venta_items(*, producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva)),
+        pagos_venta(*)
+      `).eq("id", ventaId).maybeSingle()
+      if (error || !ventaCompleta || !(ventaCompleta as any).cliente?.telefono) return
+
+      const ventaWhatsApp = ventaCompleta as unknown as Venta
+      let qrDataUrl = ""
+      if (ventaWhatsApp.cae?.trim() && afipConfig) {
+        qrDataUrl = await generarQRAfip({
+          fecha: ventaWhatsApp.fecha_venta,
+          cuit: comercio.cuit,
+          puntoVenta: afipConfig.punto_venta,
+          tipoComprobante: ventaWhatsApp.tipo_comprobante,
+          numeroComprobante: ventaWhatsApp.numero_comprobante,
+          importe: ventaWhatsApp.total,
+          cae: ventaWhatsApp.cae,
+        })
+      }
+      const file = await buildFacturaWhatsAppPdfFile({ venta: ventaWhatsApp, comercio, afipConfig, qrDataUrl })
+      await enviarComprobantePorWhatsApp({
+        ventaId,
+        comercioId: comercio.id,
+        file,
+        caption: `${TIPOS_COMPROBANTE.find((tipo) => tipo.value === ventaWhatsApp.tipo_comprobante)?.label || "Comprobante"} ${ventaWhatsApp.numero_comprobante}`,
+      })
+      toast({ title: "Comprobante enviado", description: "La factura fue enviada por WhatsApp automáticamente." })
+    } catch (error) {
+      console.error("No se pudo enviar automáticamente el comprobante por WhatsApp:", error)
+      toast({ title: "Venta registrada", description: "No se pudo enviar el comprobante por WhatsApp. Podés reenviarlo desde el detalle de la venta.", variant: "destructive" })
+    }
+  }
   
   // Estado para items de venta
   const [ventaItems, setVentaItems] = useState<VentaItemDraft[]>([])
@@ -679,6 +723,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           } catch (error) {
             throw new Error(`La venta fue registrada, pero no se pudo generar el QR: ${error instanceof Error ? error.message : "error desconocido"}`)
           }
+        }
+        if (!ventaMercadoPagoPendienteId) {
+          await enviarComprobanteAutomatico(nuevaVenta.id)
         }
       }
       

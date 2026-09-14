@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +20,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
+import { enviarComprobantePorWhatsApp } from "@/hooks/useWhatsAppComprobante";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
 import { useMercadoPago } from "@/hooks/useMercadoPago";
 import QRCode from "qrcode";
+import { supabase } from "@/integrations/supabase/client";
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
@@ -45,6 +48,17 @@ export const VentasList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [qrPreview, setQrPreview] = useState("");
   const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const { data: whatsappEnvios = [] } = useQuery({
+    queryKey: ["whatsapp-envios", selectedVenta?.id],
+    enabled: Boolean(selectedVenta?.id),
+    refetchInterval: showDetails ? 5_000 : false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("whatsapp_envios").select("*").eq("venta_id", selectedVenta!.id).order("enviado_at", { ascending: false });
+      if (error) throw error;
+      return data as Array<{ id: string; estado: "enviado" | "entregado" | "leido" | "fallido"; enviado_at: string; error_detalle?: string | null }>;
+    },
+  });
   const operacionMercadoPago = selectedVenta?.id
     ? (mercadoPagoStatus.data?.operaciones || []).find((operacion: any) => operacion.venta_id === selectedVenta.id)
     : null;
@@ -188,9 +202,10 @@ export const VentasList = () => {
 
     if (!digits) return "";
     if (hasInternationalPrefix) return digits;
-    if (digits.startsWith("54")) return digits;
+    if (digits.startsWith("549")) return digits;
+    if (digits.startsWith("54")) return `549${digits.slice(2)}`;
 
-    return `54${digits}`;
+    return `549${digits}`;
   };
 
   const buildWhatsAppMessage = (venta: Venta) => {
@@ -309,6 +324,29 @@ export const VentasList = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    if (venta.id && comercio?.id) {
+      setIsSendingWhatsApp(true);
+      try {
+        await enviarComprobantePorWhatsApp({
+          ventaId: venta.id,
+          comercioId: comercio.id,
+          file: comprobanteFile,
+          caption: `${TIPOS_COMPROBANTE.find((tipo) => tipo.value === venta.tipo_comprobante)?.label || "Comprobante"} ${venta.numero_comprobante}`,
+        });
+        toast({ title: "Comprobante enviado", description: "La factura fue enviada por WhatsApp correctamente." });
+        return;
+      } catch (error) {
+        console.error("No se pudo enviar el comprobante por WhatsApp Cloud API:", error);
+        toast({
+          title: "No se pudo enviar desde VORTEX",
+          description: error instanceof Error ? `${error.message}. Se abrirá la opción manual.` : "Se abrirá la opción manual.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSendingWhatsApp(false);
+      }
     }
 
     const shareData: ShareData = {
@@ -474,6 +512,14 @@ export const VentasList = () => {
                   <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
                 <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
+                {whatsappEnvios[0] && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Último envío WhatsApp:</span>
+                    <Badge variant={whatsappEnvios[0].estado === "fallido" ? "destructive" : "secondary"}>{whatsappEnvios[0].estado}</Badge>
+                    <span>{format(new Date(whatsappEnvios[0].enviado_at), "dd/MM/yyyy HH:mm")}</span>
+                    {whatsappEnvios[0].error_detalle && <span className="text-destructive">{whatsappEnvios[0].error_detalle}</span>}
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
                   {!selectedVenta.cae && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
@@ -501,10 +547,11 @@ export const VentasList = () => {
                   <Button
                     onClick={() => handleSendWhatsApp(selectedVenta)}
                     size="sm"
+                    disabled={isSendingWhatsApp}
                     className="bg-[#25D366] text-white hover:bg-[#1DA851]"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
-                    WhatsApp
+                    {isSendingWhatsApp ? "Enviando..." : "WhatsApp"}
                   </Button>
                 </div>
               </div>

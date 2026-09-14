@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.mercadopago-checkout]
 verify_jwt = false
+
+[functions.whatsapp-enviar-comprobante]
+verify_jwt = false
+
+[functions.whatsapp-conectar]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false

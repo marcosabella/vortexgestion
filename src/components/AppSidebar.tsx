@@ -14,6 +14,7 @@ import {
   QrCode,
   Receipt,
   ReceiptText,
+  MessageCircle,
   Settings,
   Shield,
   ShoppingBag,
@@ -97,6 +98,7 @@ const configuracionItems: Array<
   { title: string; url: string; icon: typeof Store; modulo?: ModuloSistema }
 > = [
   { title: "Mi Comercio", url: "/comercio", icon: Store },
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, modulo: "whatsapp" },
   { title: "Bancos", url: "/bancos", icon: Building2, modulo: "bancos" },
   { title: "Tarjetas", url: "/tarjetas", icon: CreditCard, modulo: "tarjetas" },
   {
