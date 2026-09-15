@@ -18,7 +18,17 @@ type ComercioPayload = {
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
+  fecha_ingreso_sistema?: string | null;
+  membresia_vigente_hasta?: string | null;
 };
+
+function normalizeComercioPayload(comercio: ComercioPayload) {
+  return {
+    ...comercio,
+    fecha_ingreso_sistema: comercio.fecha_ingreso_sistema || null,
+    membresia_vigente_hasta: comercio.membresia_vigente_hasta || null,
+  };
+}
 
 const defaultParametrizacion = {
   modulos: {
@@ -79,6 +89,7 @@ async function getAdminUserId(req: Request, supabase: any): Promise<string> {
 }
 
 async function listComercios(supabase: any) {
+  await sincronizarMembresiasVencidas(supabase);
   const { data: comercios, error } = await supabase
     .from('comercio')
     .select('*')
@@ -109,6 +120,7 @@ async function listComercios(supabase: any) {
 
     return {
       ...comercio,
+      membresia_vencida: Boolean(comercio.membresia_vigente_hasta && comercio.membresia_vigente_hasta < new Date().toISOString().slice(0, 10)),
       usuario: mainMembership
         ? {
             user_id: mainMembership.user_id,
@@ -121,6 +133,21 @@ async function listComercios(supabase: any) {
         : null,
     };
   });
+}
+
+async function sincronizarMembresiasVencidas(supabase: any) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: vencidos, error } = await supabase
+    .from('comercio')
+    .select('id')
+    .eq('activo', true)
+    .not('membresia_vigente_hasta', 'is', null)
+    .lt('membresia_vigente_hasta', today);
+
+  if (error) throw error;
+  for (const comercio of vencidos || []) {
+    await setAccess(supabase, comercio.id, false);
+  }
 }
 
 async function createComercio(supabase: any, comercio: ComercioPayload, userEmail: string, password: string) {
@@ -171,7 +198,7 @@ async function createComercio(supabase: any, comercio: ComercioPayload, userEmai
   try {
     const { data: createdComercio, error: comercioError } = await supabase
       .from('comercio')
-      .insert({ ...comercio, activo: true })
+      .insert({ ...normalizeComercioPayload(comercio), activo: true })
       .select()
       .single();
 
@@ -219,7 +246,7 @@ async function updateComercio(supabase: any, comercioId: string, comercio: Comer
 
   const { data, error } = await supabase
     .from('comercio')
-    .update(comercio)
+    .update(normalizeComercioPayload(comercio))
     .eq('id', comercioId)
     .select()
     .single();
@@ -462,6 +489,23 @@ async function setAccess(supabase: any, comercioId: string, enabled: boolean) {
   }
 }
 
+async function renovarMembresia(supabase: any, comercioId: string, fechaIngresoSistema: string, membresiaVigenteHasta?: string | null) {
+  if (!comercioId || !fechaIngresoSistema) {
+    throw new Error('La fecha de pago o alta es requerida');
+  }
+  if (membresiaVigenteHasta && membresiaVigenteHasta < fechaIngresoSistema) {
+    throw new Error('El vencimiento no puede ser anterior a la fecha de ingreso');
+  }
+
+  const { error } = await supabase
+    .from('comercio')
+    .update({ fecha_ingreso_sistema: fechaIngresoSistema, membresia_vigente_hasta: membresiaVigenteHasta || null })
+    .eq('id', comercioId);
+  if (error) throw error;
+
+  await setAccess(supabase, comercioId, true);
+}
+
 async function resetPassword(supabase: any, userId: string, password: string) {
   if (!password) {
     throw new Error('La nueva contrasena es requerida');
@@ -591,6 +635,13 @@ Deno.serve(async (req) => {
 
     if (action === 'setAccess') {
       await setAccess(supabase, body.comercioId, Boolean(body.enabled));
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'renovarMembresia') {
+      await renovarMembresia(supabase, body.comercioId, body.fechaIngresoSistema, body.membresiaVigenteHasta);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

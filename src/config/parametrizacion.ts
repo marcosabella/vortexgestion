@@ -27,6 +27,7 @@ export type FuncionSistema =
   | "imagenes_productos"
   | "publicacion_tienda_online"
   | "descripcion_enriquecida_productos"
+  | "talles_colores_productos"
   | "exportacion_pdf"
   | "whatsapp_envio_automatico_comprobantes";
 
@@ -70,6 +71,7 @@ export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; desc
   { key: "imagenes_productos", label: "Imagenes de productos", description: "Permite cargar hasta cinco imagenes por producto." },
   { key: "publicacion_tienda_online", label: "Publicacion en tienda online", description: "Permite indicar si un producto se muestra en la tienda online." },
   { key: "descripcion_enriquecida_productos", label: "Descripcion enriquecida de productos", description: "Permite editar la descripcion publica con formato para la tienda online." },
+  { key: "talles_colores_productos", label: "Talles y colores de productos", description: "Permite asignar talles y colores al producto y publicarlos en la tienda online." },
   { key: "exportacion_pdf", label: "Exportacion PDF", description: "Permite generar PDFs de comprobantes y listados." },
   { key: "whatsapp_envio_automatico_comprobantes", label: "Envio automatico de comprobantes por WhatsApp", description: "Envia el comprobante al guardar una venta si el cliente tiene telefono registrado." },
 ];
@@ -92,6 +94,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     ),
     publicacion_tienda_online: false,
     descripcion_enriquecida_productos: false,
+    talles_colores_productos: false,
     whatsapp_envio_automatico_comprobantes: false,
   },
   impresion: {

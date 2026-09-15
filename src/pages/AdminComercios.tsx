@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Building2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
+import { Building2, CalendarCheck2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin, AdminComercio } from "@/hooks/useAdminComercios";
 import { ComercioFormData } from "@/types/comercio";
 import {
@@ -38,6 +38,8 @@ const emptyComercio: ComercioFormData = {
   ingresos_brutos: "",
   fecha_inicio_actividad: "",
   logo_url: "",
+  fecha_ingreso_sistema: "",
+  membresia_vigente_hasta: "",
 };
 
 const accessDateFormatter = new Intl.DateTimeFormat("es-AR", {
@@ -143,6 +145,14 @@ function AdminComercioForm({
           <Label htmlFor="logo_url">URL del logo</Label>
           <Input id="logo_url" value={comercio.logo_url} onChange={(event) => updateField("logo_url", event.target.value)} />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="fecha_ingreso_sistema">Fecha de pago / alta</Label>
+          <Input id="fecha_ingreso_sistema" type="date" value={comercio.fecha_ingreso_sistema || ""} onChange={(event) => updateField("fecha_ingreso_sistema", event.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="membresia_vigente_hasta">Membresía vigente hasta</Label>
+          <Input id="membresia_vigente_hasta" type="date" value={comercio.membresia_vigente_hasta || ""} onChange={(event) => updateField("membresia_vigente_hasta", event.target.value)} />
+        </div>
       </div>
 
       {includeAccess && (
@@ -180,6 +190,8 @@ function comercioToForm(comercio: AdminComercio): ComercioFormData {
     ingresos_brutos: comercio.ingresos_brutos || "",
     fecha_inicio_actividad: comercio.fecha_inicio_actividad || "",
     logo_url: comercio.logo_url || "",
+    fecha_ingreso_sistema: comercio.fecha_ingreso_sistema || "",
+    membresia_vigente_hasta: comercio.membresia_vigente_hasta || "",
   };
 }
 
@@ -266,6 +278,62 @@ function ResetPasswordButton({
           </div>
           <Button type="submit" variant="success" disabled={resetPassword.isPending}>
             {resetPassword.isPending ? "Guardando..." : "Actualizar"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RenewMembershipButton({
+  comercio,
+  renovarMembresia,
+}: {
+  comercio: AdminComercio;
+  renovarMembresia: ReturnType<typeof useAdminComercios>["renovarMembresia"];
+}) {
+  const [open, setOpen] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [fechaIngresoSistema, setFechaIngresoSistema] = useState(comercio.fecha_ingreso_sistema || today);
+  const [membresiaVigenteHasta, setMembresiaVigenteHasta] = useState(comercio.membresia_vigente_hasta || today);
+  const [sinVencimiento, setSinVencimiento] = useState(!comercio.membresia_vigente_hasta);
+
+  useEffect(() => {
+    setFechaIngresoSistema(comercio.fecha_ingreso_sistema || today);
+    setMembresiaVigenteHasta(comercio.membresia_vigente_hasta || today);
+    setSinVencimiento(!comercio.membresia_vigente_hasta);
+  }, [comercio.fecha_ingreso_sistema, comercio.membresia_vigente_hasta, today]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" title="Registrar membresía">
+          <CalendarCheck2 className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Registrar membresía</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={(event) => {
+          event.preventDefault();
+          renovarMembresia.mutate({ comercioId: comercio.id, fechaIngresoSistema, membresiaVigenteHasta: sinVencimiento ? null : membresiaVigenteHasta }, { onSuccess: () => setOpen(false) });
+        }}>
+          <p className="text-sm text-muted-foreground">Al registrar el pago se habilita el comercio y su usuario hasta la fecha de vencimiento indicada.</p>
+          <div className="space-y-2">
+            <Label htmlFor={`fecha-ingreso-${comercio.id}`}>Fecha de pago / alta</Label>
+            <Input id={`fecha-ingreso-${comercio.id}`} type="date" value={fechaIngresoSistema} onChange={(event) => setFechaIngresoSistema(event.target.value)} required />
+          </div>
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div><Label htmlFor={`sin-vencimiento-${comercio.id}`}>Membresía sin vencimiento</Label><p className="text-xs text-muted-foreground">No se bloqueará ni mostrará aviso de vencimiento.</p></div>
+            <Switch id={`sin-vencimiento-${comercio.id}`} checked={sinVencimiento} onCheckedChange={setSinVencimiento} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`membresia-hasta-${comercio.id}`}>Membresía vigente hasta</Label>
+            <Input id={`membresia-hasta-${comercio.id}`} type="date" min={fechaIngresoSistema} value={sinVencimiento ? "" : membresiaVigenteHasta} onChange={(event) => setMembresiaVigenteHasta(event.target.value)} disabled={sinVencimiento} required={!sinVencimiento} />
+          </div>
+          <Button type="submit" variant="success" disabled={renovarMembresia.isPending}>
+            {renovarMembresia.isPending ? "Guardando..." : "Registrar pago y habilitar"}
           </Button>
         </form>
       </DialogContent>
@@ -377,8 +445,9 @@ function DeleteComercioButton({
 
 export default function AdminComercios() {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAppAdmin();
-  const { comerciosQuery, createComercio, updateComercio, deleteComercio, setAccess, createOrUpdateAccess, resetPassword } = useAdminComercios();
+  const { comerciosQuery, createComercio, updateComercio, deleteComercio, setAccess, renovarMembresia, createOrUpdateAccess, resetPassword } = useAdminComercios();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | "habilitados" | "deshabilitados">("habilitados");
 
   if (isAdminLoading) {
     return <div className="p-8">Cargando...</div>;
@@ -389,6 +458,11 @@ export default function AdminComercios() {
   }
 
   const comercios = comerciosQuery.data || [];
+  const today = new Date().toISOString().slice(0, 10);
+  const comerciosFiltrados = comercios.filter((comercio) => {
+    const habilitado = Boolean(comercio.activo && comercio.usuario?.activo && !comercio.membresia_vencida && (!comercio.membresia_vigente_hasta || comercio.membresia_vigente_hasta >= today));
+    return estadoFiltro === "todos" || (estadoFiltro === "habilitados" ? habilitado : !habilitado);
+  });
 
   return (
     <div className="container mx-auto space-y-6 p-8">
@@ -424,11 +498,16 @@ export default function AdminComercios() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Building2 className="h-5 w-5" />
-            Comercios
-          </CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <CardTitle className="flex items-center gap-2 text-lg"><Building2 className="h-5 w-5" />Comercios</CardTitle>
+          <Select value={estadoFiltro} onValueChange={(value) => setEstadoFiltro(value as typeof estadoFiltro)}>
+            <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los estados</SelectItem>
+              <SelectItem value="habilitados">Habilitados</SelectItem>
+              <SelectItem value="deshabilitados">Deshabilitados</SelectItem>
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
           <Table>
@@ -437,9 +516,8 @@ export default function AdminComercios() {
                 <TableHead>Comercio</TableHead>
                 <TableHead>Usuario</TableHead>
                 <TableHead>Ultimo acceso</TableHead>
-                <TableHead>CUIT</TableHead>
-                <TableHead>ARCA</TableHead>
-                <TableHead>Ubicacion</TableHead>
+                <TableHead>Pago / alta</TableHead>
+                <TableHead>Membresía hasta</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acceso</TableHead>
               </TableRow>
@@ -447,32 +525,32 @@ export default function AdminComercios() {
             <TableBody>
               {comerciosQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Cargando comercios...
                   </TableCell>
                 </TableRow>
-              ) : comercios.length === 0 ? (
+              ) : comerciosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No hay comercios cargados.
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    {comercios.length ? "No hay comercios para el filtro seleccionado." : "No hay comercios cargados."}
                   </TableCell>
                 </TableRow>
               ) : (
-                comercios.map((comercio) => {
-                  const enabled = Boolean(comercio.activo && comercio.usuario?.activo);
+                comerciosFiltrados.map((comercio) => {
+                  const membershipExpired = Boolean(comercio.membresia_vencida || (comercio.membresia_vigente_hasta && comercio.membresia_vigente_hasta < today));
+                  const enabled = Boolean(comercio.activo && comercio.usuario?.activo && !membershipExpired);
 
                   return (
                     <TableRow key={comercio.id}>
                       <TableCell className="font-medium">{comercio.nombre_comercio}</TableCell>
                       <TableCell>{comercio.usuario?.email || "-"}</TableCell>
                       <TableCell>{formatLastAccess(comercio.usuario?.last_sign_in_at)}</TableCell>
-                      <TableCell>{comercio.cuit}</TableCell>
-                      <TableCell>{comercio.situacion_afip || "-"}</TableCell>
-                      <TableCell>{comercio.localidad}, {comercio.provincia}</TableCell>
+                      <TableCell>{comercio.fecha_ingreso_sistema ? new Date(`${comercio.fecha_ingreso_sistema}T00:00:00`).toLocaleDateString("es-AR") : "-"}</TableCell>
+                      <TableCell>{comercio.membresia_vigente_hasta ? new Date(`${comercio.membresia_vigente_hasta}T00:00:00`).toLocaleDateString("es-AR") : "Sin vencimiento"}</TableCell>
                       <TableCell>
                         <Badge variant={enabled ? "default" : "secondary"} className="gap-1">
                           {enabled ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
-                          {enabled ? "Habilitado" : "Deshabilitado"}
+                          {enabled ? "Habilitado" : membershipExpired ? "Membresía vencida" : "Deshabilitado"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -483,6 +561,7 @@ export default function AdminComercios() {
                             <AccessUserButton comercio={comercio} createOrUpdateAccess={createOrUpdateAccess} />
                           )}
                           <EditComercioButton comercio={comercio} updateComercio={updateComercio} />
+                          <RenewMembershipButton comercio={comercio} renovarMembresia={renovarMembresia} />
                           <Button asChild variant="outline" size="sm">
                             <Link to={`/admin/comercios/${comercio.id}/parametrizacion`}>
                               <SlidersHorizontal className="h-4 w-4" />

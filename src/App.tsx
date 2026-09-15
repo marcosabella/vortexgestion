@@ -1,16 +1,20 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ModuleHelp } from "@/components/ModuleHelp";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Bell, LogOut } from "lucide-react";
+import { Bell, CalendarClock, LogOut } from "lucide-react";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
+import { useComercio } from "@/hooks/useComercio";
+import { Comercio } from "@/types/comercio";
+import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ModuloSistema } from "@/config/parametrizacion";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -57,8 +61,43 @@ import ListadoCaja from "./pages/listados/ListadoCaja";
 import GastosEgresos from "./pages/GastosEgresos";
 import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
 import WhatsApp from "./pages/WhatsApp";
+import { DataDeletion, PrivacyPolicy } from "./pages/Privacy";
 
 const queryClient = new QueryClient();
+
+function MembershipReminder({ comercio }: { comercio: Comercio | null }) {
+  const [open, setOpen] = useState(false);
+  const vencimiento = comercio?.membresia_vigente_hasta || null;
+
+  useEffect(() => {
+    if (!vencimiento) { setOpen(false); return; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(`${vencimiento}T00:00:00`);
+    const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000);
+    setOpen(daysUntilDue >= 0 && daysUntilDue <= 5);
+  }, [vencimiento]);
+
+  if (!vencimiento) return null;
+  const dueDate = new Date(`${vencimiento}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000);
+  const remainingText = daysUntilDue === 0 ? "vence hoy" : daysUntilDue === 1 ? "vence mañana" : `vence en ${daysUntilDue} días`;
+
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700"><CalendarClock className="h-6 w-6" /></div>
+        <DialogTitle>Vencimiento de membresía próximo</DialogTitle>
+        <DialogDescription className="pt-2 text-sm leading-6">
+          La membresía de <b>{comercio?.nombre_comercio}</b> {remainingText}, el {dueDate.toLocaleDateString("es-AR")}. Comunicate con administración para registrar el pago y mantener el acceso habilitado.
+        </DialogDescription>
+      </DialogHeader>
+      <Button type="button" onClick={() => setOpen(false)}>Entendido</Button>
+    </DialogContent>
+  </Dialog>;
+}
 
 function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; children: JSX.Element }) {
   const { data: parametrizacion, isLoading } = useComercioParametrizacion();
@@ -83,9 +122,22 @@ function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; childr
 
 function AuthenticatedLayout() {
   const { session, isLoading, signOut, user } = useAuth();
+  const { comercio } = useComercio();
+  const client = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
   const { noLeidas } = useNotificaciones();
+
+  useEffect(() => {
+    if (!session) return;
+    const refreshComercio = () => client.invalidateQueries({ queryKey: ["comercio"] });
+    const refreshOnVisible = () => { if (document.visibilityState === "visible") refreshComercio(); };
+    refreshComercio();
+    window.addEventListener("focus", refreshComercio);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    const timer = window.setInterval(refreshComercio, 15 * 60 * 1000);
+    return () => { window.removeEventListener("focus", refreshComercio); document.removeEventListener("visibilitychange", refreshOnVisible); window.clearInterval(timer); };
+  }, [client, session]);
 
   if (isLoading) {
     return (
@@ -179,6 +231,7 @@ function AuthenticatedLayout() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
+          <MembershipReminder comercio={comercio} />
         </div>
       </div>
     </SidebarProvider>
@@ -194,6 +247,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/privacidad" element={<PrivacyPolicy />} />
+            <Route path="/eliminacion-de-datos" element={<DataDeletion />} />
             <Route path="/login" element={<Login />} />
             <Route path="/login/:comercioId" element={<Login />} />
             <Route path="/*" element={<AuthenticatedLayout />} />

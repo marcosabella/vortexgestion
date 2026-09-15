@@ -27,6 +27,8 @@ import { useMercadoPago } from "@/hooks/useMercadoPago";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
+const automaticWhatsAppEnabled = import.meta.env.VITE_WHATSAPP_API_ENABLED === "true";
+
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -326,7 +328,9 @@ export const VentasList = () => {
       return;
     }
 
-    if (venta.id && comercio?.id) {
+    // Mientras Meta no esté habilitado, se prioriza la acción manual para que el
+    // navegador conserve el permiso de mostrar el selector de compartir.
+    if (automaticWhatsAppEnabled && venta.id && comercio?.id) {
       setIsSendingWhatsApp(true);
       try {
         await enviarComprobantePorWhatsApp({

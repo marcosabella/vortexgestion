@@ -17,6 +17,9 @@ export interface AdminComercio {
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
+  fecha_ingreso_sistema?: string | null;
+  membresia_vigente_hasta?: string | null;
+  membresia_vencida?: boolean;
   localidad: string;
   provincia: string;
   created_at?: string;
@@ -125,6 +128,19 @@ export function useAdminComercios(enabled = true) {
     },
   });
 
+  const renovarMembresia = useMutation({
+    mutationFn: async ({ comercioId, fechaIngresoSistema, membresiaVigenteHasta }: { comercioId: string; fechaIngresoSistema: string; membresiaVigenteHasta: string | null }) =>
+      invokeAdmin({ action: "renovarMembresia", comercioId, fechaIngresoSistema, membresiaVigenteHasta }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-comercios"] });
+      queryClient.invalidateQueries({ queryKey: ["comercio"] });
+      toast({ title: "Membresía registrada", description: "El comercio y su usuario quedaron habilitados hasta la fecha indicada." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateComercio = useMutation({
     mutationFn: async ({ comercioId, comercio }: { comercioId: string; comercio: ComercioFormData }) =>
       invokeAdmin({ action: "update", comercioId, comercio }),
@@ -189,6 +205,7 @@ export function useAdminComercios(enabled = true) {
     updateComercio,
     deleteComercio,
     setAccess,
+    renovarMembresia,
     createOrUpdateAccess,
     resetPassword,
   };

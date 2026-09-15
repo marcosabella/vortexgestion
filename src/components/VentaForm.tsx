@@ -185,6 +185,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [ventaItems, setVentaItems] = useState<VentaItemDraft[]>([])
   const [selectedProductoId, setSelectedProductoId] = useState<string>("")
   const [selectedProducto, setSelectedProducto] = useState<{ id: string; cod_producto: string; descripcion: string; precio_venta: number; porcentaje_iva: number; stock: number } | null>(null)
+  const [variantesProducto, setVariantesProducto] = useState<Array<{ id: string; stock: number; color?: string; talle?: string }>>([])
+  const [selectedVarianteId, setSelectedVarianteId] = useState("")
   const [itemDescripcion, setItemDescripcion] = useState("")
   const [itemCantidad, setItemCantidad] = useState<number>(1)
   const [itemPrecioUnitario, setItemPrecioUnitario] = useState<number>(0)
@@ -386,6 +388,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       if (venta.venta_items) {
         setVentaItems(venta.venta_items.map(item => ({
           producto_id: item.producto_id,
+          producto_variante_id: item.producto_variante_id || null,
           descripcion_manual: item.descripcion_manual,
           codigo_manual: item.codigo_manual,
           cantidad: item.cantidad,
@@ -477,7 +480,11 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
   const getItemDescripcion = (item: VentaItemDraft) => {
     const producto = item.producto_id ? productos.find(p => p.id === item.producto_id) : null
-    if (producto) return `${producto.cod_producto} - ${producto.descripcion}`
+    if (producto) {
+      const variante = variantesProducto.find((itemVariante) => itemVariante.id === item.producto_variante_id)
+      const detalle = variante ? [variante.color, variante.talle].filter(Boolean).join(" / ") : item.descripcion_manual || ""
+      return `${producto.cod_producto} - ${producto.descripcion}${detalle ? ` (${detalle})` : ""}`
+    }
     return item.descripcion_manual || "Item manual"
   }
 
@@ -485,6 +492,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const limpiarItemActual = () => {
     setSelectedProductoId("")
     setSelectedProducto(null)
+    setVariantesProducto([])
+    setSelectedVarianteId("")
     setItemDescripcion("")
     setItemCantidad(1)
     setItemPrecioUnitario(0)
@@ -508,6 +517,13 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     setItemDescripcion(producto.descripcion)
     setItemPrecioUnitario(Number(producto.precio_venta))
     setItemPorcentajeIva(Number(producto.porcentaje_iva))
+    setSelectedVarianteId("")
+    setVariantesProducto([])
+    void (async () => {
+      const { data, error } = await (supabase as any).from("producto_variantes").select("id, stock, producto_colores(nombre), producto_talles(nombre)").eq("producto_id", producto.id).order("created_at")
+      if (error) { toast({ title: "No se pudieron cargar las variantes", description: error.message, variant: "destructive" }); return }
+      setVariantesProducto((data || []).map((variante: any) => ({ id: variante.id, stock: Number(variante.stock), color: variante.producto_colores?.nombre, talle: variante.producto_talles?.nombre })))
+    })()
     setProductSearchOpen(false)
     setProductSearchTerm("")
   }
@@ -553,10 +569,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       const producto = productos.find(p => p.id === selectedProductoId)
       if (!producto) return
 
+      if (variantesProducto.length && !selectedVarianteId) {
+        toast({ title: "Seleccione talle y color", description: "Este producto se controla por variantes.", variant: "destructive" })
+        return
+      }
+      const stockBase = selectedVarianteId ? Number(variantesProducto.find((variante) => variante.id === selectedVarianteId)?.stock || 0) : Number(producto.stock)
       const cantidadYaAgregada = ventaItems
-        .filter(item => item.producto_id === selectedProductoId)
+        .filter(item => selectedVarianteId ? item.producto_variante_id === selectedVarianteId : item.producto_id === selectedProductoId && !item.producto_variante_id)
         .reduce((sum, item) => sum + item.cantidad, 0)
-      const cantidadDisponible = Number(producto.stock) - cantidadYaAgregada
+      const cantidadDisponible = stockBase - cantidadYaAgregada
 
       if (!esPresupuesto && cantidadItem > cantidadDisponible) {
         toast({
@@ -580,7 +601,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
     const nuevoItem: VentaItemDraft = {
       producto_id: selectedProductoId || null,
-      descripcion_manual: selectedProductoId ? null : descripcion,
+      producto_variante_id: selectedVarianteId || null,
+      descripcion_manual: selectedProductoId ? (selectedVarianteId ? [variantesProducto.find((variante) => variante.id === selectedVarianteId)?.color, variantesProducto.find((variante) => variante.id === selectedVarianteId)?.talle].filter(Boolean).join(" / ") : null) : descripcion,
       codigo_manual: null,
       cantidad: cantidadItem,
       precio_unitario: precioUnitario,
@@ -1032,6 +1054,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                         <p className="mt-1 text-xs text-muted-foreground">
                           Codigo: {selectedProducto.cod_producto} | Stock: {selectedProducto.stock}
                         </p>
+                      )}
+                      {variantesProducto.length > 0 && (
+                        <div className="mt-2">
+                          <label className="text-xs font-medium">Color / talle *</label>
+                          <Select value={selectedVarianteId} onValueChange={setSelectedVarianteId}>
+                            <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Elegir variante" /></SelectTrigger>
+                            <SelectContent>{variantesProducto.map((variante) => <SelectItem key={variante.id} value={variante.id}>{[variante.color, variante.talle].filter(Boolean).join(" / ")} — Stock: {variante.stock}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
                       )}
                     </div>
 

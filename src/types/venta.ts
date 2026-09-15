@@ -90,6 +90,7 @@ export interface VentaItem {
   comercio_id?: string;
   venta_id?: string;
   producto_id?: string | null;
+  producto_variante_id?: string | null;
   descripcion_manual?: string | null;
   codigo_manual?: string | null;
   cantidad: number;

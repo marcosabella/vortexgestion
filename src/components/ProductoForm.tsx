@@ -1,5 +1,5 @@
 import { ChangeEvent, useState, useEffect } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
 import { ProductDescriptionEditor } from "@/components/ProductDescriptionEditor";
 import { sanitizeProductDescription } from "@/utils/productDescription";
+import { useComercio } from "@/hooks/useComercio";
+import { AtributoProducto, ProductoVariante, useProductoAtributos } from "@/hooks/useProductoAtributos";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const EMPTY_SELECT_VALUE = "__none__";
 const PRODUCT_IMAGE_BUCKET = "producto-imagenes";
@@ -48,6 +51,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
   const { rubros } = useRubros();
   const { subrubros } = useSubRubros();
   const { data: parametrizacion } = useComercioParametrizacion();
+  const { comercio } = useComercio();
   const { toast } = useToast();
   
   const [filteredSubRubros, setFilteredSubRubros] = useState(subrubros);
@@ -57,6 +61,18 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
   const imagenesHabilitadas = parametrizacion?.funciones.imagenes_productos ?? false;
   const publicacionTiendaHabilitada = parametrizacion?.funciones.publicacion_tienda_online ?? false;
   const descripcionTiendaHabilitada = parametrizacion?.funciones.descripcion_enriquecida_productos ?? false;
+  const atributosHabilitados = parametrizacion?.funciones.talles_colores_productos ?? false;
+  const comercioId = producto?.comercio_id || comercio?.id;
+  const { colores, talles, asignaciones, variantes: variantesGuardadas, crearAtributo, guardarAsignaciones, guardarVariantes } = useProductoAtributos({
+    productoId: producto?.id,
+    comercioId,
+    enabled: atributosHabilitados,
+  });
+  const [coloresSeleccionados, setColoresSeleccionados] = useState<AtributoProducto[]>([]);
+  const [tallesSeleccionados, setTallesSeleccionados] = useState<AtributoProducto[]>([]);
+  const [nuevoAtributo, setNuevoAtributo] = useState<"producto_colores" | "producto_talles" | null>(null);
+  const [nombreAtributo, setNombreAtributo] = useState("");
+  const [variantes, setVariantes] = useState<ProductoVariante[]>([]);
 
   const {
     register,
@@ -133,6 +149,34 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       setValue("tipo_moneda", producto.tipo_moneda);
     }
   }, [producto, setValue]);
+
+  useEffect(() => {
+    if (!producto || !asignaciones) return;
+    setColoresSeleccionados(asignaciones.colores);
+    setTallesSeleccionados(asignaciones.talles);
+  }, [producto, asignaciones]);
+
+  useEffect(() => {
+    if (producto && variantesGuardadas) setVariantes(variantesGuardadas);
+  }, [producto, variantesGuardadas]);
+
+  useEffect(() => {
+    if (!atributosHabilitados) return;
+    const coloresVariante = coloresSeleccionados.length ? coloresSeleccionados.map((item) => item.id) : [null];
+    const tallesVariante = tallesSeleccionados.length ? tallesSeleccionados.map((item) => item.id) : [null];
+    if (!coloresSeleccionados.length && !tallesSeleccionados.length) {
+      setVariantes([]);
+      return;
+    }
+    setVariantes((actual) => coloresVariante.flatMap((color_id) => tallesVariante.map((talle_id) => {
+      const anterior = actual.find((item) => item.color_id === color_id && item.talle_id === talle_id);
+      return anterior || { color_id, talle_id, stock: 0 };
+    })));
+  }, [atributosHabilitados, coloresSeleccionados, tallesSeleccionados]);
+
+  useEffect(() => {
+    if (atributosHabilitados && variantes.length) setValue("stock", variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0));
+  }, [atributosHabilitados, setValue, variantes]);
 
   useEffect(() => {
     if (!producto?.id || !imagenesHabilitadas) {
@@ -268,25 +312,42 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       onClose?.();
     };
 
+    const completarGuardado = async (savedProducto: Producto) => {
+      try {
+        if (atributosHabilitados) {
+          await guardarAsignaciones(savedProducto.id, coloresSeleccionados.map((item) => item.id), tallesSeleccionados.map((item) => item.id));
+          await guardarVariantes(savedProducto.id, variantes);
+        }
+        await uploadPendingImages(savedProducto);
+        afterSuccess();
+      } catch (error) {
+        toast({ variant: "destructive", title: "Producto guardado", description: `No se pudieron guardar todos los datos: ${error instanceof Error ? error.message : "intente nuevamente"}` });
+      }
+    };
+
     if (producto) {
-      updateProducto({ ...cleanData, id: producto.id }, { onSuccess: async (savedProducto) => {
-        try {
-          await uploadPendingImages(savedProducto as Producto);
-          afterSuccess();
-        } catch (error) {
-          toast({ variant: "destructive", title: "Producto actualizado", description: `No se pudieron cargar las imagenes: ${error instanceof Error ? error.message : "intente nuevamente"}` });
-        }
-      } });
+      updateProducto({ ...cleanData, id: producto.id }, { onSuccess: async (savedProducto) => completarGuardado(savedProducto as Producto) });
     } else {
-      createProducto(cleanData, { onSuccess: async (savedProducto) => {
-        try {
-          await uploadPendingImages(savedProducto as Producto);
-          afterSuccess();
-        } catch (error) {
-          toast({ variant: "destructive", title: "Producto creado", description: `No se pudieron cargar las imagenes: ${error instanceof Error ? error.message : "intente nuevamente"}` });
-        }
-      } });
+      createProducto(cleanData, { onSuccess: async (savedProducto) => completarGuardado(savedProducto as Producto) });
     }
+  };
+
+  const agregarAtributo = async () => {
+    if (!nuevoAtributo) return;
+    try {
+      const nuevo = await crearAtributo({ tabla: nuevoAtributo, nombre: nombreAtributo });
+      if (nuevoAtributo === "producto_colores") setColoresSeleccionados((actual) => [...actual, nuevo]);
+      else setTallesSeleccionados((actual) => [...actual, nuevo]);
+      setNombreAtributo("");
+      setNuevoAtributo(null);
+    } catch (error) {
+      toast({ variant: "destructive", title: "No se pudo agregar", description: error instanceof Error ? error.message : "Intente nuevamente." });
+    }
+  };
+
+  const seleccionarAtributo = (id: string, disponibles: AtributoProducto[], seleccionados: AtributoProducto[], actualizar: (items: AtributoProducto[]) => void) => {
+    const item = disponibles.find((atributo) => atributo.id === id);
+    if (item && !seleccionados.some((atributo) => atributo.id === id)) actualizar([...seleccionados, item]);
   };
 
   return (
@@ -331,6 +392,35 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
                 <p className="text-sm text-destructive">{errors.descripcion.message}</p>
               )}
             </div>
+
+            {atributosHabilitados && <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+              {[
+                { titulo: "Colores", tabla: "producto_colores" as const, disponibles: colores, seleccionados: coloresSeleccionados, actualizar: setColoresSeleccionados, placeholder: "Seleccionar color" },
+                { titulo: "Talles", tabla: "producto_talles" as const, disponibles: talles, seleccionados: tallesSeleccionados, actualizar: setTallesSeleccionados, placeholder: "Seleccionar talle" },
+              ].map(({ titulo, tabla, disponibles, seleccionados, actualizar, placeholder }) => (
+                <div className="space-y-2" key={tabla}>
+                  <Label>{titulo}</Label>
+                  <div className="flex gap-2">
+                    <Select onValueChange={(id) => seleccionarAtributo(id, disponibles, seleccionados, actualizar)}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder={placeholder} /></SelectTrigger>
+                      <SelectContent>
+                        {disponibles.filter((item) => !seleccionados.some((seleccionado) => seleccionado.id === item.id)).map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="icon" aria-label={`Agregar ${titulo.toLowerCase()}`} onClick={() => setNuevoAtributo(tabla)}><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="flex min-h-6 flex-wrap gap-2">
+                    {seleccionados.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-sm">{item.nombre}<button type="button" aria-label={`Quitar ${item.nombre}`} onClick={() => actualizar(seleccionados.filter((seleccionado) => seleccionado.id !== item.id))}><X className="h-3.5 w-3.5" /></button></span>)}
+                    {!seleccionados.length && <span className="text-sm text-muted-foreground">Sin {titulo.toLowerCase()} asignados.</span>}
+                  </div>
+                </div>
+              ))}
+            </div>}
+
+            {atributosHabilitados && variantes.length > 0 && <div className="space-y-3 md:col-span-2">
+              <div><Label>Stock por talle y color</Label><p className="text-sm text-muted-foreground">El stock total del producto se calcula automáticamente como la suma de estas cantidades.</p></div>
+              <div className="overflow-hidden rounded-md border"><table className="w-full text-sm"><thead className="bg-muted text-left"><tr><th className="p-3">Color</th><th className="p-3">Talle</th><th className="p-3 text-right">Stock</th></tr></thead><tbody>{variantes.map((variante, indice) => <tr key={`${variante.color_id}-${variante.talle_id}`} className="border-t"><td className="p-3">{colores.find((item) => item.id === variante.color_id)?.nombre || "-"}</td><td className="p-3">{talles.find((item) => item.id === variante.talle_id)?.nombre || "-"}</td><td className="p-2 text-right"><Input className="ml-auto w-28 text-right" type="number" min="0" step="1" value={variante.stock} onChange={(event) => setVariantes((actual) => actual.map((item, itemIndex) => itemIndex === indice ? { ...item, stock: Math.max(0, Number(event.target.value) || 0) } : item))} /></td></tr>)}</tbody><tfoot className="border-t bg-muted"><tr><td className="p-3 font-medium" colSpan={2}>Stock total</td><td className="p-3 text-right font-semibold">{variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0)}</td></tr></tfoot></table></div>
+            </div>}
 
             <div className="space-y-2">
               <Label htmlFor="proveedor_id">Proveedor</Label>
@@ -492,7 +582,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
               />
             </div>
 
-            <div className="space-y-2">
+            {!variantes.length && <div className="space-y-2">
               <Label htmlFor="stock">Stock *</Label>
               <Input
                 id="stock"
@@ -507,7 +597,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
               {errors.stock && (
                 <p className="text-sm text-destructive">{errors.stock.message}</p>
               )}
-            </div>
+            </div>}
 
             <div className="space-y-2">
               <Label htmlFor="tipo_moneda">Tipo de Moneda</Label>
@@ -626,6 +716,13 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
           </div>
         </form>
       </CardContent>
+      <Dialog open={nuevoAtributo !== null} onOpenChange={(open) => { if (!open) { setNuevoAtributo(null); setNombreAtributo(""); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Agregar {nuevoAtributo === "producto_colores" ? "color" : "talle"}</DialogTitle><DialogDescription>Quedará disponible para los productos de este comercio.</DialogDescription></DialogHeader>
+          <Input autoFocus value={nombreAtributo} onChange={(event) => setNombreAtributo(event.target.value)} placeholder={nuevoAtributo === "producto_colores" ? "Ej.: Negro" : "Ej.: M"} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void agregarAtributo(); } }} />
+          <DialogFooter><Button type="button" variant="cancel" onClick={() => setNuevoAtributo(null)}>Cancelar</Button><Button type="button" onClick={() => void agregarAtributo()}>Agregar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
