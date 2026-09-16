@@ -422,7 +422,8 @@ Deno.serve(async (req) => {
           pending: `${origin}/pago/pendiente?pedido=${pedido.id}`,
           failure: `${origin}/pago/rechazado?pedido=${pedido.id}`,
         },
-        auto_return: "approved",
+          // El webhook confirma el pago. Evitamos auto_return porque Mercado
+          // Pago lo invalida cuando no puede validar la URL de exito.
         notification_url: `${functionBase}/mercadopago-webhook?op=${op.id}`,
         metadata: {
           operacion_id: op.id,
@@ -442,7 +443,10 @@ Deno.serve(async (req) => {
           ),
           checkoutUrl = config.ambiente === "production"
             ? preference.init_point
-            : preference.sandbox_init_point;
+            : (preference.sandbox_init_point || preference.init_point);
+        if (!checkoutUrl) {
+          throw new Error("Mercado Pago no devolvio una URL de checkout");
+        }
         await db.from("mercadopago_operaciones").update({
           preference_id: preference.id,
           checkout_url: checkoutUrl,

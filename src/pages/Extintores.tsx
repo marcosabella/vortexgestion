@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { buildExtintoresReportePdfFile } from "@/utils/extintoresReportePdf";
 import { downloadPdfFile, printPdfFile } from "@/utils/ordenTrabajoPdf";
+import { toast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -36,6 +37,8 @@ const vacio = {
   numero_extintor: "",
   numero_serie: "",
   sector: "",
+  area: "",
+  patente: "",
   marca_id: "",
   clase_id: "",
   anio_prueba_hidraulica: "",
@@ -74,6 +77,16 @@ export default function Extintores() {
   const set = (k: string, v: string) => setF((x: any) => ({ ...x, [k]: v }));
   const fecha = (valor?: string | null) =>
     valor ? format(new Date(`${valor}T00:00:00`), "dd/MM/yyyy") : "-";
+  const mesAnio = (valor?: string | null) =>
+    valor ? format(new Date(`${valor}T00:00:00`), "MM/yyyy") : "-";
+  const aFechaMes = (valor: string) => {
+    const coincidencia = /^(0[1-9]|1[0-2])\/(\d{4})$/.exec(valor);
+    return coincidencia ? `${coincidencia[2]}-${coincidencia[1]}-01` : valor;
+  };
+  const normalizarMes = (valor: string) => {
+    const digitos = valor.replace(/\D/g, "").slice(0, 6);
+    return digitos.length > 2 ? `${digitos.slice(0, 2)}/${digitos.slice(2)}` : digitos;
+  };
   const clientesFiltrados = useMemo(
     () =>
       clientes.filter((c) =>
@@ -86,7 +99,7 @@ export default function Extintores() {
   const abrir = (e?: Extintor) => {
     setF(
       e
-        ? { ...e, marca_id: e.marca_id || "", clase_id: e.clase_id || "" }
+        ? { ...e, marca_id: e.marca_id || "", clase_id: e.clase_id || "", fecha_proxima_recarga: mesAnio(e.fecha_proxima_recarga), fecha_vencimiento: mesAnio(e.fecha_vencimiento) }
         : vacio,
     );
     setOpen(true);
@@ -115,13 +128,19 @@ export default function Extintores() {
     recargaDesde,
     recargaHasta,
   ]);
-  const guardar = () =>
-    save({ ...f, marca_id: f.marca_id || null, clase_id: f.clase_id || null }, {
+  const guardar = () => {
+    const fechasMes = [f.fecha_proxima_recarga, f.fecha_vencimiento].filter(Boolean);
+    if (fechasMes.some((fechaMes) => !/^(0[1-9]|1[0-2])\/\d{4}$/.test(fechaMes))) {
+      toast({ title: "Mes inválido", description: "Ingresá el mes y año como 09/2026.", variant: "destructive" });
+      return;
+    }
+    save({ ...f, fecha_proxima_recarga: aFechaMes(f.fecha_proxima_recarga), fecha_vencimiento: aFechaMes(f.fecha_vencimiento), marca_id: f.marca_id || null, clase_id: f.clase_id || null }, {
       onSuccess: () => {
         setOpen(false);
         setF(vacio);
       },
     });
+  };
   const generarReporte = () => buildExtintoresReportePdfFile(extintoresFiltrados, comercio);
   const compartirReporte = async () => {
     const file = await generarReporte(); const texto = `Reporte de ${extintoresFiltrados.length} extintores según filtros.`; const shareData: ShareData = { title: "Reporte de extintores", text: texto, files: [file] };
@@ -132,6 +151,8 @@ export default function Extintores() {
     "numero_extintor",
     "numero_serie",
     "sector",
+    "area",
+    "patente",
     "anio_prueba_hidraulica",
     "fecha_ultima_recarga",
     "fecha_proxima_recarga",
@@ -240,8 +261,8 @@ export default function Extintores() {
                     {e.marca?.nombre || "-"} / {e.clase?.nombre || "-"}
                   </TableCell>
                   <TableCell>{e.sector || "-"}</TableCell>
-                  <TableCell>{fecha(e.fecha_proxima_recarga)}</TableCell>
-                  <TableCell>{fecha(e.fecha_vencimiento)}</TableCell>
+                  <TableCell>{mesAnio(e.fecha_proxima_recarga)}</TableCell>
+                  <TableCell>{mesAnio(e.fecha_vencimiento)}</TableCell>
                   <TableCell className="flex gap-2">
                     <Button
                       size="icon"
@@ -272,12 +293,12 @@ export default function Extintores() {
         </CardContent>
       </Card>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Extintor</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="sm:col-span-2 lg:col-span-3">
               <Label>Cliente</Label>
               <div className="mt-2 flex gap-2">
                 <Input
@@ -310,19 +331,24 @@ export default function Extintores() {
                     numero_extintor: "Número de extintor",
                     numero_serie: "Número de serie",
                     sector: "Sector",
+                    area: "Area",
+                    patente: "Patente",
                     fecha_ultima_recarga: "Fecha última recarga",
-                    fecha_proxima_recarga: "Fecha próxima recarga",
-                    fecha_vencimiento: "Fecha vencimiento",
+                    fecha_proxima_recarga: "Próxima recarga",
+                    fecha_vencimiento: "Vencimiento",
                   }[k]}
                 </Label>
                 <Input
-                  type={k.includes("fecha")
+                  type={k.includes("fecha") && k !== "fecha_proxima_recarga" && k !== "fecha_vencimiento"
                     ? "date"
                     : k.includes("anio")
                     ? "number"
                     : "text"}
+                  inputMode={k === "fecha_proxima_recarga" || k === "fecha_vencimiento" ? "numeric" : undefined}
+                  maxLength={k === "fecha_proxima_recarga" || k === "fecha_vencimiento" ? 7 : undefined}
+                  placeholder={k === "fecha_proxima_recarga" || k === "fecha_vencimiento" ? "09/2026" : undefined}
                   value={f[k] || ""}
-                  onChange={(e) => set(k, e.target.value)}
+                  onChange={(e) => set(k, k === "fecha_proxima_recarga" || k === "fecha_vencimiento" ? normalizarMes(e.target.value) : e.target.value)}
                 />
               </div>
             ))}
@@ -359,7 +385,7 @@ export default function Extintores() {
             ))}
           </div>
           <Button
-            disabled={!f.cliente_id || !f.numero_extintor || !f.numero_serie ||
+            disabled={!f.cliente_id || !f.numero_extintor ||
               saving}
             onClick={guardar}
           >

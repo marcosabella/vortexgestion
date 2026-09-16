@@ -55,6 +55,7 @@ export interface Venta {
   total_iva: number;
   total: number;
   observaciones?: string;
+  origen_orden_trabajo?: boolean;
   cae?: string;
   cae_vencimiento?: string;
   cae_solicitado_at?: string;

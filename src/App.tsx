@@ -12,7 +12,7 @@ import { Bell, CalendarClock, LogOut } from "lucide-react";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
 import { useComercio } from "@/hooks/useComercio";
-import { Comercio } from "@/types/comercio";
+import type { Comercio } from "@/types/comercio";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ModuloSistema } from "@/config/parametrizacion";
@@ -61,6 +61,7 @@ import ListadoCaja from "./pages/listados/ListadoCaja";
 import GastosEgresos from "./pages/GastosEgresos";
 import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
 import WhatsApp from "./pages/WhatsApp";
+import TiendaOnline from "./pages/TiendaOnline";
 import { DataDeletion, PrivacyPolicy } from "./pages/Privacy";
 
 const queryClient = new QueryClient();
@@ -195,6 +196,7 @@ function AuthenticatedLayout() {
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />
               <Route path="/pedidos-online" element={<ParametrizedRoute modulo="pedidos_online"><PedidosOnline /></ParametrizedRoute>} />
               <Route path="/mercado-pago" element={<ParametrizedRoute modulo="mercado_pago"><MercadoPago /></ParametrizedRoute>} />
+              <Route path="/tienda-online" element={<ParametrizedRoute modulo="pedidos_online"><TiendaOnline /></ParametrizedRoute>} />
               <Route path="/extintores" element={<ParametrizedRoute modulo="extintores"><Extintores /></ParametrizedRoute>} />
               <Route path="/extintores/ordenes-trabajo" element={<ParametrizedRoute modulo="extintores"><OrdenesTrabajoExtintores /></ParametrizedRoute>} />
               <Route path="/ventas/nueva" element={<ParametrizedRoute modulo="ventas"><NuevaVenta /></ParametrizedRoute>} />

@@ -79,7 +79,10 @@ Deno.serve(async (req) => {
         pending: `${origin}/pago/pendiente?pedido=${pedido.id}`,
         failure: `${origin}/pago/rechazado?pedido=${pedido.id}`,
       },
-      auto_return: "approved",
+      // Mercado Pago rechaza la preferencia si considera que la URL de retorno
+      // no es apta para auto_return (por ejemplo, en una tienda local o con
+      // dominio nuevo). Las back_urls siguen informando el resultado y el
+      // webhook es quien confirma el pago de forma segura.
       notification_url: `${functionBase}/mercadopago-webhook?op=${op.id}`,
       metadata: {
         operacion_id: op.id,
@@ -97,9 +100,16 @@ Deno.serve(async (req) => {
             body: JSON.stringify(payload),
           },
         ),
+        // Algunas credenciales de produccion devuelven solamente init_point aun
+        // cuando la configuracion local conserva el ambiente de prueba. Nunca
+        // devolvamos una preferencia sin URL: eso deja una operacion pendiente
+        // pero impide que el comprador llegue a Mercado Pago.
         checkoutUrl = config.ambiente === "production"
           ? preference.init_point
-          : preference.sandbox_init_point;
+          : (preference.sandbox_init_point || preference.init_point);
+      if (!checkoutUrl) {
+        throw new Error("Mercado Pago no devolvio una URL de checkout");
+      }
       await db.from("mercadopago_operaciones").update({
         preference_id: preference.id,
         checkout_url: checkoutUrl,

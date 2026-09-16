@@ -98,6 +98,7 @@ const configuracionItems: Array<
   { title: string; url: string; icon: typeof Store; modulo?: ModuloSistema }
 > = [
   { title: "Mi Comercio", url: "/comercio", icon: Store },
+  { title: "Tienda online", url: "/tienda-online", icon: ShoppingBag, modulo: "pedidos_online" },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, modulo: "whatsapp" },
   { title: "Bancos", url: "/bancos", icon: Building2, modulo: "bancos" },
   { title: "Tarjetas", url: "/tarjetas", icon: CreditCard, modulo: "tarjetas" },

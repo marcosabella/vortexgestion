@@ -703,6 +703,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         total: totalFinal,
         cliente_id: data.cliente_id || undefined,
         observaciones: data.observaciones,
+        origen_orden_trabajo: Boolean(ordenTrabajoInicial),
       }
 
       if (esPresupuesto && venta?.id) {
