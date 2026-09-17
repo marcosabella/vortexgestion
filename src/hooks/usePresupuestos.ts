@@ -60,7 +60,11 @@ export const usePresupuestos = () => {
   });
 
   const save = async (payload: PresupuestoPayload, presupuestoId?: string) => {
-    const header = { ...payload.venta, comercio_id: selectedComercioId || undefined };
+    // `origen_orden_trabajo` es un dato propio de ventas: la tabla de
+    // presupuestos no tiene esa columna. Se excluye del encabezado para que
+    // el mismo formulario pueda utilizarse en ambos circuitos.
+    const { origen_orden_trabajo: _origenOrdenTrabajo, ...ventaHeader } = payload.venta;
+    const header = { ...ventaHeader, comercio_id: selectedComercioId || undefined };
     let id = presupuestoId;
     let createdId: string | undefined;
     if (id) {
