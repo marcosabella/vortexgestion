@@ -332,6 +332,9 @@ const CajaDiaria = () => {
 
             {caja && (
               <>
+                <p className="text-sm text-muted-foreground">
+                  Las ventas a cuenta corriente representan deuda pendiente: no son ingresos ni movimientos de caja hasta registrar su cobro real.
+                </p>
                 {cajaAbierta && ventasPreviasPendientes.length > 0 && (
                   <Card className="no-print border-amber-300 bg-amber-50 text-amber-950">
                     <CardHeader>
@@ -359,7 +362,7 @@ const CajaDiaria = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Registrar ventas previas en caja</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Se agregaran {ventasPreviasPendientes.length} comprobante{ventasPreviasPendientes.length === 1 ? "" : "s"} como venta de la caja abierta, respetando su forma de pago. Esta accion evita duplicados por comprobante.
+                              Se agregaran solo comprobantes con ingreso efectivo. Las ventas a cuenta corriente permanecen como deuda pendiente fuera de caja. Esta accion evita duplicados por comprobante.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

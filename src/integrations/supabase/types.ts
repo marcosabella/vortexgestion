@@ -10,28 +10,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      app_admins: {
-        Row: {
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       afip_config: {
         Row: {
           activo: boolean | null
@@ -81,6 +63,32 @@ export type Database = {
           punto_venta?: number
           updated_at?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "afip_config_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_admins: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
         Relationships: []
       }
       bancos: {
@@ -123,7 +131,1774 @@ export type Database = {
           tipo_cuenta?: Database["public"]["Enums"]["tipo_cuenta_bancaria"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bancos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      caja_movimientos: {
+        Row: {
+          caja_id: string
+          comercio_id: string | null
+          concepto: string
+          created_at: string
+          descripcion: string | null
+          fecha_movimiento: string
+          id: string
+          moneda: string
+          monto: number
+          tipo: string
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          caja_id: string
+          comercio_id?: string | null
+          concepto: string
+          created_at?: string
+          descripcion?: string | null
+          fecha_movimiento?: string
+          id?: string
+          moneda?: string
+          monto: number
+          tipo: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          caja_id?: string
+          comercio_id?: string | null
+          concepto?: string
+          created_at?: string
+          descripcion?: string | null
+          fecha_movimiento?: string
+          id?: string
+          moneda?: string
+          monto?: number
+          tipo?: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caja_movimientos_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas_diarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caja_movimientos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caja_movimientos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cajas_diarias: {
+        Row: {
+          abierto_at: string
+          cerrado_at: string | null
+          comercio_id: string | null
+          created_at: string
+          diferencia: number | null
+          estado: string
+          fecha: string
+          id: string
+          monto_apertura: number
+          monto_cierre_real: number | null
+          monto_cierre_sistema: number | null
+          observaciones_apertura: string | null
+          observaciones_cierre: string | null
+          updated_at: string
+        }
+        Insert: {
+          abierto_at?: string
+          cerrado_at?: string | null
+          comercio_id?: string | null
+          created_at?: string
+          diferencia?: number | null
+          estado?: string
+          fecha?: string
+          id?: string
+          monto_apertura?: number
+          monto_cierre_real?: number | null
+          monto_cierre_sistema?: number | null
+          observaciones_apertura?: string | null
+          observaciones_cierre?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abierto_at?: string
+          cerrado_at?: string | null
+          comercio_id?: string | null
+          created_at?: string
+          diferencia?: number | null
+          estado?: string
+          fecha?: string
+          id?: string
+          monto_apertura?: number
+          monto_cierre_real?: number | null
+          monto_cierre_sistema?: number | null
+          observaciones_apertura?: string | null
+          observaciones_cierre?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cajas_diarias_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_establecimientos: {
+        Row: {
+          activo: boolean
+          cliente_id: string
+          codigo_interno: string | null
+          comercio_id: string
+          contacto_nombre: string | null
+          contacto_telefono: string | null
+          created_at: string
+          direccion: string | null
+          id: string
+          latitud: number | null
+          localidad: string | null
+          longitud: number | null
+          nombre: string
+          observaciones: string | null
+          provincia: string | null
+          superficie_total_ha: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id: string
+          codigo_interno?: string | null
+          comercio_id: string
+          contacto_nombre?: string | null
+          contacto_telefono?: string | null
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          latitud?: number | null
+          localidad?: string | null
+          longitud?: number | null
+          nombre: string
+          observaciones?: string | null
+          provincia?: string | null
+          superficie_total_ha?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string
+          codigo_interno?: string | null
+          comercio_id?: string
+          contacto_nombre?: string | null
+          contacto_telefono?: string | null
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          latitud?: number | null
+          localidad?: string | null
+          longitud?: number | null
+          nombre?: string
+          observaciones?: string | null
+          provincia?: string | null
+          superficie_total_ha?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_establecimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_establecimientos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_gps_puntos: {
+        Row: {
+          client_id: string
+          comercio_id: string
+          created_at: string
+          id: string
+          latitud: number
+          longitud: number
+          precision_metros: number
+          registrado_at: string
+          secuencia: number
+          sesion_id: string
+        }
+        Insert: {
+          client_id: string
+          comercio_id: string
+          created_at?: string
+          id?: string
+          latitud: number
+          longitud: number
+          precision_metros: number
+          registrado_at: string
+          secuencia: number
+          sesion_id: string
+        }
+        Update: {
+          client_id?: string
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          latitud?: number
+          longitud?: number
+          precision_metros?: number
+          registrado_at?: string
+          secuencia?: number
+          sesion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_gps_puntos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_gps_puntos_sesion_fkey"
+            columns: ["comercio_id", "sesion_id"]
+            isOneToOne: false
+            referencedRelation: "campo_gps_sesiones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_gps_sesiones: {
+        Row: {
+          ancho_trabajo_m_snapshot: number | null
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          parte_maquinaria_id: string | null
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          ancho_trabajo_m_snapshot?: number | null
+          comercio_id: string
+          created_at?: string
+          estado?: string
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          parte_maquinaria_id?: string | null
+          pausada_at?: string | null
+          segundos_pausados?: number
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          ancho_trabajo_m_snapshot?: number | null
+          comercio_id?: string
+          created_at?: string
+          estado?: string
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string
+          operador_id?: string
+          orden_id?: string
+          parte_id?: string
+          parte_maquinaria_id?: string | null
+          pausada_at?: string | null
+          segundos_pausados?: number
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_gps_sesiones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_operador_fkey"
+            columns: ["comercio_id", "operador_id"]
+            isOneToOne: false
+            referencedRelation: "campo_operarios"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_gps_sesiones_parte_maquinaria_fkey"
+            columns: ["comercio_id", "parte_maquinaria_id"]
+            isOneToOne: false
+            referencedRelation: "campo_parte_maquinarias"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_insumos: {
+        Row: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          costo_unitario: number | null
+          created_at: string
+          created_by: string
+          id: string
+          moneda_costo: string | null
+          nombre: string
+          observaciones: string | null
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id: string
+          costo_unitario?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda_costo?: string | null
+          nombre: string
+          observaciones?: string | null
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id?: string
+          costo_unitario?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda_costo?: string | null
+          nombre?: string
+          observaciones?: string | null
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_insumos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_lotes: {
+        Row: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          establecimiento_id: string
+          id: string
+          latitud: number | null
+          longitud: number | null
+          nombre: string
+          observaciones: string | null
+          superficie_ha: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          establecimiento_id: string
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          nombre: string
+          observaciones?: string | null
+          superficie_ha: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          establecimiento_id?: string
+          id?: string
+          latitud?: number | null
+          longitud?: number | null
+          nombre?: string
+          observaciones?: string | null
+          superficie_ha?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_lotes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_lotes_establecimiento_id_fkey"
+            columns: ["establecimiento_id"]
+            isOneToOne: false
+            referencedRelation: "campo_establecimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_maquinarias: {
+        Row: {
+          activo: boolean
+          ancho_trabajo_m: number | null
+          anio: number | null
+          codigo_interno: string | null
+          comercio_id: string
+          costo_hora: number | null
+          created_at: string
+          created_by: string
+          id: string
+          identificacion: string | null
+          marca: string | null
+          modelo: string | null
+          moneda_costo: string | null
+          nombre: string
+          observaciones: string | null
+          tipo: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          ancho_trabajo_m?: number | null
+          anio?: number | null
+          codigo_interno?: string | null
+          comercio_id: string
+          costo_hora?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          identificacion?: string | null
+          marca?: string | null
+          modelo?: string | null
+          moneda_costo?: string | null
+          nombre: string
+          observaciones?: string | null
+          tipo: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          ancho_trabajo_m?: number | null
+          anio?: number | null
+          codigo_interno?: string | null
+          comercio_id?: string
+          costo_hora?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          identificacion?: string | null
+          marca?: string | null
+          modelo?: string | null
+          moneda_costo?: string | null
+          nombre?: string
+          observaciones?: string | null
+          tipo?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_maquinarias_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_operarios: {
+        Row: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          costo_hora: number | null
+          created_at: string
+          created_by: string
+          documento: string | null
+          id: string
+          moneda_costo: string | null
+          nombre: string
+          observaciones: string | null
+          telefono: string | null
+          updated_at: string
+          updated_by: string
+          user_id: string | null
+        }
+        Insert: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id: string
+          costo_hora?: number | null
+          created_at?: string
+          created_by?: string
+          documento?: string | null
+          id?: string
+          moneda_costo?: string | null
+          nombre: string
+          observaciones?: string | null
+          telefono?: string | null
+          updated_at?: string
+          updated_by?: string
+          user_id?: string | null
+        }
+        Update: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id?: string
+          costo_hora?: number | null
+          created_at?: string
+          created_by?: string
+          documento?: string | null
+          id?: string
+          moneda_costo?: string | null
+          nombre?: string
+          observaciones?: string | null
+          telefono?: string | null
+          updated_at?: string
+          updated_by?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_operarios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_orden_comprobantes: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          created_by: string
+          estado: string
+          huella_pedido: string
+          id: string
+          idempotency_key: string
+          moneda: string
+          orden_id: string
+          venta_id: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          estado?: string
+          huella_pedido: string
+          id?: string
+          idempotency_key: string
+          moneda: string
+          orden_id: string
+          venta_id: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          estado?: string
+          huella_pedido?: string
+          id?: string
+          idempotency_key?: string
+          moneda?: string
+          orden_id?: string
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_comprobantes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_comprobantes_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_orden_comprobantes_venta_fkey"
+            columns: ["comercio_id", "venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_orden_estado_historial: {
+        Row: {
+          actor_user_id: string
+          comercio_id: string
+          created_at: string
+          estado_anterior: string | null
+          estado_nuevo: string
+          id: string
+          metadata: Json
+          motivo: string | null
+          orden_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          comercio_id: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          orden_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          comercio_id?: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo?: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          orden_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_estado_historial_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_historial_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_orden_labor_lotes: {
+        Row: {
+          activo: boolean
+          cantidad_planificada: number
+          comercio_id: string
+          created_at: string
+          created_by: string
+          id: string
+          lote_id: string
+          observaciones: string | null
+          orden_labor_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad_planificada: number
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          lote_id: string
+          observaciones?: string | null
+          orden_labor_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad_planificada?: number
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          lote_id?: string
+          observaciones?: string | null
+          orden_labor_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_labor_lotes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labor_lotes_labor_fkey"
+            columns: ["comercio_id", "orden_labor_id"]
+            isOneToOne: false
+            referencedRelation: "campo_orden_labores"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labor_lotes_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "campo_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_orden_labores: {
+        Row: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          facturable: boolean
+          id: string
+          moneda_snapshot: string | null
+          nombre: string
+          orden_id: string
+          porcentaje_iva_snapshot: number | null
+          posicion: number
+          precio_origen: string | null
+          precio_unitario_snapshot: number | null
+          tarifa_id: string | null
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          facturable?: boolean
+          id?: string
+          moneda_snapshot?: string | null
+          nombre: string
+          orden_id: string
+          porcentaje_iva_snapshot?: number | null
+          posicion?: number
+          precio_origen?: string | null
+          precio_unitario_snapshot?: number | null
+          tarifa_id?: string | null
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          facturable?: boolean
+          id?: string
+          moneda_snapshot?: string | null
+          nombre?: string
+          orden_id?: string
+          porcentaje_iva_snapshot?: number | null
+          posicion?: number
+          precio_origen?: string | null
+          precio_unitario_snapshot?: number | null
+          tarifa_id?: string | null
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_orden_labores_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labores_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_orden_labores_tarifa_fkey"
+            columns: ["comercio_id", "tarifa_id"]
+            isOneToOne: false
+            referencedRelation: "campo_tarifas"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_ordenes_trabajo: {
+        Row: {
+          cancelada_at: string | null
+          cliente_id: string
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          establecimiento_id: string
+          estado: string
+          fecha_fin_planificada: string | null
+          fecha_inicio_planificada: string | null
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string | null
+          motivo_cancelacion: string | null
+          numero: number
+          observaciones: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cancelada_at?: string | null
+          cliente_id: string
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          establecimiento_id: string
+          estado?: string
+          fecha_fin_planificada?: string | null
+          fecha_inicio_planificada?: string | null
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string | null
+          motivo_cancelacion?: string | null
+          numero?: number
+          observaciones?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          cancelada_at?: string | null
+          cliente_id?: string
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          descripcion?: string | null
+          establecimiento_id?: string
+          estado?: string
+          fecha_fin_planificada?: string | null
+          fecha_inicio_planificada?: string | null
+          finalizada_at?: string | null
+          id?: string
+          iniciada_at?: string | null
+          motivo_cancelacion?: string | null
+          numero?: number
+          observaciones?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_ordenes_trabajo_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_ordenes_trabajo_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_ordenes_trabajo_establecimiento_id_fkey"
+            columns: ["establecimiento_id"]
+            isOneToOne: false
+            referencedRelation: "campo_establecimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_parte_estado_historial: {
+        Row: {
+          actor_user_id: string
+          comercio_id: string
+          created_at: string
+          estado_anterior: string | null
+          estado_nuevo: string
+          id: string
+          metadata: Json
+          motivo: string | null
+          parte_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          comercio_id: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          parte_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          comercio_id?: string
+          created_at?: string
+          estado_anterior?: string | null
+          estado_nuevo?: string
+          id?: string
+          metadata?: Json
+          motivo?: string | null
+          parte_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_estado_historial_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_historial_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_insumos: {
+        Row: {
+          activo: boolean
+          cantidad: number
+          comercio_id: string
+          costo_unitario_snapshot: number | null
+          created_at: string
+          created_by: string
+          id: string
+          insumo_id: string
+          moneda_costo_snapshot: string | null
+          observaciones: string | null
+          parte_id: string
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad: number
+          comercio_id: string
+          costo_unitario_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          insumo_id: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          parte_id: string
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad?: number
+          comercio_id?: string
+          costo_unitario_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          insumo_id?: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          parte_id?: string
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_insumos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_insumos_insumo_fkey"
+            columns: ["comercio_id", "insumo_id"]
+            isOneToOne: false
+            referencedRelation: "campo_insumos"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_parte_insumos_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_lotes: {
+        Row: {
+          activo: boolean
+          cantidad_ejecutada: number
+          comercio_id: string
+          created_at: string
+          created_by: string
+          id: string
+          observaciones: string | null
+          orden_labor_lote_id: string
+          parte_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad_ejecutada: number
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          observaciones?: string | null
+          orden_labor_lote_id: string
+          parte_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad_ejecutada?: number
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          observaciones?: string | null
+          orden_labor_lote_id?: string
+          parte_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_lotes_asignacion_fkey"
+            columns: ["comercio_id", "orden_labor_lote_id"]
+            isOneToOne: false
+            referencedRelation: "campo_orden_labor_lotes"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_parte_lotes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_lotes_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_maquinarias: {
+        Row: {
+          activo: boolean
+          comercio_id: string
+          costo_hora_snapshot: number | null
+          created_at: string
+          created_by: string
+          horas_uso: number | null
+          id: string
+          lectura_final: number | null
+          lectura_inicial: number | null
+          maquinaria_id: string
+          moneda_costo_snapshot: string | null
+          observaciones: string | null
+          parte_id: string
+          unidad_lectura: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          comercio_id: string
+          costo_hora_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          horas_uso?: number | null
+          id?: string
+          lectura_final?: number | null
+          lectura_inicial?: number | null
+          maquinaria_id: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          parte_id: string
+          unidad_lectura?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          comercio_id?: string
+          costo_hora_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          horas_uso?: number | null
+          id?: string
+          lectura_final?: number | null
+          lectura_inicial?: number | null
+          maquinaria_id?: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          parte_id?: string
+          unidad_lectura?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_maquinarias_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_maquinarias_maquinaria_fkey"
+            columns: ["comercio_id", "maquinaria_id"]
+            isOneToOne: false
+            referencedRelation: "campo_maquinarias"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_parte_maquinarias_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_operarios: {
+        Row: {
+          activo: boolean
+          comercio_id: string
+          costo_hora_snapshot: number | null
+          created_at: string
+          created_by: string
+          funcion: string | null
+          horas_trabajadas: number | null
+          id: string
+          moneda_costo_snapshot: string | null
+          observaciones: string | null
+          operario_id: string
+          parte_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          comercio_id: string
+          costo_hora_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          funcion?: string | null
+          horas_trabajadas?: number | null
+          id?: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          operario_id: string
+          parte_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          comercio_id?: string
+          costo_hora_snapshot?: number | null
+          created_at?: string
+          created_by?: string
+          funcion?: string | null
+          horas_trabajadas?: number | null
+          id?: string
+          moneda_costo_snapshot?: string | null
+          observaciones?: string | null
+          operario_id?: string
+          parte_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_operarios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_operarios_operario_fkey"
+            columns: ["comercio_id", "operario_id"]
+            isOneToOne: false
+            referencedRelation: "campo_operarios"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_parte_operarios_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_parte_otros_costos: {
+        Row: {
+          activo: boolean
+          cantidad: number
+          comercio_id: string
+          concepto: string
+          costo_unitario: number
+          created_at: string
+          created_by: string
+          id: string
+          moneda: string
+          observaciones: string | null
+          parte_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad: number
+          comercio_id: string
+          concepto: string
+          costo_unitario: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda: string
+          observaciones?: string | null
+          parte_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad?: number
+          comercio_id?: string
+          concepto?: string
+          costo_unitario?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          moneda?: string
+          observaciones?: string | null
+          parte_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_parte_otros_costos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_parte_otros_costos_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_partes_trabajo: {
+        Row: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          anulado_at?: string | null
+          anulado_by?: string | null
+          comercio_id: string
+          condiciones_climaticas?: string | null
+          confirmado_at?: string | null
+          confirmado_by?: string | null
+          created_at?: string
+          created_by?: string
+          descartado_at?: string | null
+          descartado_by?: string | null
+          descripcion?: string | null
+          enviado_at?: string | null
+          enviado_by?: string | null
+          estado?: string
+          fecha_trabajo: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          id?: string
+          motivo_anulacion?: string | null
+          motivo_descarte?: string | null
+          motivo_rechazo?: string | null
+          numero?: number
+          observaciones?: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id?: string | null
+          propietario_user_id: string
+          rechazado_at?: string | null
+          rechazado_by?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          anulado_at?: string | null
+          anulado_by?: string | null
+          comercio_id?: string
+          condiciones_climaticas?: string | null
+          confirmado_at?: string | null
+          confirmado_by?: string | null
+          created_at?: string
+          created_by?: string
+          descartado_at?: string | null
+          descartado_by?: string | null
+          descripcion?: string | null
+          enviado_at?: string | null
+          enviado_by?: string | null
+          estado?: string
+          fecha_trabajo?: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          id?: string
+          motivo_anulacion?: string | null
+          motivo_descarte?: string | null
+          motivo_rechazo?: string | null
+          numero?: number
+          observaciones?: string | null
+          orden_id?: string
+          orden_labor_id?: string
+          propietario_operario_id?: string | null
+          propietario_user_id?: string
+          rechazado_at?: string | null
+          rechazado_by?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_partes_labor_fkey"
+            columns: ["comercio_id", "orden_labor_id"]
+            isOneToOne: false
+            referencedRelation: "campo_orden_labores"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_partes_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_partes_propietario_operario_fkey"
+            columns: ["comercio_id", "propietario_operario_id"]
+            isOneToOne: false
+            referencedRelation: "campo_operarios"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_partes_trabajo_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_tarifas: {
+        Row: {
+          activo: boolean
+          cliente_id: string | null
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          establecimiento_id: string | null
+          id: string
+          moneda: string
+          nivel: string
+          nombre: string
+          observaciones: string | null
+          porcentaje_iva: number
+          precio_unitario: number
+          unidad: string
+          updated_at: string
+          updated_by: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id?: string | null
+          codigo_interno?: string | null
+          comercio_id: string
+          created_at?: string
+          created_by?: string
+          establecimiento_id?: string | null
+          id?: string
+          moneda?: string
+          nivel: string
+          nombre: string
+          observaciones?: string | null
+          porcentaje_iva?: number
+          precio_unitario: number
+          unidad: string
+          updated_at?: string
+          updated_by?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string | null
+          codigo_interno?: string | null
+          comercio_id?: string
+          created_at?: string
+          created_by?: string
+          establecimiento_id?: string | null
+          id?: string
+          moneda?: string
+          nivel?: string
+          nombre?: string
+          observaciones?: string | null
+          porcentaje_iva?: number
+          precio_unitario?: number
+          unidad?: string
+          updated_at?: string
+          updated_by?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_tarifas_cliente_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_tarifas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_tarifas_establecimiento_fkey"
+            columns: ["establecimiento_id"]
+            isOneToOne: false
+            referencedRelation: "campo_establecimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campo_telemetria_importaciones: {
+        Row: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancelada_at?: string | null
+          cantidad_descartadas?: number
+          cantidad_muestras?: number
+          cantidad_validas?: number
+          comercio_id: string
+          created_at?: string
+          estado?: string
+          fin_at?: string | null
+          finalizada_at?: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo?: string | null
+          imported_by: string
+          inicio_at?: string | null
+          maquinaria_id: string
+          nombre_archivo?: string | null
+          orden_id?: string | null
+          origen: string
+          parte_id?: string | null
+          proveedor?: string | null
+          sesion_gps_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancelada_at?: string | null
+          cantidad_descartadas?: number
+          cantidad_muestras?: number
+          cantidad_validas?: number
+          comercio_id?: string
+          created_at?: string
+          estado?: string
+          fin_at?: string | null
+          finalizada_at?: string | null
+          formato?: string
+          hash_sha256?: string
+          id?: string
+          identificador_externo?: string | null
+          imported_by?: string
+          inicio_at?: string | null
+          maquinaria_id?: string
+          nombre_archivo?: string | null
+          orden_id?: string | null
+          origen?: string
+          parte_id?: string | null
+          proveedor?: string | null
+          sesion_gps_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_telemetria_importaciones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_maquinaria_fkey"
+            columns: ["comercio_id", "maquinaria_id"]
+            isOneToOne: false
+            referencedRelation: "campo_maquinarias"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_orden_fkey"
+            columns: ["comercio_id", "orden_id"]
+            isOneToOne: false
+            referencedRelation: "campo_ordenes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_parte_fkey"
+            columns: ["comercio_id", "parte_id"]
+            isOneToOne: false
+            referencedRelation: "campo_partes_trabajo"
+            referencedColumns: ["comercio_id", "id"]
+          },
+          {
+            foreignKeyName: "campo_telemetria_importaciones_sesion_fkey"
+            columns: ["comercio_id", "sesion_gps_id"]
+            isOneToOne: false
+            referencedRelation: "campo_gps_sesiones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
+      }
+      campo_telemetria_muestras: {
+        Row: {
+          altitud_m: number | null
+          combustible_litros: number | null
+          comercio_id: string
+          created_at: string
+          datos_adicionales: Json
+          distancia_acumulada_km: number | null
+          horas_motor: number | null
+          id: string
+          identificador_externo: string | null
+          importacion_id: string
+          latitud: number | null
+          longitud: number | null
+          motor_encendido: boolean | null
+          precision_m: number | null
+          rumbo_grados: number | null
+          secuencia: number
+          superficie_acumulada_ha: number | null
+          timestamp_at: string
+          trabajando: boolean | null
+          velocidad_kmh: number | null
+        }
+        Insert: {
+          altitud_m?: number | null
+          combustible_litros?: number | null
+          comercio_id: string
+          created_at?: string
+          datos_adicionales?: Json
+          distancia_acumulada_km?: number | null
+          horas_motor?: number | null
+          id?: string
+          identificador_externo?: string | null
+          importacion_id: string
+          latitud?: number | null
+          longitud?: number | null
+          motor_encendido?: boolean | null
+          precision_m?: number | null
+          rumbo_grados?: number | null
+          secuencia: number
+          superficie_acumulada_ha?: number | null
+          timestamp_at: string
+          trabajando?: boolean | null
+          velocidad_kmh?: number | null
+        }
+        Update: {
+          altitud_m?: number | null
+          combustible_litros?: number | null
+          comercio_id?: string
+          created_at?: string
+          datos_adicionales?: Json
+          distancia_acumulada_km?: number | null
+          horas_motor?: number | null
+          id?: string
+          identificador_externo?: string | null
+          importacion_id?: string
+          latitud?: number | null
+          longitud?: number | null
+          motor_encendido?: boolean | null
+          precision_m?: number | null
+          rumbo_grados?: number | null
+          secuencia?: number
+          superficie_acumulada_ha?: number | null
+          timestamp_at?: string
+          trabajando?: boolean | null
+          velocidad_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campo_telemetria_muestras_importacion_fkey"
+            columns: ["comercio_id", "importacion_id"]
+            isOneToOne: false
+            referencedRelation: "campo_telemetria_importaciones"
+            referencedColumns: ["comercio_id", "id"]
+          },
+        ]
       }
       cheques: {
         Row: {
@@ -182,6 +1957,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "cheques_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_cheques_cliente"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -200,6 +1982,89 @@ export type Database = {
             columns: ["venta_id"]
             isOneToOne: false
             referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_usuarios: {
+        Row: {
+          cliente_id: string
+          comercio_id: string
+          created_at: string
+          id: string
+          metodo: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id: string
+          comercio_id: string
+          created_at?: string
+          id?: string
+          metodo: string
+          user_id: string
+        }
+        Update: {
+          cliente_id?: string
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          metodo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_usuarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_usuarios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_vinculaciones_pendientes: {
+        Row: {
+          coincidencias: number
+          comercio_id: string
+          created_at: string
+          email: string
+          id: string
+          motivo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          coincidencias?: number
+          comercio_id: string
+          created_at?: string
+          email: string
+          id?: string
+          motivo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          coincidencias?: number
+          comercio_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          motivo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_vinculaciones_pendientes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
             referencedColumns: ["id"]
           },
         ]
@@ -262,7 +2127,15 @@ export type Database = {
           tipo_persona?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       comercio: {
         Row: {
@@ -321,6 +2194,38 @@ export type Database = {
         }
         Relationships: []
       }
+      comercio_parametrizacion: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          id: string
+          parametros: Json
+          updated_at: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          id?: string
+          parametros?: Json
+          updated_at?: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          parametros?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comercio_parametrizacion_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: true
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comercio_usuarios: {
         Row: {
           activo: boolean
@@ -352,6 +2257,870 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "comercio_usuarios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cuenta_corriente: {
+        Row: {
+          cliente_id: string
+          comercio_id: string | null
+          concepto: string
+          created_at: string
+          cuotas: number | null
+          fecha_movimiento: string
+          id: string
+          moneda: string
+          monto: number
+          observaciones: string | null
+          tarjeta_id: string | null
+          tipo_movimiento: string
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          cliente_id: string
+          comercio_id?: string | null
+          concepto: string
+          created_at?: string
+          cuotas?: number | null
+          fecha_movimiento?: string
+          id?: string
+          moneda?: string
+          monto?: number
+          observaciones?: string | null
+          tarjeta_id?: string | null
+          tipo_movimiento: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          comercio_id?: string | null
+          concepto?: string
+          created_at?: string
+          cuotas?: number | null
+          fecha_movimiento?: string
+          id?: string
+          moneda?: string
+          monto?: number
+          observaciones?: string | null
+          tarjeta_id?: string | null
+          tipo_movimiento?: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_corriente_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuenta_corriente_tarjeta_id_fkey"
+            columns: ["tarjeta_id"]
+            isOneToOne: false
+            referencedRelation: "tarjetas_credito"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cuenta_corriente_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cuenta_corriente_venta"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historial_legacy: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          datos: Json
+          fecha: string | null
+          id: string
+          migracion_id: string
+          source_id: string
+          tipo: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          datos: Json
+          fecha?: string | null
+          id?: string
+          migracion_id: string
+          source_id: string
+          tipo: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          datos?: Json
+          fecha?: string | null
+          id?: string
+          migracion_id?: string
+          source_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_legacy_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_legacy_migracion_id_fkey"
+            columns: ["migracion_id"]
+            isOneToOne: false
+            referencedRelation: "migraciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marcas: {
+        Row: {
+          comercio_id: string | null
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          comercio_id?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          comercio_id?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marcas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_cajas: {
+        Row: {
+          activa: boolean
+          comercio_id: string
+          created_at: string
+          external_pos_id: string
+          id: string
+          mp_pos_id: string | null
+          nombre: string
+          qr_data: string | null
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          comercio_id: string
+          created_at?: string
+          external_pos_id: string
+          id?: string
+          mp_pos_id?: string | null
+          nombre: string
+          qr_data?: string | null
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          comercio_id?: string
+          created_at?: string
+          external_pos_id?: string
+          id?: string
+          mp_pos_id?: string | null
+          nombre?: string
+          qr_data?: string | null
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_cajas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_cajas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "mercadopago_sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_configuraciones: {
+        Row: {
+          ambiente: string
+          checkout_habilitado: boolean
+          comercio_id: string
+          confirmar_pedido_automaticamente: boolean
+          connected: boolean
+          convertir_pedido_en_venta: boolean
+          created_at: string
+          cuenta_email: string | null
+          last_error: string | null
+          minutos_reserva: number
+          modo_qr: string
+          mp_user_id: string | null
+          qr_habilitado: boolean
+          registrar_en_caja: boolean
+          reservar_stock: boolean
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          ambiente?: string
+          checkout_habilitado?: boolean
+          comercio_id: string
+          confirmar_pedido_automaticamente?: boolean
+          connected?: boolean
+          convertir_pedido_en_venta?: boolean
+          created_at?: string
+          cuenta_email?: string | null
+          last_error?: string | null
+          minutos_reserva?: number
+          modo_qr?: string
+          mp_user_id?: string | null
+          qr_habilitado?: boolean
+          registrar_en_caja?: boolean
+          reservar_stock?: boolean
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ambiente?: string
+          checkout_habilitado?: boolean
+          comercio_id?: string
+          confirmar_pedido_automaticamente?: boolean
+          connected?: boolean
+          convertir_pedido_en_venta?: boolean
+          created_at?: string
+          cuenta_email?: string | null
+          last_error?: string | null
+          minutos_reserva?: number
+          modo_qr?: string
+          mp_user_id?: string | null
+          qr_habilitado?: boolean
+          registrar_en_caja?: boolean
+          reservar_stock?: boolean
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_configuraciones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: true
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_credenciales: {
+        Row: {
+          access_token: string
+          comercio_id: string
+          created_at: string
+          expires_at: string | null
+          mp_user_id: string
+          public_key: string | null
+          refresh_token: string | null
+          scopes: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          comercio_id: string
+          created_at?: string
+          expires_at?: string | null
+          mp_user_id: string
+          public_key?: string | null
+          refresh_token?: string | null
+          scopes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          comercio_id?: string
+          created_at?: string
+          expires_at?: string | null
+          mp_user_id?: string
+          public_key?: string | null
+          refresh_token?: string | null
+          scopes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_credenciales_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: true
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_oauth_estados: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          expires_at: string
+          redirect_to: string | null
+          state_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          expires_at: string
+          redirect_to?: string | null
+          state_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          expires_at?: string
+          redirect_to?: string | null
+          state_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_oauth_estados_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_operaciones: {
+        Row: {
+          ambiente: string
+          approved_at: string | null
+          caja_mp_id: string | null
+          checkout_url: string | null
+          comercio_id: string
+          created_at: string
+          cuotas: number | null
+          estado: string
+          estado_detalle: string | null
+          expires_at: string | null
+          external_reference: string
+          id: string
+          idempotency_key: string
+          importe: number
+          importe_reembolsado: number
+          medio_pago: string | null
+          modalidad: string
+          moneda: string
+          order_id: string | null
+          origen: string
+          pago_venta_id: string | null
+          payment_id: string | null
+          pedido_online_id: string | null
+          preference_id: string | null
+          qr_data: string | null
+          raw_response: Json
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          ambiente: string
+          approved_at?: string | null
+          caja_mp_id?: string | null
+          checkout_url?: string | null
+          comercio_id: string
+          created_at?: string
+          cuotas?: number | null
+          estado?: string
+          estado_detalle?: string | null
+          expires_at?: string | null
+          external_reference: string
+          id?: string
+          idempotency_key?: string
+          importe: number
+          importe_reembolsado?: number
+          medio_pago?: string | null
+          modalidad: string
+          moneda?: string
+          order_id?: string | null
+          origen: string
+          pago_venta_id?: string | null
+          payment_id?: string | null
+          pedido_online_id?: string | null
+          preference_id?: string | null
+          qr_data?: string | null
+          raw_response?: Json
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          ambiente?: string
+          approved_at?: string | null
+          caja_mp_id?: string | null
+          checkout_url?: string | null
+          comercio_id?: string
+          created_at?: string
+          cuotas?: number | null
+          estado?: string
+          estado_detalle?: string | null
+          expires_at?: string | null
+          external_reference?: string
+          id?: string
+          idempotency_key?: string
+          importe?: number
+          importe_reembolsado?: number
+          medio_pago?: string | null
+          modalidad?: string
+          moneda?: string
+          order_id?: string | null
+          origen?: string
+          pago_venta_id?: string | null
+          payment_id?: string | null
+          pedido_online_id?: string | null
+          preference_id?: string | null
+          qr_data?: string | null
+          raw_response?: Json
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_operaciones_caja_mp_id_fkey"
+            columns: ["caja_mp_id"]
+            isOneToOne: false
+            referencedRelation: "mercadopago_cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_operaciones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_operaciones_pago_venta_id_fkey"
+            columns: ["pago_venta_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_venta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_operaciones_pedido_online_id_fkey"
+            columns: ["pedido_online_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_online"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_operaciones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_sucursales: {
+        Row: {
+          activa: boolean
+          comercio_id: string
+          created_at: string
+          direccion: Json
+          external_store_id: string
+          id: string
+          mp_store_id: string | null
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          comercio_id: string
+          created_at?: string
+          direccion?: Json
+          external_store_id: string
+          id?: string
+          mp_store_id?: string | null
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          comercio_id?: string
+          created_at?: string
+          direccion?: Json
+          external_store_id?: string
+          id?: string
+          mp_store_id?: string | null
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_sucursales_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadopago_webhook_eventos: {
+        Row: {
+          comercio_id: string | null
+          created_at: string
+          error: string | null
+          evento_externo_id: string | null
+          firma_valida: boolean
+          id: string
+          intentos: number
+          payload: Json
+          procesado_at: string | null
+          recurso_id: string | null
+          topic: string | null
+        }
+        Insert: {
+          comercio_id?: string | null
+          created_at?: string
+          error?: string | null
+          evento_externo_id?: string | null
+          firma_valida?: boolean
+          id?: string
+          intentos?: number
+          payload?: Json
+          procesado_at?: string | null
+          recurso_id?: string | null
+          topic?: string | null
+        }
+        Update: {
+          comercio_id?: string | null
+          created_at?: string
+          error?: string | null
+          evento_externo_id?: string | null
+          firma_valida?: boolean
+          id?: string
+          intentos?: number
+          payload?: Json
+          procesado_at?: string | null
+          recurso_id?: string | null
+          topic?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_webhook_eventos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      migracion_id_map: {
+        Row: {
+          accion: string
+          comercio_id: string
+          created_at: string
+          entidad: string
+          id: string
+          id_destino: string
+          id_origen: string
+          migracion_id: string
+        }
+        Insert: {
+          accion?: string
+          comercio_id: string
+          created_at?: string
+          entidad: string
+          id?: string
+          id_destino: string
+          id_origen: string
+          migracion_id: string
+        }
+        Update: {
+          accion?: string
+          comercio_id?: string
+          created_at?: string
+          entidad?: string
+          id?: string
+          id_destino?: string
+          id_origen?: string
+          migracion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "migracion_id_map_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "migracion_id_map_migracion_id_fkey"
+            columns: ["migracion_id"]
+            isOneToOne: false
+            referencedRelation: "migraciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      migracion_modulos: {
+        Row: {
+          actualizados: number
+          created_at: string
+          dependencias: string[]
+          diagnostico: Json
+          errores: number
+          estado: Database["public"]["Enums"]["migracion_modulo_estado"]
+          id: string
+          insertados: number
+          migracion_id: string
+          modulo: string
+          omitidos: number
+          registros_origen: number
+          registros_validos: number
+          tabla_destino: string | null
+          tabla_origen: string
+          updated_at: string
+        }
+        Insert: {
+          actualizados?: number
+          created_at?: string
+          dependencias?: string[]
+          diagnostico?: Json
+          errores?: number
+          estado?: Database["public"]["Enums"]["migracion_modulo_estado"]
+          id?: string
+          insertados?: number
+          migracion_id: string
+          modulo: string
+          omitidos?: number
+          registros_origen?: number
+          registros_validos?: number
+          tabla_destino?: string | null
+          tabla_origen: string
+          updated_at?: string
+        }
+        Update: {
+          actualizados?: number
+          created_at?: string
+          dependencias?: string[]
+          diagnostico?: Json
+          errores?: number
+          estado?: Database["public"]["Enums"]["migracion_modulo_estado"]
+          id?: string
+          insertados?: number
+          migracion_id?: string
+          modulo?: string
+          omitidos?: number
+          registros_origen?: number
+          registros_validos?: number
+          tabla_destino?: string | null
+          tabla_origen?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "migracion_modulos_migracion_id_fkey"
+            columns: ["migracion_id"]
+            isOneToOne: false
+            referencedRelation: "migraciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      migracion_staging_maestros: {
+        Row: {
+          accion: string | null
+          comercio_id: string
+          created_at: string
+          datos: Json
+          destino_id: string | null
+          errores: string[]
+          estado: string
+          id: number
+          migracion_id: string
+          modulo: string
+          source_id: string
+        }
+        Insert: {
+          accion?: string | null
+          comercio_id: string
+          created_at?: string
+          datos: Json
+          destino_id?: string | null
+          errores?: string[]
+          estado?: string
+          id?: never
+          migracion_id: string
+          modulo: string
+          source_id: string
+        }
+        Update: {
+          accion?: string | null
+          comercio_id?: string
+          created_at?: string
+          datos?: Json
+          destino_id?: string | null
+          errores?: string[]
+          estado?: string
+          id?: never
+          migracion_id?: string
+          modulo?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "migracion_staging_maestros_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "migracion_staging_maestros_migracion_id_fkey"
+            columns: ["migracion_id"]
+            isOneToOne: false
+            referencedRelation: "migraciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      migracion_staging_operaciones: {
+        Row: {
+          comercio_id: string
+          datos: Json
+          destino_id: string | null
+          errores: string[]
+          estado: string
+          id: string
+          migracion_id: string
+          modulo: string
+          source_id: string
+        }
+        Insert: {
+          comercio_id: string
+          datos: Json
+          destino_id?: string | null
+          errores?: string[]
+          estado?: string
+          id?: string
+          migracion_id: string
+          modulo: string
+          source_id: string
+        }
+        Update: {
+          comercio_id?: string
+          datos?: Json
+          destino_id?: string | null
+          errores?: string[]
+          estado?: string
+          id?: string
+          migracion_id?: string
+          modulo?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "migracion_staging_operaciones_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "migracion_staging_operaciones_migracion_id_fkey"
+            columns: ["migracion_id"]
+            isOneToOne: false
+            referencedRelation: "migraciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      migraciones: {
+        Row: {
+          archivo_hash: string | null
+          archivo_nombre: string
+          archivo_tamano: number | null
+          comercio_id: string
+          creado_por: string
+          created_at: string
+          estado: Database["public"]["Enums"]["migracion_estado"]
+          expires_at: string | null
+          id: string
+          resumen: Json
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          archivo_hash?: string | null
+          archivo_nombre: string
+          archivo_tamano?: number | null
+          comercio_id: string
+          creado_por?: string
+          created_at?: string
+          estado?: Database["public"]["Enums"]["migracion_estado"]
+          expires_at?: string | null
+          id?: string
+          resumen?: Json
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archivo_hash?: string | null
+          archivo_nombre?: string
+          archivo_tamano?: number | null
+          comercio_id?: string
+          creado_por?: string
+          created_at?: string
+          estado?: Database["public"]["Enums"]["migracion_estado"]
+          expires_at?: string | null
+          id?: string
+          resumen?: Json
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "migraciones_comercio_id_fkey"
             columns: ["comercio_id"]
             isOneToOne: false
             referencedRelation: "comercio"
@@ -485,103 +3254,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cuenta_corriente: {
-        Row: {
-          cliente_id: string
-          comercio_id: string | null
-          concepto: string
-          created_at: string
-          cuotas: number | null
-          fecha_movimiento: string
-          id: string
-          monto: number
-          observaciones: string | null
-          tarjeta_id: string | null
-          tipo_movimiento: string
-          updated_at: string
-          venta_id: string | null
-        }
-        Insert: {
-          cliente_id: string
-          comercio_id?: string | null
-          concepto: string
-          created_at?: string
-          cuotas?: number | null
-          fecha_movimiento?: string
-          id?: string
-          monto?: number
-          observaciones?: string | null
-          tarjeta_id?: string | null
-          tipo_movimiento: string
-          updated_at?: string
-          venta_id?: string | null
-        }
-        Update: {
-          cliente_id?: string
-          comercio_id?: string | null
-          concepto?: string
-          created_at?: string
-          cuotas?: number | null
-          fecha_movimiento?: string
-          id?: string
-          monto?: number
-          observaciones?: string | null
-          tarjeta_id?: string | null
-          tipo_movimiento?: string
-          updated_at?: string
-          venta_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cuenta_corriente_tarjeta_id_fkey"
-            columns: ["tarjeta_id"]
-            isOneToOne: false
-            referencedRelation: "tarjetas_credito"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_cuenta_corriente_cliente"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_cuenta_corriente_venta"
-            columns: ["venta_id"]
-            isOneToOne: false
-            referencedRelation: "ventas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marcas: {
-        Row: {
-          comercio_id: string | null
-          created_at: string
-          descripcion: string | null
-          id: string
-          nombre: string
-          updated_at: string
-        }
-        Insert: {
-          comercio_id?: string | null
-          created_at?: string
-          descripcion?: string | null
-          id?: string
-          nombre: string
-          updated_at?: string
-        }
-        Update: {
-          comercio_id?: string | null
-          created_at?: string
-          descripcion?: string | null
-          id?: string
-          nombre?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       pagos_venta: {
         Row: {
           banco_id: string | null
@@ -593,6 +3265,8 @@ export type Database = {
           estado_conciliacion: string
           fecha_acreditacion: string | null
           id: string
+          mercadopago_operacion_id: string | null
+          moneda: string
           monto: number
           monto_comision_estimado: number
           monto_comision_real: number | null
@@ -617,6 +3291,8 @@ export type Database = {
           estado_conciliacion?: string
           fecha_acreditacion?: string | null
           id?: string
+          mercadopago_operacion_id?: string | null
+          moneda?: string
           monto?: number
           monto_comision_estimado?: number
           monto_comision_real?: number | null
@@ -641,6 +3317,8 @@ export type Database = {
           estado_conciliacion?: string
           fecha_acreditacion?: string | null
           id?: string
+          mercadopago_operacion_id?: string | null
+          moneda?: string
           monto?: number
           monto_comision_estimado?: number
           monto_comision_real?: number | null
@@ -684,6 +3362,470 @@ export type Database = {
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pagos_venta_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_venta_mercadopago_operacion_id_fkey"
+            columns: ["mercadopago_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "mercadopago_operaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_online_items: {
+        Row: {
+          cantidad: number
+          descripcion: string
+          id: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          subtotal: number
+        }
+        Insert: {
+          cantidad: number
+          descripcion: string
+          id?: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          subtotal: number
+        }
+        Update: {
+          cantidad?: number
+          descripcion?: string
+          id?: string
+          pedido_id?: string
+          precio_unitario?: number
+          producto_id?: string
+          subtotal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_online_items_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_online"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_online_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_online_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_online: {
+        Row: {
+          cliente_direccion: string
+          cliente_email: string
+          cliente_id: string | null
+          cliente_nombre: string
+          cliente_telefono: string
+          cliente_user_id: string
+          comercio_id: string
+          created_at: string
+          estado: string
+          estado_pago: string
+          id: string
+          importe_pagado: number
+          numero: number
+          observaciones: string | null
+          total: number
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          cliente_direccion: string
+          cliente_email: string
+          cliente_id?: string | null
+          cliente_nombre: string
+          cliente_telefono: string
+          cliente_user_id: string
+          comercio_id: string
+          created_at?: string
+          estado?: string
+          estado_pago?: string
+          id?: string
+          importe_pagado?: number
+          numero?: never
+          observaciones?: string | null
+          total: number
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          cliente_direccion?: string
+          cliente_email?: string
+          cliente_id?: string | null
+          cliente_nombre?: string
+          cliente_telefono?: string
+          cliente_user_id?: string
+          comercio_id?: string
+          created_at?: string
+          estado?: string
+          estado_pago?: string
+          id?: string
+          importe_pagado?: number
+          numero?: never
+          observaciones?: string | null
+          total?: number
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_online_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_online_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_online_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presupuesto_items: {
+        Row: {
+          cantidad: number
+          codigo_manual: string | null
+          comercio_id: string
+          created_at: string
+          descripcion_manual: string | null
+          id: string
+          monto_descuento: number
+          monto_iva: number
+          monto_recargo: number
+          porcentaje_descuento: number
+          porcentaje_iva: number
+          porcentaje_recargo: number
+          precio_unitario: number
+          presupuesto_id: string
+          producto_id: string | null
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          cantidad?: number
+          codigo_manual?: string | null
+          comercio_id: string
+          created_at?: string
+          descripcion_manual?: string | null
+          id?: string
+          monto_descuento?: number
+          monto_iva?: number
+          monto_recargo?: number
+          porcentaje_descuento?: number
+          porcentaje_iva?: number
+          porcentaje_recargo?: number
+          precio_unitario: number
+          presupuesto_id: string
+          producto_id?: string | null
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          codigo_manual?: string | null
+          comercio_id?: string
+          created_at?: string
+          descripcion_manual?: string | null
+          id?: string
+          monto_descuento?: number
+          monto_iva?: number
+          monto_recargo?: number
+          porcentaje_descuento?: number
+          porcentaje_iva?: number
+          porcentaje_recargo?: number
+          precio_unitario?: number
+          presupuesto_id?: string
+          producto_id?: string | null
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_items_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_items_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presupuesto_pagos: {
+        Row: {
+          banco_id: string | null
+          cheque_id: string | null
+          comercio_id: string
+          created_at: string
+          cuotas: number | null
+          id: string
+          monto: number
+          presupuesto_id: string
+          recargo_cuotas: number | null
+          tarjeta_id: string | null
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          updated_at: string
+        }
+        Insert: {
+          banco_id?: string | null
+          cheque_id?: string | null
+          comercio_id: string
+          created_at?: string
+          cuotas?: number | null
+          id?: string
+          monto?: number
+          presupuesto_id: string
+          recargo_cuotas?: number | null
+          tarjeta_id?: string | null
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          updated_at?: string
+        }
+        Update: {
+          banco_id?: string | null
+          cheque_id?: string | null
+          comercio_id?: string
+          created_at?: string
+          cuotas?: number | null
+          id?: string
+          monto?: number
+          presupuesto_id?: string
+          recargo_cuotas?: number | null
+          tarjeta_id?: string | null
+          tipo_pago?: Database["public"]["Enums"]["tipo_pago"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_pagos_banco_id_fkey"
+            columns: ["banco_id"]
+            isOneToOne: false
+            referencedRelation: "bancos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_pagos_cheque_id_fkey"
+            columns: ["cheque_id"]
+            isOneToOne: false
+            referencedRelation: "cheques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_pagos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_pagos_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_pagos_tarjeta_id_fkey"
+            columns: ["tarjeta_id"]
+            isOneToOne: false
+            referencedRelation: "tarjetas_credito"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presupuestos: {
+        Row: {
+          cliente_id: string | null
+          cliente_nombre: string | null
+          comercio_id: string
+          confirmado_at: string | null
+          created_at: string
+          estado: string
+          fecha_venta: string
+          id: string
+          monto_descuento: number
+          monto_recargo: number
+          numero_comprobante: string
+          observaciones: string | null
+          porcentaje_descuento: number
+          porcentaje_recargo: number
+          subtotal: number
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          total: number
+          total_iva: number
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nombre?: string | null
+          comercio_id: string
+          confirmado_at?: string | null
+          created_at?: string
+          estado?: string
+          fecha_venta?: string
+          id?: string
+          monto_descuento?: number
+          monto_recargo?: number
+          numero_comprobante: string
+          observaciones?: string | null
+          porcentaje_descuento?: number
+          porcentaje_recargo?: number
+          subtotal?: number
+          tipo_comprobante?: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago?: Database["public"]["Enums"]["tipo_pago"]
+          total?: number
+          total_iva?: number
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nombre?: string | null
+          comercio_id?: string
+          confirmado_at?: string | null
+          created_at?: string
+          estado?: string
+          fecha_venta?: string
+          id?: string
+          monto_descuento?: number
+          monto_recargo?: number
+          numero_comprobante?: string
+          observaciones?: string | null
+          porcentaje_descuento?: number
+          porcentaje_recargo?: number
+          subtotal?: number
+          tipo_comprobante?: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago?: Database["public"]["Enums"]["tipo_pago"]
+          total?: number
+          total_iva?: number
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuestos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      producto_imagenes: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          id: string
+          orden: number
+          producto_id: string
+          storage_path: string
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          id?: string
+          orden: number
+          producto_id: string
+          storage_path: string
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          id?: string
+          orden?: number
+          producto_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producto_imagenes_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_imagenes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_imagenes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_productos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       productos: {
@@ -694,6 +3836,7 @@ export type Database = {
           created_at: string
           descripcion: string
           descripcion_tienda_html: string | null
+          destacado_en_tienda: boolean
           id: string
           marca_id: string | null
           observaciones: string | null
@@ -709,7 +3852,6 @@ export type Database = {
           tipo_moneda: Database["public"]["Enums"]["tipo_moneda"]
           updated_at: string
           visible_en_tienda: boolean
-          destacado_en_tienda: boolean
         }
         Insert: {
           cod_barras?: string | null
@@ -718,6 +3860,7 @@ export type Database = {
           created_at?: string
           descripcion: string
           descripcion_tienda_html?: string | null
+          destacado_en_tienda?: boolean
           id?: string
           marca_id?: string | null
           observaciones?: string | null
@@ -733,7 +3876,6 @@ export type Database = {
           tipo_moneda?: Database["public"]["Enums"]["tipo_moneda"]
           updated_at?: string
           visible_en_tienda?: boolean
-          destacado_en_tienda?: boolean
         }
         Update: {
           cod_barras?: string | null
@@ -742,6 +3884,7 @@ export type Database = {
           created_at?: string
           descripcion?: string
           descripcion_tienda_html?: string | null
+          destacado_en_tienda?: boolean
           id?: string
           marca_id?: string | null
           observaciones?: string | null
@@ -757,9 +3900,15 @@ export type Database = {
           tipo_moneda?: Database["public"]["Enums"]["tipo_moneda"]
           updated_at?: string
           visible_en_tienda?: boolean
-          destacado_en_tienda?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "productos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "productos_marca_id_fkey"
             columns: ["marca_id"]
@@ -851,7 +4000,15 @@ export type Database = {
           tipo_persona?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "proveedores_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rubros: {
         Row: {
@@ -878,7 +4035,15 @@ export type Database = {
           nombre?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rubros_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subrubros: {
         Row: {
@@ -909,6 +4074,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subrubros_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subrubros_rubro_id_fkey"
             columns: ["rubro_id"]
@@ -951,6 +4123,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "tarjeta_cuotas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tarjeta_cuotas_tarjeta_id_fkey"
             columns: ["tarjeta_id"]
             isOneToOne: false
@@ -990,21 +4169,63 @@ export type Database = {
           porcentaje_comision?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tarjetas_credito_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_favoritos: {
+        Row: {
+          created_at: string
+          producto_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          producto_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          producto_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_favoritos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_favoritos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_productos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venta_items: {
         Row: {
+          afecta_stock: boolean
           cantidad: number
           codigo_manual: string | null
           comercio_id: string | null
           created_at: string
           descripcion_manual: string | null
           id: string
-          monto_iva: number
           monto_descuento: number
+          monto_iva: number
           monto_recargo: number
-          porcentaje_iva: number
           porcentaje_descuento: number
+          porcentaje_iva: number
           porcentaje_recargo: number
           precio_unitario: number
           producto_id: string | null
@@ -1014,17 +4235,18 @@ export type Database = {
           venta_id: string
         }
         Insert: {
+          afecta_stock?: boolean
           cantidad?: number
           codigo_manual?: string | null
           comercio_id?: string | null
           created_at?: string
           descripcion_manual?: string | null
           id?: string
-          monto_iva?: number
           monto_descuento?: number
+          monto_iva?: number
           monto_recargo?: number
-          porcentaje_iva?: number
           porcentaje_descuento?: number
+          porcentaje_iva?: number
           porcentaje_recargo?: number
           precio_unitario: number
           producto_id?: string | null
@@ -1034,17 +4256,18 @@ export type Database = {
           venta_id: string
         }
         Update: {
+          afecta_stock?: boolean
           cantidad?: number
           codigo_manual?: string | null
           comercio_id?: string | null
           created_at?: string
           descripcion_manual?: string | null
           id?: string
-          monto_iva?: number
           monto_descuento?: number
+          monto_iva?: number
           monto_recargo?: number
-          porcentaje_iva?: number
           porcentaje_descuento?: number
+          porcentaje_iva?: number
           porcentaje_recargo?: number
           precio_unitario?: number
           producto_id?: string | null
@@ -1055,10 +4278,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "venta_items_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "venta_items_producto_id_fkey"
             columns: ["producto_id"]
             isOneToOne: false
             referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_productos"
             referencedColumns: ["id"]
           },
           {
@@ -1084,12 +4321,17 @@ export type Database = {
           cuotas: number | null
           fecha_venta: string
           id: string
-          numero_comprobante: string
-          observaciones: string | null
+          idempotency_key: string | null
+          idempotency_payload: Json | null
+          moneda: string
           monto_descuento: number
           monto_recargo: number
+          numero_comprobante: string
+          numero_secuencial: number | null
+          observaciones: string | null
           porcentaje_descuento: number
           porcentaje_recargo: number
+          punto_venta: number | null
           recargo_cuotas: number | null
           subtotal: number
           tarjeta_id: string | null
@@ -1112,12 +4354,17 @@ export type Database = {
           cuotas?: number | null
           fecha_venta?: string
           id?: string
-          numero_comprobante: string
-          observaciones?: string | null
+          idempotency_key?: string | null
+          idempotency_payload?: Json | null
+          moneda?: string
           monto_descuento?: number
           monto_recargo?: number
+          numero_comprobante: string
+          numero_secuencial?: number | null
+          observaciones?: string | null
           porcentaje_descuento?: number
           porcentaje_recargo?: number
+          punto_venta?: number | null
           recargo_cuotas?: number | null
           subtotal?: number
           tarjeta_id?: string | null
@@ -1140,12 +4387,17 @@ export type Database = {
           cuotas?: number | null
           fecha_venta?: string
           id?: string
-          numero_comprobante?: string
-          observaciones?: string | null
+          idempotency_key?: string | null
+          idempotency_payload?: Json | null
+          moneda?: string
           monto_descuento?: number
           monto_recargo?: number
+          numero_comprobante?: string
+          numero_secuencial?: number | null
+          observaciones?: string | null
           porcentaje_descuento?: number
           porcentaje_recargo?: number
+          punto_venta?: number | null
           recargo_cuotas?: number | null
           subtotal?: number
           tarjeta_id?: string | null
@@ -1171,6 +4423,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ventas_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ventas_tarjeta_id_fkey"
             columns: ["tarjeta_id"]
             isOneToOne: false
@@ -1179,24 +4438,1043 @@ export type Database = {
           },
         ]
       }
+      ventas_numeradores: {
+        Row: {
+          comercio_id: string
+          punto_venta: number
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero: number
+          updated_at: string
+        }
+        Insert: {
+          comercio_id: string
+          punto_venta: number
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Update: {
+          comercio_id?: string
+          punto_venta?: number
+          tipo_comprobante?: Database["public"]["Enums"]["tipo_comprobante"]
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_numeradores_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      tienda_productos: {
+        Row: {
+          cod_producto: string | null
+          comercio_id: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_tienda_html: string | null
+          destacado_en_tienda: boolean | null
+          id: string | null
+          imagen_path: string | null
+          imagen_paths: string[] | null
+          marca_nombre: string | null
+          observaciones: string | null
+          precio_venta: number | null
+          rubro_nombre: string | null
+          stock: number | null
+          subrubro_nombre: string | null
+          tipo_moneda: Database["public"]["Enums"]["tipo_moneda"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      current_comercio_id: {
-        Args: Record<PropertyKey, never>
+      actualizar_estado_pedido_online: {
+        Args: { p_estado: string; p_pedido_id: string }
+        Returns: {
+          cliente_direccion: string
+          cliente_email: string
+          cliente_id: string | null
+          cliente_nombre: string
+          cliente_telefono: string
+          cliente_user_id: string
+          comercio_id: string
+          created_at: string
+          estado: string
+          estado_pago: string
+          id: string
+          importe_pagado: number
+          numero: number
+          observaciones: string | null
+          total: number
+          updated_at: string
+          venta_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pedidos_online"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      actualizar_formato_impresion_comercio: {
+        Args: { p_comercio_id: string; p_formato: string }
+        Returns: Json
+      }
+      actualizar_mi_cliente_tienda: {
+        Args: { p_datos: Json }
+        Returns: undefined
+      }
+      campo_actualizar_operador_membresia: {
+        Args: { p_activo: boolean; p_comercio_id: string; p_user_id: string }
+        Returns: {
+          activo: boolean
+          rol: string
+          user_id: string
+        }[]
+      }
+      campo_anular_parte: {
+        Args: { p_motivo: string; p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_cambiar_estado_orden: {
+        Args: { p_motivo?: string; p_nuevo_estado: string; p_orden_id: string }
+        Returns: {
+          cancelada_at: string | null
+          cliente_id: string
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          establecimiento_id: string
+          estado: string
+          fecha_fin_planificada: string | null
+          fecha_inicio_planificada: string | null
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string | null
+          motivo_cancelacion: string | null
+          numero: number
+          observaciones: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_ordenes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_configurar_precio_labor: {
+        Args: {
+          p_facturable?: boolean
+          p_moneda_manual?: string
+          p_orden_labor_id: string
+          p_porcentaje_iva_manual?: number
+          p_precio_manual?: number
+          p_tarifa_id?: string
+        }
+        Returns: {
+          activo: boolean
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          descripcion: string | null
+          facturable: boolean
+          id: string
+          moneda_snapshot: string | null
+          nombre: string
+          orden_id: string
+          porcentaje_iva_snapshot: number | null
+          posicion: number
+          precio_origen: string | null
+          precio_unitario_snapshot: number | null
+          tarifa_id: string | null
+          unidad: string
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_orden_labores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_confirmar_parte: {
+        Args: { p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_costos_insumos: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_maquinarias: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_operarios: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          costo: number
+          id: string
+          moneda: string
+        }[]
+      }
+      campo_costos_parte: { Args: { p_parte_id: string }; Returns: Json }
+      campo_crear_parte: {
+        Args: {
+          p_condiciones_climaticas?: string
+          p_descripcion?: string
+          p_fecha_trabajo: string
+          p_hora_fin?: string
+          p_hora_inicio?: string
+          p_observaciones?: string
+          p_orden_id: string
+          p_orden_labor_id: string
+        }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_descartar_parte: {
+        Args: { p_motivo: string; p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_enviar_parte: {
+        Args: { p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_es_operador_vinculado: {
+        Args: { p_comercio_id: string }
+        Returns: boolean
+      }
+      campo_facturar_orden: {
+        Args: {
+          p_idempotency_key: string
+          p_modalidad: string
+          p_moneda: string
+          p_orden_id: string
+          p_punto_venta: number
+          p_tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+        }
+        Returns: {
+          comprobante: Database["public"]["Tables"]["campo_orden_comprobantes"]["Row"]
+          moneda: string
+          subtotal: number
+          total: number
+          total_iva: number
+          venta: Database["public"]["Tables"]["ventas"]["Row"]
+        }[]
+      }
+      campo_gps_autorizar_operador: {
+        Args: { p_parte_id: string }
+        Returns: {
+          ancho_trabajo_m_snapshot: number | null
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          parte_maquinaria_id: string | null
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_cambiar_estado: {
+        Args: { p_accion: string; p_sesion_id: string }
+        Returns: {
+          ancho_trabajo_m_snapshot: number | null
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          parte_maquinaria_id: string | null
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_haversine_metros: {
+        Args: {
+          p_lat_1: number
+          p_lat_2: number
+          p_lon_1: number
+          p_lon_2: number
+        }
+        Returns: number
+      }
+      campo_gps_iniciar_sesion: {
+        Args: { p_parte_id: string; p_parte_maquinaria_id?: string }
+        Returns: {
+          ancho_trabajo_m_snapshot: number | null
+          comercio_id: string
+          created_at: string
+          estado: string
+          finalizada_at: string | null
+          id: string
+          iniciada_at: string
+          operador_id: string
+          orden_id: string
+          parte_id: string
+          parte_maquinaria_id: string | null
+          pausada_at: string | null
+          segundos_pausados: number
+          updated_at: string
+          usuario_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_gps_sesiones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_gps_metricas_sesion: {
+        Args: { p_sesion_id: string }
+        Returns: Json
+      }
+      campo_gps_metricas_sesion_base: {
+        Args: { p_sesion_id: string }
+        Returns: Json
+      }
+      campo_gps_metricas_umbrales: { Args: never; Returns: Json }
+      campo_gps_registrar_puntos: {
+        Args: { p_puntos: Json; p_sesion_id: string }
+        Returns: number
+      }
+      campo_listar_operadores_comercio: {
+        Args: { p_comercio_id: string }
+        Returns: {
+          activo: boolean
+          email: string
+          operario_activo: boolean
+          operario_id: string
+          operario_nombre: string
+          user_id: string
+        }[]
+      }
+      campo_operario_actual: {
+        Args: { p_comercio_id: string }
         Returns: string
       }
+      campo_puede_crear_parte: {
+        Args: { p_comercio_id: string }
+        Returns: boolean
+      }
+      campo_puede_editar_parte: {
+        Args: { p_parte_id: string }
+        Returns: boolean
+      }
+      campo_reabrir_parte: {
+        Args: { p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_rechazar_parte: {
+        Args: { p_motivo: string; p_parte_id: string }
+        Returns: {
+          anulado_at: string | null
+          anulado_by: string | null
+          comercio_id: string
+          condiciones_climaticas: string | null
+          confirmado_at: string | null
+          confirmado_by: string | null
+          created_at: string
+          created_by: string
+          descartado_at: string | null
+          descartado_by: string | null
+          descripcion: string | null
+          enviado_at: string | null
+          enviado_by: string | null
+          estado: string
+          fecha_trabajo: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo_anulacion: string | null
+          motivo_descarte: string | null
+          motivo_rechazo: string | null
+          numero: number
+          observaciones: string | null
+          orden_id: string
+          orden_labor_id: string
+          propietario_operario_id: string | null
+          propietario_user_id: string
+          rechazado_at: string | null
+          rechazado_by: string | null
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_partes_trabajo"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_resolver_tarifa_labor: {
+        Args: { p_fecha?: string; p_orden_labor_id: string }
+        Returns: {
+          activo: boolean
+          cliente_id: string | null
+          codigo_interno: string | null
+          comercio_id: string
+          created_at: string
+          created_by: string
+          establecimiento_id: string | null
+          id: string
+          moneda: string
+          nivel: string
+          nombre: string
+          observaciones: string | null
+          porcentaje_iva: number
+          precio_unitario: number
+          unidad: string
+          updated_at: string
+          updated_by: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_tarifas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_resumen_economico_orden: {
+        Args: { p_orden_id: string }
+        Returns: Json
+      }
+      campo_telemetria_admin: {
+        Args: { p_comercio: string }
+        Returns: undefined
+      }
+      campo_telemetria_autorizar_lectura: {
+        Args: { p_importacion_id: string; p_operativo?: boolean }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_cargar_muestras: {
+        Args: { p_importacion_id: string; p_muestras: Json }
+        Returns: number
+      }
+      campo_telemetria_estado_importacion: {
+        Args: { p_importacion_id: string }
+        Returns: Json
+      }
+      campo_telemetria_finalizar_importacion: {
+        Args: { p_cancelar?: boolean; p_importacion_id: string }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_iniciar_importacion: {
+        Args: {
+          p_formato?: string
+          p_hash_sha256?: string
+          p_id: string
+          p_identificador_externo?: string
+          p_maquinaria_id: string
+          p_nombre_archivo?: string
+          p_orden_id?: string
+          p_origen?: string
+          p_parte_id?: string
+          p_proveedor?: string
+          p_sesion_gps_id?: string
+        }
+        Returns: {
+          cancelada_at: string | null
+          cantidad_descartadas: number
+          cantidad_muestras: number
+          cantidad_validas: number
+          comercio_id: string
+          created_at: string
+          estado: string
+          fin_at: string | null
+          finalizada_at: string | null
+          formato: string
+          hash_sha256: string
+          id: string
+          identificador_externo: string | null
+          imported_by: string
+          inicio_at: string | null
+          maquinaria_id: string
+          nombre_archivo: string | null
+          orden_id: string | null
+          origen: string
+          parte_id: string | null
+          proveedor: string | null
+          sesion_gps_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campo_telemetria_importaciones"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      campo_telemetria_resumen_importacion: {
+        Args: { p_importacion_id: string }
+        Returns: Json
+      }
+      campo_validar_parte_detalles: {
+        Args: {
+          p_comercio_id: string
+          p_orden_labor_id: string
+          p_parte_id: string
+        }
+        Returns: undefined
+      }
+      campo_vincular_operador: {
+        Args: {
+          p_comercio_id: string
+          p_operario_id?: string
+          p_user_id: string
+        }
+        Returns: {
+          operario_activo: boolean
+          operario_id: string
+          operario_nombre: string
+          user_id: string
+        }[]
+      }
+      confirmar_presupuesto: {
+        Args: { p_presupuesto_id: string }
+        Returns: string
+      }
+      crear_pedido_online: {
+        Args: { p_cliente: Json; p_items: Json }
+        Returns: Json
+      }
+      current_comercio_id: { Args: never; Returns: string }
       get_comercio_login: {
         Args: { target_comercio_id: string }
         Returns: {
           id: string
-          nombre_comercio: string
           localidad: string
+          logo_url: string
+          nombre_comercio: string
           provincia: string
-          logo_url: string | null
         }[]
+      }
+      get_estado_pago_pedido: { Args: { p_pedido_id: string }; Returns: Json }
+      get_mi_historial_compras: { Args: never; Returns: Json }
+      get_tienda_comercio_contacto: {
+        Args: { target_comercio_id: string }
+        Returns: {
+          calle: string
+          localidad: string
+          numero: string
+          provincia: string
+          telefono: string
+        }[]
+      }
+      get_tienda_pago_config: {
+        Args: { target_comercio_id: string }
+        Returns: Json
+      }
+      is_app_admin: { Args: never; Returns: boolean }
+      migracion_aplicar_cierre: {
+        Args: {
+          p_archivo_hash: string
+          p_archivo_nombre: string
+          p_archivo_tamano: number
+          p_comercio_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      migracion_aplicar_maestros: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_aplicar_operaciones: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_aplicar_operaciones_v1: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_assert_admin: { Args: never; Returns: undefined }
+      migracion_cargar_staging_maestros: {
+        Args: {
+          p_filas: Json
+          p_migracion_id: string
+          p_modulo: string
+          p_reemplazar?: boolean
+        }
+        Returns: number
+      }
+      migracion_cargar_staging_operaciones: {
+        Args: {
+          p_filas: Json
+          p_migracion_id: string
+          p_modulo: string
+          p_reemplazar?: boolean
+        }
+        Returns: number
+      }
+      migracion_crear_maestros: {
+        Args: {
+          p_archivo_hash?: string
+          p_archivo_nombre: string
+          p_archivo_tamano?: number
+          p_comercio_id: string
+        }
+        Returns: string
+      }
+      migracion_crear_operaciones: {
+        Args: {
+          p_archivo_hash: string
+          p_archivo_nombre: string
+          p_archivo_tamano: number
+          p_comercio_id: string
+        }
+        Returns: string
+      }
+      migracion_revertir_maestros: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_revertir_operaciones: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_revertir_operaciones_v1: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_simular_cierre: {
+        Args: { p_comercio_id: string; p_payload: Json }
+        Returns: Json
+      }
+      migracion_simular_maestros: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_simular_maestros_v1: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      migracion_simular_operaciones: {
+        Args: { p_migracion_id: string }
+        Returns: Json
+      }
+      notificacion_visible_para_comercio: {
+        Args: { target_comercio_id: string; target_notificacion_id: string }
+        Returns: boolean
+      }
+      previsualizar_numero_venta: {
+        Args: {
+          p_comercio_id: string
+          p_punto_venta: number
+          p_tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+        }
+        Returns: string
+      }
+      registrar_pago_mercadopago_aprobado: {
+        Args: {
+          p_cuotas: number
+          p_medio_pago: string
+          p_operacion_id: string
+          p_payment_id: string
+          p_raw: Json
+        }
+        Returns: undefined
+      }
+      registrar_venta_transaccional: {
+        Args: {
+          p_cliente_id: string
+          p_cliente_nombre: string
+          p_comercio_id: string
+          p_fecha_venta?: string
+          p_idempotency_key: string
+          p_items: Json
+          p_modalidad: string
+          p_moneda: string
+          p_monto_descuento?: number
+          p_monto_recargo?: number
+          p_observaciones?: string
+          p_pagos: Json
+          p_porcentaje_descuento?: number
+          p_porcentaje_recargo?: number
+          p_punto_venta: number
+          p_tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+        }
+        Returns: {
+          banco_id: string | null
+          cae: string | null
+          cae_error: string | null
+          cae_solicitado_at: string | null
+          cae_vencimiento: string | null
+          cliente_id: string | null
+          cliente_nombre: string | null
+          comercio_id: string | null
+          created_at: string
+          cuotas: number | null
+          fecha_venta: string
+          id: string
+          idempotency_key: string | null
+          idempotency_payload: Json | null
+          moneda: string
+          monto_descuento: number
+          monto_recargo: number
+          numero_comprobante: string
+          numero_secuencial: number | null
+          observaciones: string | null
+          porcentaje_descuento: number
+          porcentaje_recargo: number
+          punto_venta: number | null
+          recargo_cuotas: number | null
+          subtotal: number
+          tarjeta_id: string | null
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          total: number
+          total_iva: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ventas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       user_belongs_to_comercio: {
         Args: { target_comercio_id: string }
@@ -1206,13 +5484,38 @@ export type Database = {
         Args: { target_comercio_id: string }
         Returns: boolean
       }
-      is_app_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
+      ventas_numero_secuencial_canonico: {
+        Args: { p_numero: string }
+        Returns: number
+      }
+      ventas_punto_venta_canonico: {
+        Args: { p_numero: string }
+        Returns: number
       }
     }
     Enums: {
       estado_cheque: "en_cartera" | "depositado" | "rechazado" | "endosado"
+      migracion_estado:
+        | "borrador"
+        | "subido"
+        | "analizando"
+        | "listo"
+        | "importando"
+        | "completado"
+        | "completado_con_errores"
+        | "fallido"
+        | "cancelado"
+      migracion_modulo_estado:
+        | "pendiente"
+        | "compatible"
+        | "requiere_revision"
+        | "no_disponible"
+        | "listo"
+        | "importando"
+        | "completado"
+        | "completado_con_errores"
+        | "fallido"
+        | "omitido"
       tipo_comprobante:
         | "factura_a"
         | "factura_b"
@@ -1226,9 +5529,9 @@ export type Database = {
         | "recibo_a"
         | "recibo_b"
         | "recibo_c"
-        | "recibo_x"
         | "ticket_fiscal"
         | "factura_exportacion"
+        | "recibo_x"
       tipo_cuenta_bancaria:
         | "CA_PESOS"
         | "CA_USD"
@@ -1237,7 +5540,13 @@ export type Database = {
         | "CAJA_AHORRO"
         | "CUENTA_SUELDO"
       tipo_moneda: "ARS" | "USD" | "USD_BLUE"
-      tipo_pago: "contado" | "transferencia" | "tarjeta" | "cheque" | "cta_cte"
+      tipo_pago:
+        | "contado"
+        | "transferencia"
+        | "tarjeta"
+        | "cheque"
+        | "cta_cte"
+        | "mercado_pago"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1253,12 +5562,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1282,11 +5591,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1307,11 +5616,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1332,11 +5641,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1349,11 +5658,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1366,6 +5675,29 @@ export const Constants = {
   public: {
     Enums: {
       estado_cheque: ["en_cartera", "depositado", "rechazado", "endosado"],
+      migracion_estado: [
+        "borrador",
+        "subido",
+        "analizando",
+        "listo",
+        "importando",
+        "completado",
+        "completado_con_errores",
+        "fallido",
+        "cancelado",
+      ],
+      migracion_modulo_estado: [
+        "pendiente",
+        "compatible",
+        "requiere_revision",
+        "no_disponible",
+        "listo",
+        "importando",
+        "completado",
+        "completado_con_errores",
+        "fallido",
+        "omitido",
+      ],
       tipo_comprobante: [
         "factura_a",
         "factura_b",
@@ -1379,9 +5711,9 @@ export const Constants = {
         "recibo_a",
         "recibo_b",
         "recibo_c",
-        "recibo_x",
         "ticket_fiscal",
         "factura_exportacion",
+        "recibo_x",
       ],
       tipo_cuenta_bancaria: [
         "CA_PESOS",
@@ -1392,7 +5724,14 @@ export const Constants = {
         "CUENTA_SUELDO",
       ],
       tipo_moneda: ["ARS", "USD", "USD_BLUE"],
-      tipo_pago: ["contado", "transferencia", "tarjeta", "cheque", "cta_cte"],
+      tipo_pago: [
+        "contado",
+        "transferencia",
+        "tarjeta",
+        "cheque",
+        "cta_cte",
+        "mercado_pago",
+      ],
     },
   },
 } as const

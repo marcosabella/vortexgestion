@@ -598,7 +598,7 @@ Deno.serve(async (req) => {
 
     // Validar que los certificados estén cargados
     if (!afipConfig.certificado_crt || !afipConfig.certificado_key) {
-      throw new Error('Los certificados digitales no están cargados. Debe cargar el certificado (.crt) y la clave privada (.key) en la configuración AFIP.');
+      throw new Error('No se puede solicitar CAE: faltan las credenciales fiscales completas. Cargue certificado y clave privada en la configuración ARCA.');
     }
 
     const cuitEmisor = normalizarCuit(afipConfig.cuit_emisor);

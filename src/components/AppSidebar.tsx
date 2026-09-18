@@ -22,6 +22,8 @@ import {
   Store,
   Truck,
   Users,
+  Sprout,
+  Activity,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Fragment, useState } from "react";
@@ -29,6 +31,7 @@ import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useComercio } from "@/hooks/useComercio";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
+import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { ModuloSistema } from "@/config/parametrizacion";
 
 import {
@@ -53,9 +56,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-const menuItems: Array<
-  { title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema }
-> = [
+const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modulo?: ModuloSistema; activePrefix?: string }> = [
   { title: "Caja Diaria", url: "/caja", icon: Banknote, modulo: "caja" },
   { title: "Gastos y egresos", url: "/gastos-egresos", icon: ReceiptText, modulo: "gastos_egresos" },
   { title: "Clientes", url: "/clientes", icon: Users, modulo: "clientes" },
@@ -131,6 +132,18 @@ const listadosItems = [
   },
 ];
 
+const campoItems = [
+  { title: "Tarifas comerciales", url: "/campo/tarifas", icon: Banknote },
+  { title: "Establecimientos", url: "/campo/establecimientos", icon: Sprout },
+  { title: "Órdenes de trabajo", url: "/campo/ordenes", icon: ClipboardList },
+  { title: "Partes pendientes", url: "/campo/partes-pendientes", icon: FileText, adminOnly: true },
+  { title: "Operarios", url: "/campo/operarios", icon: Users },
+  { title: "Usuarios y operadores", url: "/campo/operadores", icon: Shield, adminOnly: true },
+  { title: "Maquinarias", url: "/campo/maquinarias", icon: Truck },
+  { title: "Insumos", url: "/campo/insumos", icon: Package },
+  { title: "Telemetría", url: "/campo/telemetria", icon: Activity, adminOnly: true },
+]
+
 export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const location = useLocation();
@@ -141,8 +154,10 @@ export function AppSidebar() {
   const [extintoresOpen, setExtintoresOpen] = useState(
     currentPath.startsWith("/extintores"),
   );
+  const [campoOpen, setCampoOpen] = useState(currentPath.startsWith("/campo"));
   const { data: isAdmin } = useIsAppAdmin();
   const { comercio, isLoading: isComercioLoading } = useComercio();
+  const campoAccess = useCampoAccess(comercio?.id);
   const { data: parametrizacion } = useComercioParametrizacion();
   const { notificaciones } = useNotificaciones(true);
   const comercioName = comercio?.nombre_comercio ||
@@ -163,12 +178,15 @@ export function AppSidebar() {
   }).length;
 
   const isActive = (path: string) => currentPath === path;
+  const isMenuItemActive = (item: (typeof menuItems)[number]) =>
+    item.activePrefix ? currentPath === item.activePrefix || currentPath.startsWith(`${item.activePrefix}/`) : isActive(item.url);
   const isConfiguracionActive = currentPath === "/comercio" ||
     enabledConfiguracionItems.some((item) => currentPath === item.url);
   const isListadosActive = parametrizacion.modulos.listados &&
     currentPath.startsWith("/listados");
   const isExtintoresActive = parametrizacion.modulos.extintores &&
     currentPath.startsWith("/extintores");
+  const isCampoActive = parametrizacion.modulos.campo && currentPath.startsWith("/campo");
   const closeMobileMenu = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -201,10 +219,9 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    className={`mx-2 ${
-                      isActive(item.url)
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className={`mx-2 ${isMenuItemActive(item)
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     }`}
                   >
                     <NavLink to={item.url} end onClick={closeMobileMenu}>
@@ -229,68 +246,34 @@ export function AppSidebar() {
                 </Fragment>
               ))}
 
-              {false && parametrizacion.modulos.extintores && (
-                <Collapsible
-                  open={extintoresOpen}
-                  onOpenChange={setExtintoresOpen}
-                >
+              {parametrizacion.modulos.campo && (
+                <Collapsible open={campoOpen} onOpenChange={setCampoOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`mx-2 ${
-                          isExtintoresActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        className={`mx-2 ${isCampoActive
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`}
                       >
-                        <Flame className="h-4 w-4" />
-                        {!collapsed && <span className="ml-3">Extintores</span>}
-                        {!collapsed && (
-                          <ChevronDown
-                            className={`ml-auto h-4 w-4 transition-transform ${
-                              extintoresOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        )}
+                        <Sprout className="h-4 w-4" />
+                        {!collapsed && <span className="ml-3">Vortex Campo</span>}
+                        {!collapsed && <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${campoOpen ? 'rotate-180' : ''}`} />}
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     {!collapsed && (
                       <CollapsibleContent>
                         <SidebarMenuSub>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              asChild
-                              className={isActive("/extintores")
-                                ? "bg-sidebar-accent/50"
-                                : ""}
-                            >
-                              <NavLink
-                                to="/extintores"
-                                end
-                                onClick={closeMobileMenu}
-                              >
-                                <Flame className="h-4 w-4" />
-                                <span className="ml-2">Extintores</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              asChild
-                              className={isActive("/extintores/ordenes-trabajo")
-                                ? "bg-sidebar-accent/50"
-                                : ""}
-                            >
-                              <NavLink
-                                to="/extintores/ordenes-trabajo"
-                                end
-                                onClick={closeMobileMenu}
-                              >
-                                <ClipboardList className="h-4 w-4" />
-                                <span className="ml-2">Órdenes de trabajo</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                          {campoItems.filter((item) => !("adminOnly" in item) || !item.adminOnly || campoAccess.isAdmin).map((item) => (
+                            <SidebarMenuSubItem key={item.title}>
+                              <SidebarMenuSubButton asChild className={isActive(item.url) ? 'bg-sidebar-accent/50' : ''}>
+                                <NavLink to={item.url} onClick={closeMobileMenu}>
+                                  <item.icon className="h-4 w-4" />
+                                  <span className="ml-2">{item.title}</span>
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     )}

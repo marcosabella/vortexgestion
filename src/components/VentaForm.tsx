@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -34,6 +34,8 @@ import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
 import { useComercio } from "@/hooks/useComercio"
 import { useAfipConfig } from "@/hooks/useAfipConfig"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
+import { useAuth } from "@/contexts/AuthContext"
+import { useQuery } from "@tanstack/react-query"
 import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
 import { generarQRAfip } from "@/utils/afipQr"
@@ -134,13 +136,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const { createVentaAsync, updateVenta } = useVentas()
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
+  const { comercio } = useComercio()
+  const { user } = useAuth()
+  const afipConfigQuery = useAfipConfig()
+  const afipConfig = afipConfigQuery.data
   const esPresupuesto = modo === "presupuesto"
   const nombreDocumento = esPresupuesto ? "presupuesto" : "venta"
   const { data: clientes = [] } = useClientes()
   const { productos } = useProductos()
   const { data: parametrizacion } = useComercioParametrizacion()
-  const { comercio } = useComercio()
-  const { data: afipConfig } = useAfipConfig()
   const permiteItemsManuales = esPresupuesto || parametrizacion.funciones.venta_items_manuales
   const permiteAjustes = parametrizacion.funciones.descuentos_recargos
 
@@ -210,6 +214,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [qrCobro, setQrCobro] = useState<{ image: string; ventaId: string; operacionId: string; importe: number } | null>(null)
   const [ventaMercadoPagoPendienteId, setVentaMercadoPagoPendienteId] = useState("")
   const [cancelarMercadoPagoTarget, setCancelarMercadoPagoTarget] = useState<"qr" | "pendiente" | null>(null)
+  const idempotencyKeyRef = useRef<string | null>(null)
   const mercadoPagoData = mercadoPagoStatus.data || {}
   const mercadoPagoCajas = mercadoPagoData.cajas || []
   const mercadoPagoHabilitado = !esPresupuesto && !venta
@@ -307,6 +312,43 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const watchMontoDescuento = form.watch("monto_descuento")
   const watchPorcentajeRecargo = form.watch("porcentaje_recargo")
   const watchMontoRecargo = form.watch("monto_recargo")
+  const puntoVenta = afipConfig?.punto_venta
+  const puntoVentaValido = typeof puntoVenta === "number" && Number.isInteger(puntoVenta) && puntoVenta > 0
+  const puedePrevisualizarNumero =
+    !venta &&
+    !esPresupuesto &&
+    Boolean(comercio?.id && user?.id && watchTipoComprobante && puntoVentaValido)
+  const numeroPreview = useQuery({
+    queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null],
+    enabled: puedePrevisualizarNumero,
+    queryFn: async () => {
+      if (!comercio?.id || !user?.id || !watchTipoComprobante || typeof puntoVenta !== "number" || !Number.isInteger(puntoVenta) || puntoVenta <= 0) {
+        throw new Error("La configuración de punto de venta no está disponible.")
+      }
+
+      const { data: membership, error: membershipError } = await supabase
+        .from("comercio_usuarios")
+        .select("rol")
+        .eq("comercio_id", comercio.id)
+        .eq("user_id", user.id)
+        .eq("activo", true)
+        .maybeSingle()
+
+      if (membershipError || membership?.rol !== "admin") {
+        throw new Error("No tiene permisos para consultar la numeración.")
+      }
+
+      const { data, error } = await supabase.rpc("previsualizar_numero_venta", {
+        p_comercio_id: comercio.id,
+        p_tipo_comprobante: watchTipoComprobante,
+        p_punto_venta: puntoVenta,
+      })
+
+      if (error || !data) throw error ?? new Error("No se pudo previsualizar la numeración.")
+      return data
+    },
+  })
+  const numeroPreviewEnCarga = afipConfigQuery.isLoading || numeroPreview.isPending
 
   useEffect(() => {
     if (permiteAjustes) return
@@ -321,26 +363,33 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     setItemMontoRecargo(0)
   }, [form, permiteAjustes])
 
-  // Generar número de comprobante automático cuando cambia el tipo
+  useEffect(() => {
+    if (!venta && !esPresupuesto && numeroPreview.data) {
+      form.setValue("numero_comprobante", numeroPreview.data, { shouldValidate: false })
+    }
+  }, [esPresupuesto, form, numeroPreview.data, venta])
+
+  // Los presupuestos conservan su numeración propia. Las ventas reciben el número
+  // definitivo de la RPC, que lo reserva de forma concurrente.
   useEffect(() => {
     const generarNumeroComprobante = async () => {
       if (venta) return;
+
+      if (!esPresupuesto) {
+        return
+      }
       
       const tipoComprobante = watchTipoComprobante;
       if (!tipoComprobante) return;
 
       try {
-        const puntoVenta = esPresupuesto ? "P" : "0001";
+        const puntoVenta = "P";
         
         // La tabla se incorpora en la migracion de presupuestos y aun no forma parte del tipo generado.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let numeroRequest = (supabase as any)
-          .from(esPresupuesto ? "presupuestos" : "ventas")
+        const numeroRequest = (supabase as any)
+          .from("presupuestos")
           .select("numero_comprobante");
-
-        if (!esPresupuesto) {
-          numeroRequest = numeroRequest.eq("tipo_comprobante", tipoComprobante);
-        }
 
         const { data, error } = await numeroRequest
           .like("numero_comprobante", `${puntoVenta}-%`)
@@ -641,6 +690,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const onSubmit = async (data: VentaFormData) => {
+    if (!esPresupuesto && !venta && !puntoVentaValido) {
+      toast({
+        title: "Configuración requerida",
+        description: "Configurá un punto de venta activo antes de registrar la venta.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (ventaItems.length === 0) {
       toast({
         title: "Error",
@@ -726,7 +784,17 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         const pagosConfirmados = pagosVenta.filter(pago => pago.tipo_pago !== "mercado_pago")
         const nuevaVenta = ventaMercadoPagoPendienteId
           ? { id: ventaMercadoPagoPendienteId }
-          : await createVentaAsync({ venta: ventaData, items: ventaItems, pagos: pagosConfirmados })
+          : await createVentaAsync({
+              venta: ventaData,
+              items: ventaItems,
+              pagos: pagosConfirmados,
+              idempotencyKey: idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID()),
+              mercadoPago: Boolean(pagoMercadoPago),
+            })
+        idempotencyKeyRef.current = null
+        if (!pagoMercadoPago && "numero_comprobante" in nuevaVenta && typeof nuevaVenta.numero_comprobante === "string") {
+          form.setValue("numero_comprobante", nuevaVenta.numero_comprobante)
+        }
         if (pagoMercadoPago) {
           setVentaMercadoPagoPendienteId(nuevaVenta.id)
           try {
@@ -824,8 +892,23 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   <FormItem>
                     <FormLabel>Número de Comprobante</FormLabel>
                     <FormControl>
-                      <Input {...field} readOnly className="bg-muted" />
+                      <Input
+                        {...(esPresupuesto || venta
+                          ? field
+                          : {
+                              value: numeroPreviewEnCarga
+                                ? "..."
+                                : numeroPreview.isError || !puntoVentaValido
+                                  ? "No disponible"
+                                  : numeroPreview.data ?? "...",
+                            })}
+                        readOnly
+                        className="bg-muted"
+                      />
                     </FormControl>
+                    {!esPresupuesto && !venta && !numeroPreviewEnCarga && (numeroPreview.isError || !puntoVentaValido) && (
+                      <p className="text-sm text-destructive">{numeroPreview.isError ? "No se pudo consultar la numeración." : "Configurá CUIT y un punto de venta activo y válido para registrar ventas."}</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

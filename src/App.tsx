@@ -63,6 +63,19 @@ import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
 import WhatsApp from "./pages/WhatsApp";
 import TiendaOnline from "./pages/TiendaOnline";
 import { DataDeletion, PrivacyPolicy } from "./pages/Privacy";
+import CampoEstablecimientos from "./pages/CampoEstablecimientos";
+import CampoLotes from "./pages/CampoLotes";
+import CampoOrdenes from "./pages/CampoOrdenes";
+import CampoOrdenDetalle from "./pages/CampoOrdenDetalle";
+import CampoOperarios from "./pages/CampoOperarios";
+import CampoOperadores from "./pages/CampoOperadores";
+import CampoMaquinarias from "./pages/CampoMaquinarias";
+import CampoInsumos from "./pages/CampoInsumos";
+import CampoTarifas from "./pages/CampoTarifas";
+import CampoParteDetalle from "./pages/CampoParteDetalle";
+import CampoPartesPendientes from "./pages/CampoPartesPendientes";
+import CampoTelemetria from "./pages/CampoTelemetria";
+import CampoTelemetriaDetalle from "./pages/CampoTelemetriaDetalle";
 
 const queryClient = new QueryClient();
 
@@ -223,6 +236,20 @@ function AuthenticatedLayout() {
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
+              <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
+              <Route path="/campo/establecimientos" element={<ParametrizedRoute modulo="campo"><CampoEstablecimientos /></ParametrizedRoute>} />
+              <Route path="/campo/establecimientos/:establecimientoId/lotes" element={<ParametrizedRoute modulo="campo"><CampoLotes /></ParametrizedRoute>} />
+              <Route path="/campo/ordenes" element={<ParametrizedRoute modulo="campo"><CampoOrdenes /></ParametrizedRoute>} />
+              <Route path="/campo/ordenes/:ordenId" element={<ParametrizedRoute modulo="campo"><CampoOrdenDetalle /></ParametrizedRoute>} />
+              <Route path="/campo/ordenes/:ordenId/partes/:parteId" element={<ParametrizedRoute modulo="campo"><CampoParteDetalle /></ParametrizedRoute>} />
+              <Route path="/campo/partes-pendientes" element={<ParametrizedRoute modulo="campo"><CampoPartesPendientes /></ParametrizedRoute>} />
+              <Route path="/campo/operarios" element={<ParametrizedRoute modulo="campo"><CampoOperarios /></ParametrizedRoute>} />
+              <Route path="/campo/operadores" element={<ParametrizedRoute modulo="campo"><CampoOperadores /></ParametrizedRoute>} />
+              <Route path="/campo/maquinarias" element={<ParametrizedRoute modulo="campo"><CampoMaquinarias /></ParametrizedRoute>} />
+              <Route path="/campo/tarifas" element={<ParametrizedRoute modulo="campo"><CampoTarifas /></ParametrizedRoute>} />
+              <Route path="/campo/insumos" element={<ParametrizedRoute modulo="campo"><CampoInsumos /></ParametrizedRoute>} />
+              <Route path="/campo/telemetria" element={<ParametrizedRoute modulo="campo"><CampoTelemetria /></ParametrizedRoute>} />
+              <Route path="/campo/telemetria/:importacionId" element={<ParametrizedRoute modulo="campo"><CampoTelemetriaDetalle /></ParametrizedRoute>} />
               <Route path="/listados/clientes" element={<ParametrizedRoute modulo="listados"><ListadoClientes /></ParametrizedRoute>} />
               <Route path="/listados/proveedores" element={<ParametrizedRoute modulo="listados"><ListadoProveedores /></ParametrizedRoute>} />
               <Route path="/listados/productos" element={<ParametrizedRoute modulo="listados"><ListadoProductos /></ParametrizedRoute>} />

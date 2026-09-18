@@ -16,7 +16,8 @@ export type ModuloSistema =
   | "mercado_pago"
   | "whatsapp"
   | "gastos_egresos"
-  | "extintores";
+  | "extintores"
+  | "campo";
 
 export type FuncionSistema =
   | "venta_items_manuales"
@@ -60,6 +61,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "whatsapp", label: "WhatsApp API", description: "Envio oficial de comprobantes mediante WhatsApp Business." },
   { key: "gastos_egresos", label: "Gastos y egresos", description: "Registro de gastos, pagos y obligaciones del comercio." },
   { key: "extintores", label: "Extintores", description: "Asignacion y seguimiento de extintores por cliente." },
+  { key: "campo", label: "Vortex Campo", description: "Consulta de establecimientos y lotes del comercio." },
 ];
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
@@ -86,6 +88,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     mercado_pago: true,
     whatsapp: false,
     extintores: false,
+    campo: false,
   },
   funciones: {
     ...FUNCIONES_SISTEMA.reduce(

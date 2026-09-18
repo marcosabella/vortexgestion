@@ -23,6 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.*
+!.env.example
+
+# Archivos locales generados; pueden contener referencias o credenciales
+supabase/.temp/
+vite.config.ts.timestamp-*.mjs
 
 # Backups privados de bases legacy (nunca publicar ni versionar)
 private-backups/

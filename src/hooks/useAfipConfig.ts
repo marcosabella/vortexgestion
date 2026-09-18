@@ -8,6 +8,7 @@ export function useAfipConfig() {
 
   return useQuery({
     queryKey: ['afip-config', comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       if (!comercioId) {
         return null;
@@ -17,9 +18,7 @@ export function useAfipConfig() {
         .from('afip_config')
         .select('*')
         .eq('activo', true)
-        .eq('comercio_id', comercioId)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .eq('comercio_id', comercioId);
 
       const { data, error } = await query.maybeSingle();
       

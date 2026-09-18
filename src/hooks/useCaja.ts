@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, CajaMovimiento, CajaMovimientoTipo } from "@/types/caja";
-import { getVentaTotalFinal, Venta } from "@/types/venta";
+import { esVentaCuentaCorriente, getVentaTotalFinal, Venta } from "@/types/venta";
 
-const db = supabase as any;
+const db = supabase;
 
 const VENTAS_CAJA_SELECT = `
   *,
@@ -205,6 +205,7 @@ export const useCajaDiaria = (fecha: string) => {
         .select(VENTAS_CAJA_SELECT)
         .gte("fecha_venta", `${fecha}T00:00:00`)
         .lt("fecha_venta", abiertoAt)
+        .neq("tipo_pago", "cta_cte")
         .order("fecha_venta", { ascending: true });
 
       if (ventasDelDiaError) throw ventasDelDiaError;
@@ -221,6 +222,7 @@ export const useCajaDiaria = (fecha: string) => {
 
       return ventasDelDia.filter((venta) => {
         if (!venta.id || movimientosVentaIds.has(venta.id)) return false;
+        if (esVentaCuentaCorriente(venta)) return false;
         if (getVentaTotalFinal(venta) <= 0) return false;
 
         const fechaVenta = new Date(venta.fecha_venta).getTime();
@@ -363,7 +365,8 @@ export const useCajaDiaria = (fecha: string) => {
     mutationFn: async (): Promise<RegistrarVentasPreviasResult> => {
       if (!caja?.id) return { movimientos: [], ventasRegistradas: [] };
 
-      const ventasPrevias = ventasPreviasPendientesQuery.data || [];
+      const ventasPrevias = (ventasPreviasPendientesQuery.data || [])
+        .filter((venta) => !esVentaCuentaCorriente(venta));
       const movimientos = ventasPrevias
         .map((venta) => ({
           caja_id: caja.id,
