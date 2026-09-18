@@ -34,6 +34,14 @@ export function useCampoTelemetriaDetalle(comercioId:string|null, importacionId:
   const resumen=useQuery({queryKey:telemetriaKey(comercioId,"resumen",importacionId),enabled,queryFn:async()=>{const {data,error}=await supabase.rpc("campo_telemetria_resumen_importacion",{p_importacion_id:importacionId!});if(error)fail(error);return data;}});
   return {estado,resumen};
 }
+export type TelemetriaRutaPunto = { secuencia:number; latitud:number; longitud:number };
+export function useCampoTelemetriaRuta(comercioId:string|null, importacionId:string|null, allowed:boolean) {
+  return useQuery({queryKey:telemetriaKey(comercioId,"ruta",importacionId),enabled:Boolean(comercioId&&importacionId&&allowed),queryFn:async():Promise<TelemetriaRutaPunto[]>=>{
+    const {data,error}=await supabase.from("campo_telemetria_muestras").select("secuencia,latitud,longitud").eq("comercio_id",comercioId!).eq("importacion_id",importacionId!).not("latitud","is",null).not("longitud","is",null).order("secuencia").limit(10000);
+    if(error) fail(error);
+    return (data??[]) as TelemetriaRutaPunto[];
+  }});
+}
 export function useCampoTelemetriaImportar(comercioId:string|null, allowed:boolean) {
   const client=useQueryClient();
   const invalidate=async(id?:string)=>{await client.invalidateQueries({queryKey:telemetriaKey(comercioId,"list")}); if(id){await client.invalidateQueries({queryKey:telemetriaKey(comercioId,"estado",id)});await client.invalidateQueries({queryKey:telemetriaKey(comercioId,"resumen",id)});}};
