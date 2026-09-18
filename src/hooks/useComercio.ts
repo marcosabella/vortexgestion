@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Comercio, ComercioFormData } from "@/types/comercio";
@@ -15,6 +15,16 @@ export const useComercio = () => {
   const [selectedComercioId, setSelectedComercioId] = useState(() =>
     localStorage.getItem("selectedComercioId"),
   );
+
+  useEffect(() => {
+    const syncSelectedComercio = () => setSelectedComercioId(localStorage.getItem("selectedComercioId"));
+    window.addEventListener("comercio-activo-cambio", syncSelectedComercio);
+    window.addEventListener("storage", syncSelectedComercio);
+    return () => {
+      window.removeEventListener("comercio-activo-cambio", syncSelectedComercio);
+      window.removeEventListener("storage", syncSelectedComercio);
+    };
+  }, []);
 
   const { data, isLoading } = useQuery<ComercioQueryResult>({
     queryKey: ["comercio", selectedComercioId],
@@ -89,6 +99,7 @@ export const useComercio = () => {
   const selectComercio = (comercioId: string) => {
     localStorage.setItem("selectedComercioId", comercioId);
     setSelectedComercioId(comercioId);
+    window.dispatchEvent(new Event("comercio-activo-cambio"));
   };
 
   const createComercio = useMutation({
