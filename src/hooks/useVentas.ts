@@ -147,10 +147,11 @@ export const useVentas = () => {
       }
 
       if (!comercio?.id) throw new Error("Seleccione un comercio antes de registrar la venta.");
-      const puntoVenta = afipConfig.data?.punto_venta;
-      if (typeof puntoVenta !== "number" || !Number.isInteger(puntoVenta) || puntoVenta <= 0) {
-        throw new Error("Configure un punto de venta activo y válido antes de registrar la venta.");
-      }
+      const puntoVentaConfigurado = afipConfig.data?.punto_venta;
+      const puntoVenta =
+        typeof puntoVentaConfigurado === "number" && Number.isInteger(puntoVentaConfigurado) && puntoVentaConfigurado > 0
+          ? puntoVentaConfigurado
+          : 1;
 
       const pagosCuentaCorriente = pagos.filter((pago) => pago.tipo_pago === "cta_cte");
       const esCuentaCorriente = pagosCuentaCorriente.length > 0;

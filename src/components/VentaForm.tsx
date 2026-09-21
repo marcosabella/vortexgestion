@@ -312,18 +312,21 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const watchMontoDescuento = form.watch("monto_descuento")
   const watchPorcentajeRecargo = form.watch("porcentaje_recargo")
   const watchMontoRecargo = form.watch("monto_recargo")
-  const puntoVenta = afipConfig?.punto_venta
-  const puntoVentaValido = typeof puntoVenta === "number" && Number.isInteger(puntoVenta) && puntoVenta > 0
+  const puntoVentaConfigurado = afipConfig?.punto_venta
+  const puntoVenta =
+    typeof puntoVentaConfigurado === "number" && Number.isInteger(puntoVentaConfigurado) && puntoVentaConfigurado > 0
+      ? puntoVentaConfigurado
+      : 1
   const puedePrevisualizarNumero =
     !venta &&
     !esPresupuesto &&
-    Boolean(comercio?.id && user?.id && watchTipoComprobante && puntoVentaValido)
+    Boolean(comercio?.id && user?.id && watchTipoComprobante)
   const numeroPreview = useQuery({
     queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null],
     enabled: puedePrevisualizarNumero,
     queryFn: async () => {
-      if (!comercio?.id || !user?.id || !watchTipoComprobante || typeof puntoVenta !== "number" || !Number.isInteger(puntoVenta) || puntoVenta <= 0) {
-        throw new Error("La configuración de punto de venta no está disponible.")
+      if (!comercio?.id || !user?.id || !watchTipoComprobante) {
+        throw new Error("No está disponible la información necesaria para generar el comprobante.")
       }
 
       const { data: membership, error: membershipError } = await supabase
@@ -348,7 +351,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       return data
     },
   })
-  const numeroPreviewEnCarga = afipConfigQuery.isLoading || numeroPreview.isPending
+  const numeroPreviewEnCarga =
+    afipConfigQuery.isLoading || (puedePrevisualizarNumero && numeroPreview.isFetching)
 
   useEffect(() => {
     if (permiteAjustes) return
@@ -674,6 +678,23 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const abrirFinalizacion = async () => {
+    if (!esPresupuesto && !venta) {
+      const numeroComprobante = numeroPreview.data || (await numeroPreview.refetch()).data
+      if (!numeroComprobante) {
+        toast({
+          title: "No se pudo generar el número",
+          description: "No se pudo consultar la numeración del comprobante. Intentá nuevamente.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      form.setValue("numero_comprobante", numeroComprobante, {
+        shouldDirty: false,
+        shouldValidate: true,
+      })
+    }
+
     const datosValidos = await form.trigger()
     if (!datosValidos) return
 
@@ -898,7 +919,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                           : {
                               value: numeroPreviewEnCarga
                                 ? "..."
-                                : numeroPreview.isError || !puntoVentaValido
+                                : numeroPreview.isError
                                   ? "No disponible"
                                   : numeroPreview.data ?? "...",
                             })}
@@ -906,8 +927,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                         className="bg-muted"
                       />
                     </FormControl>
-                    {!esPresupuesto && !venta && !numeroPreviewEnCarga && (numeroPreview.isError || !puntoVentaValido) && (
-                      <p className="text-sm text-destructive">{numeroPreview.isError ? "No se pudo consultar la numeración." : "Configurá CUIT y un punto de venta activo y válido para registrar ventas."}</p>
+                    {!esPresupuesto && !venta && !numeroPreviewEnCarga && numeroPreview.isError && (
+                      <p className="text-sm text-destructive">No se pudo consultar la numeración.</p>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -1358,8 +1379,19 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
               <Button type="button" variant="cancel" onClick={onSuccess}>
                 Cancelar
               </Button>
-              <Button type="button" variant="success" onClick={abrirFinalizacion}>
-                {venta ? `Actualizar ${esPresupuesto ? "Presupuesto" : "Venta"}` : esPresupuesto ? "Guardar Presupuesto" : "Registrar Venta"}
+              <Button
+                type="button"
+                variant="success"
+                disabled={!esPresupuesto && !venta && numeroPreviewEnCarga}
+                onClick={abrirFinalizacion}
+              >
+                {!esPresupuesto && !venta && numeroPreviewEnCarga
+                  ? "Generando número..."
+                  : venta
+                    ? `Actualizar ${esPresupuesto ? "Presupuesto" : "Venta"}`
+                    : esPresupuesto
+                      ? "Guardar Presupuesto"
+                      : "Registrar Venta"}
               </Button>
             </div>
 
