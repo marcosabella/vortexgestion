@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronDown,
   ClipboardList,
+  PackagePlus,
   CreditCard,
   Database,
   FileKey,
@@ -24,6 +25,7 @@ import {
   Users,
   Sprout,
   Activity,
+  LayoutDashboard,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Fragment, useState } from "react";
@@ -66,6 +68,8 @@ const menuItems: Array<{ title: string; url: string; icon: typeof Banknote; modu
     icon: Truck,
     modulo: "proveedores",
   },
+  { title: "Compras", url: "/compras", icon: PackagePlus, modulo: "compras" },
+  { title: "Cta. cte. proveedores", url: "/compras/cuenta-corriente", icon: CreditCard, modulo: "compras" },
   { title: "Productos", url: "/productos", icon: Package, modulo: "productos" },
   { title: "Ventas", url: "/ventas", icon: ShoppingCart, modulo: "ventas" },
   {
@@ -164,7 +168,10 @@ export function AppSidebar() {
     (isComercioLoading ? "Cargando..." : "Comercio");
   const isModuloEnabled = (modulo?: ModuloSistema) =>
     !modulo || parametrizacion.modulos[modulo];
-  const enabledMenuItems = menuItems.filter((item) =>
+  const enabledMenuItems = [
+    ...(parametrizacion.inicio.habilitado ? [{ title: "Inicio", url: "/inicio", icon: LayoutDashboard }] : []),
+    ...menuItems,
+  ].filter((item) =>
     isModuloEnabled(item.modulo)
   );
   const enabledConfiguracionItems = configuracionItems.filter((item) =>

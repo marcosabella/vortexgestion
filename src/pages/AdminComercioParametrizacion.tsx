@@ -66,9 +66,18 @@ export default function AdminComercioParametrizacion() {
     }));
   };
 
+  const setInicio = (key: "habilitado" | keyof ComercioParametrizacion["inicio"]["tarjetas"], value: boolean) => {
+    setDraft((current) => {
+      const base = normalizeParametrizacion(current || parametros);
+      return key === "habilitado"
+        ? { ...base, inicio: { ...base.inicio, habilitado: value } }
+        : { ...base, inicio: { ...base.inicio, tarjetas: { ...base.inicio.tarjetas, [key]: value } } };
+    });
+  };
+
   const guardar = () => {
     updateParametrizacion.mutate(parametros, {
-      onSuccess: (data: any) => setDraft(normalizeParametrizacion(data.parametros)),
+      onSuccess: (data) => setDraft(normalizeParametrizacion((data as { parametros: ComercioParametrizacion }).parametros)),
     });
   };
 
@@ -120,6 +129,29 @@ export default function AdminComercioParametrizacion() {
                 A4 se utiliza por defecto. El formato de 58 mm adapta el contenido al ancho de una impresora termica.
               </p>
             </div>
+          </CardContent>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Inicio operativo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4 rounded-md border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="inicio-operativo" className="text-base">Habilitar inicio operativo</Label>
+                <p className="text-sm text-muted-foreground">Al activarlo, el comercio ingresará a un resumen diario y verá el acceso Inicio en el menú.</p>
+              </div>
+              <Switch id="inicio-operativo" className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600" checked={parametros.inicio.habilitado} onCheckedChange={(checked) => setInicio("habilitado", checked)} />
+            </div>
+            {parametros.inicio.habilitado && <div className="grid gap-3 md:grid-cols-2">
+              {([
+                ["ventas_hoy", "Ventas de hoy", "Cantidad e importe vendido durante la jornada."],
+                ["caja_actual", "Caja actual", "Estado de la caja abierta para hoy."],
+                ["stock_critico", "Stock crítico", "Productos sin existencias o con stock menor o igual a cero."],
+                ["cuenta_corriente", "Cuenta corriente", "Clientes con saldo pendiente."],
+                ["cheques_proximos", "Cheques próximos", "Cheques en cartera que vencen dentro de los próximos 7 días."],
+              ] as const).map(([key, label, description]) => <div key={key} className="flex items-center justify-between gap-4 rounded-md border p-4"><div><Label htmlFor={`inicio-${key}`} className="text-base">{label}</Label><p className="text-sm text-muted-foreground">{description}</p></div><Switch id={`inicio-${key}`} checked={parametros.inicio.tarjetas[key]} onCheckedChange={(checked) => setInicio(key, checked)} /></div>)}
+            </div>}
           </CardContent>
         </Card>
         <Card>

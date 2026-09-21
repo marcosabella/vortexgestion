@@ -76,6 +76,11 @@ import CampoParteDetalle from "./pages/CampoParteDetalle";
 import CampoPartesPendientes from "./pages/CampoPartesPendientes";
 import CampoTelemetria from "./pages/CampoTelemetria";
 import CampoTelemetriaDetalle from "./pages/CampoTelemetriaDetalle";
+import InicioOperativo from "./pages/InicioOperativo";
+import Compras from "./pages/Compras";
+import NuevaCompra from "./pages/NuevaCompra";
+import EditarCompra from "./pages/EditarCompra";
+import CuentaCorrienteProveedores from "./pages/CuentaCorrienteProveedores";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +146,7 @@ function AuthenticatedLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { noLeidas } = useNotificaciones();
+  const { data: parametrizacion } = useComercioParametrizacion();
 
   useEffect(() => {
     if (!session) return;
@@ -199,11 +205,16 @@ function AuthenticatedLayout() {
           </header>
           <main className="flex-1 bg-background">
             <Routes>
-              <Route path="/" element={<Navigate to="/caja" replace />} />
+              <Route path="/" element={<Navigate to={parametrizacion.inicio.habilitado ? "/inicio" : "/caja"} replace />} />
+              <Route path="/inicio" element={parametrizacion.inicio.habilitado ? <InicioOperativo /> : <Navigate to="/caja" replace />} />
               <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
               <Route path="/clientes/nuevo" element={<ParametrizedRoute modulo="clientes"><NuevoCliente /></ParametrizedRoute>} />
               <Route path="/proveedores" element={<ParametrizedRoute modulo="proveedores"><Proveedores /></ParametrizedRoute>} />
               <Route path="/proveedores/nuevo" element={<ParametrizedRoute modulo="proveedores"><NuevoProveedor /></ParametrizedRoute>} />
+              <Route path="/compras" element={<ParametrizedRoute modulo="compras"><Compras /></ParametrizedRoute>} />
+              <Route path="/compras/nueva" element={<ParametrizedRoute modulo="compras"><NuevaCompra /></ParametrizedRoute>} />
+              <Route path="/compras/:compraId/editar" element={<ParametrizedRoute modulo="compras"><EditarCompra /></ParametrizedRoute>} />
+              <Route path="/compras/cuenta-corriente" element={<ParametrizedRoute modulo="compras"><CuentaCorrienteProveedores /></ParametrizedRoute>} />
               <Route path="/productos" element={<ParametrizedRoute modulo="productos"><Productos /></ParametrizedRoute>} />
               <Route path="/productos/nuevo" element={<ParametrizedRoute modulo="productos"><NuevoProducto /></ParametrizedRoute>} />
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />

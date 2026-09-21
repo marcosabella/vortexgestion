@@ -37,7 +37,8 @@ export default function Login() {
 
   const redirectTo = useMemo(() => {
     const state = location.state as LoginLocationState | null;
-    return state?.from?.pathname && state.from.pathname !== "/login" ? state.from.pathname : "/caja";
+    // /inicio redirige internamente a Caja cuando el administrador no habilitó el inicio operativo.
+    return state?.from?.pathname && state.from.pathname !== "/login" ? state.from.pathname : "/inicio";
   }, [location.state]);
 
   useEffect(() => {

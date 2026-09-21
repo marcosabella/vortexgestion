@@ -35,6 +35,7 @@ const defaultParametrizacion = {
     caja: true,
     clientes: true,
     proveedores: true,
+    compras: false,
     productos: true,
     ventas: true,
     cuenta_corriente: true,
@@ -59,6 +60,16 @@ const defaultParametrizacion = {
   },
   impresion: {
     formato_comprobante: 'a4',
+  },
+  inicio: {
+    habilitado: false,
+    tarjetas: {
+      ventas_hoy: true,
+      caja_actual: true,
+      stock_critico: true,
+      cuenta_corriente: true,
+      cheques_proximos: true,
+    },
   },
 };
 
@@ -533,6 +544,13 @@ function mergeParametrizacion(parametros: any) {
     },
     impresion: {
       formato_comprobante: parametros?.impresion?.formato_comprobante === '58mm' ? '58mm' : 'a4',
+    },
+    inicio: {
+      habilitado: parametros?.inicio?.habilitado === true,
+      tarjetas: {
+        ...defaultParametrizacion.inicio.tarjetas,
+        ...(parametros?.inicio?.tarjetas || {}),
+      },
     },
   };
 }

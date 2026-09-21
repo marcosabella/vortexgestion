@@ -34,6 +34,7 @@ type ImagenPendiente = { file: File; previewUrl: string };
 interface ProductoFormProps {
   producto?: Producto;
   onClose?: () => void;
+  onSaved?: (producto: Producto) => void;
   showTitle?: boolean;
 }
 
@@ -44,7 +45,7 @@ type ProductoFormData = Producto & {
   subrubro?: unknown;
 };
 
-export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFormProps) => {
+export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: ProductoFormProps) => {
   const { createProducto, updateProducto, isCreating, isUpdating } = useProductos();
   const { data: proveedores = [] } = useProveedores();
   const { marcas } = useMarcas();
@@ -185,6 +186,8 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
     }
 
     const loadImages = async () => {
+      // La tabla fue agregada por migración y aún no forma parte de los tipos generados locales.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("producto_imagenes")
         .select("id, storage_path, orden")
@@ -246,6 +249,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
       toast({ variant: "destructive", title: "No se pudo eliminar la imagen", description: storageError.message });
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("producto_imagenes").delete().eq("id", image.id);
     if (error) {
       toast({ variant: "destructive", title: "No se pudo eliminar la imagen", description: error.message });
@@ -275,6 +279,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
         const orden = [1, 2, 3, 4, 5].find((position) => !usedOrders.has(position));
         if (!orden) throw new Error("Cada producto admite hasta cinco imagenes.");
         usedOrders.add(orden);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
           .from("producto_imagenes")
           .insert({ producto_id: savedProducto.id, comercio_id: comercioId, storage_path: storagePath, orden })
@@ -305,10 +310,11 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
     } = data as ProductoFormData;
     cleanData.descripcion_tienda_html = sanitizeProductDescription(cleanData.descripcion_tienda_html);
     
-    const afterSuccess = () => {
+    const afterSuccess = (savedProducto: Producto) => {
       if (!producto) {
         reset();
       }
+      onSaved?.(savedProducto);
       onClose?.();
     };
 
@@ -319,7 +325,7 @@ export const ProductoForm = ({ producto, onClose, showTitle = true }: ProductoFo
           await guardarVariantes(savedProducto.id, variantes);
         }
         await uploadPendingImages(savedProducto);
-        afterSuccess();
+        afterSuccess(savedProducto);
       } catch (error) {
         toast({ variant: "destructive", title: "Producto guardado", description: `No se pudieron guardar todos los datos: ${error instanceof Error ? error.message : "intente nuevamente"}` });
       }

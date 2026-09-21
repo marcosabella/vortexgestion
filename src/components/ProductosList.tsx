@@ -14,6 +14,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useProductos } from "@/hooks/useProductos";
 import { useToast } from "@/hooks/use-toast";
 import { ProductoForm } from "@/components/ProductoForm";
+import { AjusteStockDialog } from "@/components/AjusteStockDialog";
 import { Producto } from "@/types/producto";
 import { buildProductoEtiquetasPdfFile, buildProductosEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
 
@@ -270,6 +271,7 @@ export const ProductosList = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <AjusteStockDialog productoId={producto.id} descripcion={producto.descripcion} />
                         <Button
                           variant="outline"
                           size="sm"

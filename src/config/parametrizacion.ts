@@ -2,6 +2,7 @@ export type ModuloSistema =
   | "caja"
   | "clientes"
   | "proveedores"
+  | "compras"
   | "productos"
   | "ventas"
   | "presupuestos"
@@ -37,6 +38,16 @@ export type FormatoComprobante = "a4" | "58mm";
 export type ComercioParametrizacion = {
   modulos: Record<ModuloSistema, boolean>;
   funciones: Record<FuncionSistema, boolean>;
+  inicio: {
+    habilitado: boolean;
+    tarjetas: {
+      ventas_hoy: boolean;
+      caja_actual: boolean;
+      stock_critico: boolean;
+      cuenta_corriente: boolean;
+      cheques_proximos: boolean;
+    };
+  };
   impresion: {
     formato_comprobante: FormatoComprobante;
   };
@@ -46,6 +57,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "caja", label: "Caja diaria", description: "Apertura, movimientos y cierre de caja." },
   { key: "clientes", label: "Clientes", description: "Alta, edicion y consulta de clientes." },
   { key: "proveedores", label: "Proveedores", description: "Gestion de proveedores." },
+  { key: "compras", label: "Compras y reposicion", description: "Ordenes de compra, recepcion de mercaderia y actualizacion de costos." },
   { key: "productos", label: "Productos", description: "Catalogo, stock, marcas, rubros y subrubros." },
   { key: "ventas", label: "Ventas", description: "Registro y consulta de ventas." },
   { key: "presupuestos", label: "Presupuestos", description: "Emision de presupuestos y conversion a ventas." },
@@ -85,6 +97,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
       {} as Record<ModuloSistema, boolean>,
     ),
     pedidos_online: false,
+    compras: false,
     mercado_pago: true,
     whatsapp: false,
     extintores: false,
@@ -103,6 +116,17 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
   impresion: {
     formato_comprobante: "a4",
   },
+  inicio: {
+    // Se mantiene apagado para no cambiar el ingreso de comercios existentes.
+    habilitado: false,
+    tarjetas: {
+      ventas_hoy: true,
+      caja_actual: true,
+      stock_critico: true,
+      cuenta_corriente: true,
+      cheques_proximos: true,
+    },
+  },
 };
 
 export function normalizeParametrizacion(value?: Partial<ComercioParametrizacion> | null): ComercioParametrizacion {
@@ -114,6 +138,13 @@ export function normalizeParametrizacion(value?: Partial<ComercioParametrizacion
     funciones: {
       ...DEFAULT_PARAMETRIZACION.funciones,
       ...(value?.funciones || {}),
+    },
+    inicio: {
+      habilitado: value?.inicio?.habilitado === true,
+      tarjetas: {
+        ...DEFAULT_PARAMETRIZACION.inicio.tarjetas,
+        ...(value?.inicio?.tarjetas || {}),
+      },
     },
     impresion: {
       formato_comprobante: value?.impresion?.formato_comprobante === "58mm" ? "58mm" : "a4",
