@@ -133,7 +133,7 @@ const calcularTotalesVenta = (
 
 const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta", ordenTrabajoInicial }) => {
   const { toast } = useToast()
-  const { createVentaAsync, updateVenta } = useVentas()
+  const { createVentaAsync, updateVenta, isCreating } = useVentas()
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
   const { comercio } = useComercio()
@@ -711,15 +711,6 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const onSubmit = async (data: VentaFormData) => {
-    if (!esPresupuesto && !venta && !puntoVentaValido) {
-      toast({
-        title: "Configuración requerida",
-        description: "Configurá un punto de venta activo antes de registrar la venta.",
-        variant: "destructive",
-      })
-      return
-    }
-
     if (ventaItems.length === 0) {
       toast({
         title: "Error",
@@ -1502,7 +1493,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   <Button type="button" variant="cancel" onClick={() => setFinalizarDialogOpen(false)}>
                     Volver
                   </Button>
-                  <Button type="button" variant="success" disabled={mercadoPagoWorking} onClick={form.handleSubmit(onSubmit)}>
+                  <Button type="button" variant="success" disabled={mercadoPagoWorking || isCreating} onClick={form.handleSubmit(onSubmit)}>
                     {mercadoPagoWorking ? "Generando QR..." : venta ? "Confirmar actualizacion" : esPresupuesto ? "Guardar presupuesto" : "Confirmar venta"}
                   </Button>
                 </DialogFooter>
