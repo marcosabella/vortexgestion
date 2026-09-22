@@ -94,6 +94,7 @@ export const usePresupuestos = () => {
           return {
             presupuesto_id: id,
             producto_id: productoId,
+            producto_variante_id: productoId ? item.producto_variante_id || null : null,
             descripcion_manual: productoId ? null : descripcionManual,
             codigo_manual: productoId ? null : item.codigo_manual?.trim() || null,
             cantidad: item.cantidad,
@@ -158,7 +159,7 @@ export const usePresupuestos = () => {
   const confirmMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await db.rpc("confirmar_presupuesto", { p_presupuesto_id: id });
-      if (error) throw error;
+      if (error) throw new Error(getDatabaseErrorMessage(error));
       return data as string;
     },
     onSuccess: () => {
