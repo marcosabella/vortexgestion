@@ -135,29 +135,39 @@ export type FacturaProveedor = {
   movimientos: Array<{ tipo: "deuda" | "pago"; monto: number }>;
 };
 
-export function useCompras() {
+type UseComprasOptions = {
+  proveedorId?: string;
+  cargarCompras?: boolean;
+  cargarFacturas?: boolean;
+};
+
+export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas = true }: UseComprasOptions = {}) {
   const client = useQueryClient();
   const { comercio } = useComercio();
   const { toast } = useToast();
   const comercioId = comercio?.id;
   const comprasQuery = useQuery({
     queryKey: ["compras", comercioId],
-    enabled: !!comercioId,
+    enabled: Boolean(comercioId && cargarCompras),
     queryFn: async () => {
-      const { data, error } = await db.from("compras").select(
+      let query = db.from("compras").select(
         "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), compra_items(*, producto:productos(cod_producto,descripcion))",
-      ).eq("comercio_id", comercioId).gt("total", 0).order("created_at", { ascending: false });
+      ).eq("comercio_id", comercioId);
+      if (proveedorId) query = query.eq("proveedor_id", proveedorId);
+      const { data, error } = await query.gt("total", 0).order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as Compra[];
     },
   });
   const facturasQuery = useQuery({
     queryKey: ["compras-facturas", comercioId],
-    enabled: !!comercioId,
+    enabled: Boolean(comercioId && cargarFacturas),
     queryFn: async () => {
-      const { data, error } = await db.from("compras_facturas").select(
+      let query = db.from("compras_facturas").select(
         "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), movimientos:cuenta_corriente_proveedores(tipo,monto)",
-      ).eq("comercio_id", comercioId).order("fecha", { ascending: false });
+      ).eq("comercio_id", comercioId);
+      if (proveedorId) query = query.eq("proveedor_id", proveedorId);
+      const { data, error } = await query.order("fecha", { ascending: false });
       if (error) throw error;
       return (data || []) as FacturaProveedor[];
     },
@@ -166,10 +176,12 @@ export function useCompras() {
     queryKey: ["cuenta-proveedores", comercioId],
     enabled: !!comercioId,
     queryFn: async () => {
-      const { data, error } = await db.from("cuenta_corriente_proveedores")
+      let query = db.from("cuenta_corriente_proveedores")
         .select(
-          "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), factura:compras_facturas(numero_comprobante,fecha_vencimiento,compra_id), gasto:gastos_egresos(concepto,numero_comprobante), cheque:cheques(numero_cheque,banco_emisor,monto,tipo_cheque)",
-        ).eq("comercio_id", comercioId).order("fecha", { ascending: false });
+          "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), factura:compras_facturas(numero_comprobante,fecha_vencimiento,compra_id), gasto:gastos_egresos(concepto,numero_comprobante), cheque:cheques!cuenta_corriente_proveedores_cheque_id_fkey(numero_cheque,banco_emisor,monto,tipo_cheque)",
+        ).eq("comercio_id", comercioId);
+      if (proveedorId) query = query.eq("proveedor_id", proveedorId);
+      const { data, error } = await query.order("fecha", { ascending: false });
       if (error) throw error;
       return (data || []) as MovimientoProveedor[];
     },
@@ -513,6 +525,7 @@ export function useCompras() {
     compras: comprasQuery.data || [],
     facturas: facturasQuery.data || [],
     movimientos: movimientosQuery.data || [],
+    error: comprasQuery.error || facturasQuery.error || movimientosQuery.error,
     isLoading: comprasQuery.isLoading || facturasQuery.isLoading ||
       movimientosQuery.isLoading,
     confirmarCompra,

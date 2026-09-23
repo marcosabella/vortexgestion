@@ -18,12 +18,13 @@ function invalidateGastos(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ["cuenta-proveedores"] });
 }
 
-export function useGastosEgresos(desde?: string, hasta?: string) {
+export function useGastosEgresos(desde?: string, hasta?: string, proveedorId?: string) {
   const { comercio } = useComercio(); const comercioId = comercio?.id;
-  return useQuery({ queryKey: ["gastos-egresos", comercioId, desde, hasta], enabled: Boolean(comercioId), queryFn: async () => {
+  return useQuery({ queryKey: ["gastos-egresos", comercioId, desde, hasta, proveedorId], enabled: Boolean(comercioId), queryFn: async () => {
     let query = db.from("gastos_egresos").select("*, proveedor:proveedores(nombre, apellido, razon_social, cuit)").eq("comercio_id", comercioId).order("fecha", { ascending: false });
     if (desde) query = query.gte("fecha", desde);
     if (hasta) query = query.lte("fecha", hasta);
+    if (proveedorId) query = query.eq("proveedor_id", proveedorId);
     const { data, error } = await query;
     if (error) throw error;
     return (data || []) as GastoEgreso[];

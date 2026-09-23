@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { type ChequePropioPago, type FacturaProveedor, type PagoProveedorBorrador, useCompras } from "@/hooks/useCompras";
 import { useGastosEgresos } from "@/hooks/useGastosEgresos";
 import { useCheques } from "@/hooks/useCheques";
@@ -23,12 +23,14 @@ const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/
 const methodLabels: Record<PaymentRow["tipo"], string> = { contado: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", cheque: "Cheque" };
 
 export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: Props) {
-  const { movimientos, facturas, registrarPagosMixtos } = useCompras();
-  const { data: gastos = [] } = useGastosEgresos();
+  const { movimientos, facturas, registrarPagosMixtos } = useCompras({ proveedorId: providerId, cargarCompras: false });
+  const { data: gastos = [] } = useGastosEgresos(undefined, undefined, providerId);
   const { cheques = [] } = useCheques();
   const { comercio } = useComercio();
   const { toast } = useToast();
   const [documentValue, setDocumentValue] = useState("");
+  const [documentOpen, setDocumentOpen] = useState(false);
+  const [documentSearch, setDocumentSearch] = useState("");
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [method, setMethod] = useState<PaymentRow["tipo"]>("contado");
   const [amount, setAmount] = useState(0);
@@ -43,6 +45,9 @@ export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: 
   const expenseBalance = (expenseId: string) => movimientos.filter((movement) => movement.gasto_egreso_id === expenseId).reduce((sum, movement) => sum + (movement.tipo === "deuda" ? Number(movement.monto) : -Number(movement.monto)), 0);
   const pendingInvoices = facturas.filter((invoice) => invoice.proveedor_id === providerId && invoiceBalance(invoice) > 0);
   const pendingExpenses = gastos.filter((expense) => expense.proveedor_id === providerId && expense.medio_pago === "cuenta_corriente" && expenseBalance(expense.id) > 0);
+  const normalizedDocumentSearch = documentSearch.trim().toLocaleLowerCase("es");
+  const visibleInvoices = pendingInvoices.filter((item) => !normalizedDocumentSearch || `${item.numero_comprobante} factura`.toLocaleLowerCase("es").includes(normalizedDocumentSearch));
+  const visibleExpenses = pendingExpenses.filter((item) => !normalizedDocumentSearch || `${item.numero_comprobante || ""} ${item.concepto} gasto egreso`.toLocaleLowerCase("es").includes(normalizedDocumentSearch));
   const invoice = documentValue.startsWith("invoice:") ? facturas.find((item) => item.id === documentValue.slice(8)) || null : null;
   const expense = documentValue.startsWith("expense:") ? gastos.find((item) => item.id === documentValue.slice(8)) || null : null;
   const debt = invoice ? invoiceBalance(invoice) : expense ? expenseBalance(expense.id) : 0;
@@ -56,11 +61,11 @@ export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: 
 
   useEffect(() => {
     if (!open) return;
-    setDocumentValue(""); setRows([]); setMethod("contado"); setAmount(0); setDate(today()); setNotes(""); setChequeOpen(false); setSelectedChequeIds([]); setOwnAmount(0);
+    setDocumentValue(""); setDocumentOpen(false); setDocumentSearch(""); setRows([]); setMethod("contado"); setAmount(0); setDate(today()); setNotes(""); setChequeOpen(false); setSelectedChequeIds([]); setOwnAmount(0);
     setOwnCheque({ numero_cheque: "", banco_emisor: "", fecha_emision: today(), fecha_vencimiento: today(), emisor_nombre: comercio?.nombre_comercio || "", emisor_cuit: comercio?.cuit || "", observaciones: "" });
   }, [comercio?.cuit, comercio?.nombre_comercio, open]);
 
-  const selectDocument = (value: string) => { setDocumentValue(value); setRows([]); setAmount(0); };
+  const selectDocument = (value: string) => { setDocumentValue(value); setRows([]); setAmount(0); setDocumentOpen(false); };
   const addRegularPayment = () => {
     if (!documentValue || amount <= 0 || amount > remaining) { toast({ title: "Importe inválido", description: "El importe debe ser mayor que cero y no superar el saldo restante.", variant: "destructive" }); return; }
     setRows((current) => [...current, { localId: crypto.randomUUID(), tipo: method, monto: amount, detail: methodLabels[method] }]);
@@ -87,12 +92,21 @@ export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: 
 
   return <>
     <Dialog open={open} onOpenChange={(next) => !registrarPagosMixtos.isPending && onOpenChange(next)}><DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Registrar pago a proveedor</DialogTitle></DialogHeader>
-      <div className="space-y-2"><Label>Factura o gasto pendiente</Label><Select value={documentValue} onValueChange={selectDocument}><SelectTrigger><SelectValue placeholder="Seleccioná el documento a pagar" /></SelectTrigger><SelectContent>{pendingInvoices.map((item) => <SelectItem key={`invoice:${item.id}`} value={`invoice:${item.id}`}>Factura {item.numero_comprobante} · Saldo {money(invoiceBalance(item))}</SelectItem>)}{pendingExpenses.map((item: GastoEgreso) => <SelectItem key={`expense:${item.id}`} value={`expense:${item.id}`}>Gasto {item.numero_comprobante || item.concepto} · Saldo {money(expenseBalance(item.id))}</SelectItem>)}</SelectContent></Select></div>
+      <div className="space-y-2"><Label>Factura o gasto pendiente</Label><div className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0">{invoice ? <><p className="font-medium">Factura {invoice.numero_comprobante}</p><p className="text-sm text-muted-foreground">Saldo pendiente: {money(debt)}</p></> : expense ? <><p className="truncate font-medium">Gasto {expense.numero_comprobante || expense.concepto}</p><p className="text-sm text-muted-foreground">{expense.concepto} · Saldo pendiente: {money(debt)}</p></> : <p className="text-sm text-muted-foreground">Todavía no seleccionaste un comprobante.</p>}</div><Button type="button" variant="outline" className="shrink-0" onClick={() => { setDocumentSearch(""); setDocumentOpen(true); }}><Search className="mr-2 h-4 w-4" />Buscar comprobante</Button></div></div>
       <div className="grid gap-3 rounded-lg bg-muted p-4 sm:grid-cols-3"><Summary label="Deuda seleccionada" value={debt} /><Summary label="Total agregado" value={assigned} className="text-green-600" /><Summary label="Saldo restante" value={remaining} className="text-orange-600" /></div>
       <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_1fr_auto]"><div className="space-y-2"><Label>Medio de pago</Label><Select value={method} onValueChange={(value) => setMethod(value as PaymentRow["tipo"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contado">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="cheque">Cheque</SelectItem></SelectContent></Select></div>{method !== "cheque" ? <div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={amount || ""} onChange={(event) => setAmount(Number(event.target.value))} /></div> : <div className="flex items-end"><p className="pb-2 text-sm text-muted-foreground">Podés seleccionar varios cheques propios o de terceros.</p></div>}<div className="flex items-end"><Button type="button" disabled={!documentValue || remaining <= 0} onClick={method === "cheque" ? openChequeSelector : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Seleccionar cheques" : "Agregar"}</Button></div></div>
       <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Medio</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Importe</TableHead><TableHead className="w-16" /></TableRow></TableHeader><TableBody>{rows.length === 0 ? <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Todavía no agregaste medios de pago.</TableCell></TableRow> : rows.map((row) => <TableRow key={row.localId}><TableCell>{methodLabels[row.tipo]}</TableCell><TableCell>{row.detail}</TableCell><TableCell className="text-right font-medium">{money(row.monto)}</TableCell><TableCell><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => setRows((current) => current.filter((item) => item.localId !== row.localId))}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div>
       <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Fecha</Label><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div><div className="space-y-2"><Label>Observaciones generales</Label><Input value={notes} onChange={(event) => setNotes(event.target.value)} /></div></div>
       <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={registrarPagosMixtos.isPending}>Cancelar</Button><Button onClick={submit} disabled={!documentValue || rows.length === 0 || assigned > debt || registrarPagosMixtos.isPending}>Confirmar pago</Button></DialogFooter>
+    </DialogContent></Dialog>
+
+    <Dialog open={documentOpen} onOpenChange={setDocumentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Seleccionar comprobante pendiente</DialogTitle></DialogHeader>
+      <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input autoFocus className="pl-9" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Buscar por número de comprobante o concepto" /></div>
+      <div className="max-h-[55vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Tipo</TableHead><TableHead>Comprobante / concepto</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Saldo pendiente</TableHead><TableHead className="w-28" /></TableRow></TableHeader><TableBody>
+        {visibleInvoices.map((item) => <TableRow key={`invoice:${item.id}`}><TableCell>Factura</TableCell><TableCell className="font-medium">{item.numero_comprobante}</TableCell><TableCell>{new Date(`${item.fecha}T00:00:00`).toLocaleDateString("es-AR")}</TableCell><TableCell className="text-right font-medium">{money(invoiceBalance(item))}</TableCell><TableCell className="text-right"><Button type="button" size="sm" onClick={() => selectDocument(`invoice:${item.id}`)}>Seleccionar</Button></TableCell></TableRow>)}
+        {visibleExpenses.map((item: GastoEgreso) => <TableRow key={`expense:${item.id}`}><TableCell>Gasto / egreso</TableCell><TableCell><p className="font-medium">{item.numero_comprobante || "Sin comprobante"}</p><p className="max-w-md truncate text-xs text-muted-foreground">{item.concepto}</p></TableCell><TableCell>{new Date(`${item.fecha}T00:00:00`).toLocaleDateString("es-AR")}</TableCell><TableCell className="text-right font-medium">{money(expenseBalance(item.id))}</TableCell><TableCell className="text-right"><Button type="button" size="sm" onClick={() => selectDocument(`expense:${item.id}`)}>Seleccionar</Button></TableCell></TableRow>)}
+        {visibleInvoices.length === 0 && visibleExpenses.length === 0 && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No se encontraron comprobantes pendientes.</TableCell></TableRow>}
+      </TableBody></Table></div><DialogFooter><Button type="button" variant="outline" onClick={() => setDocumentOpen(false)}>Cerrar</Button></DialogFooter>
     </DialogContent></Dialog>
 
     <Dialog open={chequeOpen} onOpenChange={setChequeOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Agregar cheques al pago</DialogTitle></DialogHeader><div className="grid gap-3 rounded-lg bg-muted p-4 sm:grid-cols-4"><Summary label="Deuda total" value={debt} /><Summary label="Saldo disponible" value={remaining} /><Summary label="Cheques marcados" value={selectedChequeTotal} className="text-green-600" /><Summary label="Disponible luego" value={remaining - selectedChequeTotal} className="text-orange-600" /></div><Tabs defaultValue="terceros"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="terceros">De terceros en cartera</TabsTrigger><TabsTrigger value="propio">Registrar propio</TabsTrigger></TabsList>

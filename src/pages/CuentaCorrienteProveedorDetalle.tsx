@@ -26,11 +26,11 @@ export default function CuentaCorrienteProveedorDetalle() {
   const navigate = useNavigate();
   const { proveedorId = "" } = useParams();
   const {
-    movimientos, editarPago, eliminarPago,
+    movimientos, error: movimientosError, editarPago, eliminarPago,
     editarPagoGasto, eliminarPagoGasto, eliminarPagoCheque, isLoading,
-  } = useCompras();
-  const { data: gastos = [], isLoading: gastosLoading } = useGastosEgresos();
-  const { data: proveedores = [], isLoading: proveedoresLoading } = useProveedores();
+  } = useCompras({ proveedorId, cargarCompras: false, cargarFacturas: false });
+  const { data: gastos = [], isLoading: gastosLoading } = useGastosEgresos(undefined, undefined, proveedorId);
+  const { data: proveedores = [], isLoading: proveedoresLoading } = useProveedores(proveedorId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<MovimientoProveedor | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<MovimientoProveedor | null>(null);
@@ -72,6 +72,7 @@ export default function CuentaCorrienteProveedorDetalle() {
   const loading = isLoading || gastosLoading || proveedoresLoading;
 
   if (loading) return <div className="container mx-auto p-6"><p className="py-12 text-center">Cargando cuenta corriente…</p></div>;
+  if (movimientosError) return <div className="container mx-auto space-y-4 p-6"><Button variant="outline" onClick={() => navigate("/compras/cuenta-corriente")}>Volver al listado</Button><div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive"><p className="font-semibold">No se pudo cargar la cuenta corriente del proveedor.</p><p className="mt-1 text-sm">{movimientosError instanceof Error ? movimientosError.message : "Error desconocido de consulta."}</p></div></div>;
   if (!provider) return <div className="container mx-auto space-y-4 p-6"><Button variant="outline" onClick={() => navigate("/compras/cuenta-corriente")}>Volver al listado</Button><p>No se encontró el proveedor solicitado.</p></div>;
 
   return <div className="container mx-auto space-y-6 p-4 sm:p-6">
@@ -86,7 +87,7 @@ export default function CuentaCorrienteProveedorDetalle() {
       </Tabs>
     </CardContent></Card>
 
-    <PagoProveedorMultipleDialog open={paymentOpen} onOpenChange={setPaymentOpen} providerId={proveedorId} />
+    {paymentOpen && <PagoProveedorMultipleDialog open onOpenChange={setPaymentOpen} providerId={proveedorId} />}
     <Dialog open={!!editingPayment} onOpenChange={(open) => { if (!open) closeEditPayment(); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Modificar pago</DialogTitle></DialogHeader>
       <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></div><div className="space-y-2"><Label>Fecha</Label><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div></div>
       <div className="space-y-2"><Label>Medio de pago</Label><Select value={method} onValueChange={setMethod}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>

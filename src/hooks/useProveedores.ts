@@ -21,16 +21,17 @@ export interface Proveedor {
   tipo_persona: 'fisica' | 'juridica';
 }
 
-export function useProveedores() {
+export function useProveedores(proveedorId?: string) {
   const { comercio } = useComercio(); const comercioId = comercio?.id;
   return useQuery({
-    queryKey: ['proveedores', comercioId], enabled: Boolean(comercioId),
+    queryKey: ['proveedores', comercioId, proveedorId], enabled: Boolean(comercioId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('proveedores')
         .select('*')
-        .eq('comercio_id', comercioId)
-        .order('nombre', { ascending: true });
+        .eq('comercio_id', comercioId);
+      if (proveedorId) query = query.eq('id', proveedorId);
+      const { data, error } = await query.order('nombre', { ascending: true });
       
       if (error) throw error;
       return data as Proveedor[];
