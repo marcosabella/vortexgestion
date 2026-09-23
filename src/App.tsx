@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ModuleHelp } from "@/components/ModuleHelp";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Bell, CalendarClock, LogOut } from "lucide-react";
+import { Bell, Building2, CalendarClock, LogOut } from "lucide-react";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
 import { useComercio } from "@/hooks/useComercio";
@@ -142,12 +142,13 @@ function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; childr
 
 function AuthenticatedLayout() {
   const { session, isLoading, signOut, user } = useAuth();
-  const { comercio } = useComercio();
+  const { comercio, comerciosDisponibles, isLoading: comercioLoading, selectComercio } = useComercio();
   const client = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
   const { noLeidas } = useNotificaciones();
   const { data: parametrizacion } = useComercioParametrizacion();
+  const [selectingComercioId, setSelectingComercioId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -160,6 +161,10 @@ function AuthenticatedLayout() {
     return () => { window.removeEventListener("focus", refreshComercio); document.removeEventListener("visibilitychange", refreshOnVisible); window.clearInterval(timer); };
   }, [client, session]);
 
+  useEffect(() => {
+    if (comercio) setSelectingComercioId(null);
+  }, [comercio]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
@@ -171,6 +176,16 @@ function AuthenticatedLayout() {
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
+
+  if (comercioLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Cargando comercios...
+      </div>
+    );
+  }
+
+  const seleccionRequerida = !comercio && comerciosDisponibles.length > 1;
 
   const handleSignOut = async () => {
     await signOut();
@@ -205,7 +220,7 @@ function AuthenticatedLayout() {
             </Button>
           </header>
           <main className="flex-1 bg-background">
-            <Routes>
+            {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <Routes>
               <Route path="/" element={<Navigate to={parametrizacion.inicio.habilitado ? "/inicio" : "/caja"} replace />} />
               <Route path="/inicio" element={parametrizacion.inicio.habilitado ? <InicioOperativo /> : <Navigate to="/caja" replace />} />
               <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
@@ -271,9 +286,30 @@ function AuthenticatedLayout() {
               <Route path="/listados/gastos-egresos" element={<ParametrizedRoute modulo="listados"><ListadoGastosEgresos /></ParametrizedRoute>} />
               <Route path="/listados/cuenta-corriente" element={<ParametrizedRoute modulo="listados"><ListadoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="*" element={<NotFound />} />
-            </Routes>
+            </Routes>}
           </main>
           <MembershipReminder comercio={comercio} />
+          <Dialog open={seleccionRequerida} onOpenChange={() => undefined}>
+            <DialogContent className="sm:max-w-xl [&>button]:hidden" onEscapeKeyDown={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
+              <DialogHeader>
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Building2 className="h-6 w-6" /></div>
+                <DialogTitle>Seleccioná un comercio</DialogTitle>
+                <DialogDescription>
+                  Tu usuario tiene acceso a más de un comercio. Los datos y movimientos que veas pertenecerán únicamente al comercio elegido.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3 py-2">
+                {comerciosDisponibles.map((item) => {
+                  const selecting = selectingComercioId === item.id;
+                  return <Button key={item.id} type="button" variant="outline" className="h-auto justify-start p-4 text-left" disabled={Boolean(selectingComercioId)} onClick={() => { setSelectingComercioId(item.id); selectComercio(item.id); }}>
+                    <Building2 className="mr-3 h-5 w-5 shrink-0 text-primary" />
+                    <span className="min-w-0"><span className="block truncate font-semibold">{item.nombre_comercio}</span><span className="block text-xs font-normal text-muted-foreground">CUIT {item.cuit || "sin informar"}{selecting ? " · Ingresando..." : ""}</span></span>
+                  </Button>;
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">Podrás cambiar el comercio activo posteriormente desde “Mi Comercio”.</p>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </SidebarProvider>
