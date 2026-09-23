@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useComercio } from '@/hooks/useComercio';
 
 export interface Cliente {
   id?: string;
@@ -21,12 +22,14 @@ export interface Cliente {
 }
 
 export function useClientes() {
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
   return useQuery({
-    queryKey: ['clientes'],
+    queryKey: ['clientes', comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('clientes')
         .select('*, cliente_usuarios(user_id,metodo,created_at)')
+        .eq('comercio_id', comercioId)
         .order('apellido', { ascending: true });
       
       if (error) throw error;
@@ -37,12 +40,14 @@ export function useClientes() {
 
 export function useCreateCliente() {
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
   
   return useMutation({
     mutationFn: async (cliente: Omit<Cliente, 'id'>) => {
+      if (!comercio?.id) throw new Error('Seleccioná un comercio antes de crear el cliente.');
       const { data, error } = await supabase
         .from('clientes')
-        .insert([cliente])
+        .insert([{ ...cliente, comercio_id: comercio.id }])
         .select()
         .single();
       
@@ -61,13 +66,16 @@ export function useCreateCliente() {
 
 export function useUpdateCliente() {
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
   
   return useMutation({
     mutationFn: async ({ id, ...cliente }: Cliente) => {
+      if (!comercio?.id) throw new Error('Seleccioná un comercio antes de actualizar el cliente.');
       const { data, error } = await supabase
         .from('clientes')
         .update(cliente)
         .eq('id', id)
+        .eq('comercio_id', comercio.id)
         .select()
         .single();
       
@@ -86,13 +94,16 @@ export function useUpdateCliente() {
 
 export function useDeleteCliente() {
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
   
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!comercio?.id) throw new Error('Seleccioná un comercio antes de eliminar el cliente.');
       const { error } = await supabase
         .from('clientes')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('comercio_id', comercio.id);
       
       if (error) throw error;
     },

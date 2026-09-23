@@ -45,11 +45,12 @@ const getRpcErrorMessage = (error: unknown) => {
   return message || "No se pudo registrar la venta.";
 };
 
-const assertVentaSinCAE = async (ventaId: string) => {
+const assertVentaSinCAE = async (ventaId: string, comercioId: string) => {
   const { data, error } = await supabase
     .from("ventas")
     .select("cae")
     .eq("id", ventaId)
+    .eq("comercio_id", comercioId)
     .single();
 
   if (error) throw error;
@@ -63,6 +64,7 @@ export const useVentas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio();
+  const comercioId = comercio?.id;
   const afipConfig = useAfipConfig();
 
   const {
@@ -70,7 +72,8 @@ export const useVentas = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["ventas"],
+    queryKey: ["ventas", comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ventas")
@@ -90,6 +93,7 @@ export const useVentas = () => {
             cheque:cheques(numero_cheque, monto, banco_emisor)
           )
         `)
+        .eq("comercio_id", comercioId!)
         .order("fecha_venta", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -249,13 +253,15 @@ export const useVentas = () => {
       items: Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">[]; 
       pagos?: any[]
     }) => {
-      await assertVentaSinCAE(ventaId);
+      if (!comercioId) throw new Error("Seleccione un comercio antes de modificar la venta.");
+      await assertVentaSinCAE(ventaId, comercioId);
 
       // First, delete any existing cuenta corriente movements for this sale
       const { error: deleteCuentaError } = await supabase
         .from("cuenta_corriente")
         .delete()
-        .eq("venta_id", ventaId);
+        .eq("venta_id", ventaId)
+        .eq("comercio_id", comercioId);
 
       if (deleteCuentaError) throw deleteCuentaError;
 
@@ -264,6 +270,7 @@ export const useVentas = () => {
         .from("ventas")
         .update(venta)
         .eq("id", ventaId)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -358,13 +365,15 @@ export const useVentas = () => {
 
   const deleteVentaMutation = useMutation({
     mutationFn: async (id: string) => {
-      await assertVentaSinCAE(id);
+      if (!comercioId) throw new Error("Seleccione un comercio antes de eliminar la venta.");
+      await assertVentaSinCAE(id, comercioId);
 
       // First delete related cuenta corriente movements
       const { error: cuentaError } = await supabase
         .from("cuenta_corriente")
         .delete()
-        .eq("venta_id", id);
+        .eq("venta_id", id)
+        .eq("comercio_id", comercioId);
       
       if (cuentaError) throw cuentaError;
 
@@ -386,7 +395,7 @@ export const useVentas = () => {
       if (mercadoPagoError) throw mercadoPagoError;
 
       // Then delete the sale
-      const { error } = await supabase.from("ventas").delete().eq("id", id);
+      const { error } = await supabase.from("ventas").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

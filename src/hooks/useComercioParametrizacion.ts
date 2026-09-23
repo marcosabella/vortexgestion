@@ -2,38 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_PARAMETRIZACION, FormatoComprobante, normalizeParametrizacion } from "@/config/parametrizacion";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export function useComercioParametrizacion() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { comercio, isLoading: comercioLoading } = useComercio();
+  const comercioId = comercio?.id;
   const query = useQuery({
-    queryKey: ["comercio-parametrizacion", localStorage.getItem("selectedComercioId")],
+    queryKey: ["comercio-parametrizacion", comercioId],
+    enabled: !comercioLoading && Boolean(comercioId),
     queryFn: async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-      if (!user) return DEFAULT_PARAMETRIZACION;
-
-      const selectedComercioId = localStorage.getItem("selectedComercioId");
-      let comercioId = selectedComercioId;
-
-      if (!comercioId) {
-        const { data: memberships, error: membershipsError } = await supabase
-          .from("comercio_usuarios")
-          .select("comercio_id")
-          .eq("user_id", user.id)
-          .eq("activo", true)
-          .order("created_at", { ascending: true });
-
-        if (membershipsError) throw membershipsError;
-        if ((memberships || []).length === 1) {
-          comercioId = memberships[0].comercio_id;
-        }
-      }
-
       if (!comercioId) return DEFAULT_PARAMETRIZACION;
 
       const { data, error } = await (supabase as any)
@@ -67,7 +46,7 @@ export function useComercioParametrizacion() {
     },
     onSuccess: (parametros) => {
       queryClient.setQueryData(
-        ["comercio-parametrizacion", localStorage.getItem("selectedComercioId")],
+        ["comercio-parametrizacion", comercioId],
         parametros,
       );
       toast({ title: "Formato actualizado", description: "El formato de impresion quedo guardado." });

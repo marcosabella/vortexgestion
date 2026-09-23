@@ -81,6 +81,7 @@ import Compras from "./pages/Compras";
 import NuevaCompra from "./pages/NuevaCompra";
 import EditarCompra from "./pages/EditarCompra";
 import CuentaCorrienteProveedores from "./pages/CuentaCorrienteProveedores";
+import CuentaCorrienteProveedorDetalle from "./pages/CuentaCorrienteProveedorDetalle";
 
 const queryClient = new QueryClient();
 
@@ -215,6 +216,7 @@ function AuthenticatedLayout() {
               <Route path="/compras/nueva" element={<ParametrizedRoute modulo="compras"><NuevaCompra /></ParametrizedRoute>} />
               <Route path="/compras/:compraId/editar" element={<ParametrizedRoute modulo="compras"><EditarCompra /></ParametrizedRoute>} />
               <Route path="/compras/cuenta-corriente" element={<ParametrizedRoute modulo="compras"><CuentaCorrienteProveedores /></ParametrizedRoute>} />
+              <Route path="/compras/cuenta-corriente/:proveedorId" element={<ParametrizedRoute modulo="compras"><CuentaCorrienteProveedorDetalle /></ParametrizedRoute>} />
               <Route path="/productos" element={<ParametrizedRoute modulo="productos"><Productos /></ParametrizedRoute>} />
               <Route path="/productos/nuevo" element={<ParametrizedRoute modulo="productos"><NuevoProducto /></ParametrizedRoute>} />
               <Route path="/ventas" element={<ParametrizedRoute modulo="ventas"><Ventas /></ParametrizedRoute>} />

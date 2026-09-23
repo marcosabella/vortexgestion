@@ -2,10 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export const useCuentaCorriente = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
+  const comercioId = comercio?.id;
 
   // Get all movements
   const {
@@ -13,7 +16,8 @@ export const useCuentaCorriente = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["cuenta-corriente"],
+    queryKey: ["cuenta-corriente", comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cuenta_corriente")
@@ -22,6 +26,7 @@ export const useCuentaCorriente = () => {
           cliente:clientes(nombre, apellido, cuit, telefono),
           venta:ventas(numero_comprobante, cae)
         `)
+        .eq("comercio_id", comercioId!)
         .order("fecha_movimiento", { ascending: false });
 
       if (error) throw error;
@@ -32,7 +37,7 @@ export const useCuentaCorriente = () => {
   // Get movements by client
   const useMovimientosByCliente = (clienteId: string | null) => {
     return useQuery({
-      queryKey: ["cuenta-corriente", "cliente", clienteId],
+      queryKey: ["cuenta-corriente", comercioId, "cliente", clienteId],
       queryFn: async () => {
         if (!clienteId) return [];
         
@@ -43,20 +48,22 @@ export const useCuentaCorriente = () => {
             cliente:clientes(nombre, apellido, cuit, telefono),
             venta:ventas(numero_comprobante, cae)
           `)
+          .eq("comercio_id", comercioId!)
           .eq("cliente_id", clienteId)
           .order("fecha_movimiento", { ascending: false });
 
         if (error) throw error;
         return data as CuentaCorriente[];
       },
-      enabled: !!clienteId,
+      enabled: Boolean(comercioId && clienteId),
     });
   };
 
   // Get account summary by client
   const getResumenCuentaCorreinte = () => {
     return useQuery({
-      queryKey: ["cuenta-corriente", "resumen"],
+      queryKey: ["cuenta-corriente", comercioId, "resumen"],
+      enabled: Boolean(comercioId),
       queryFn: async () => {
         // Manual calculation since RPC function doesn't exist yet
         const { data: movimientos, error: movError } = await supabase
@@ -67,7 +74,8 @@ export const useCuentaCorriente = () => {
             monto,
             fecha_movimiento,
             cliente:clientes(nombre, apellido, cuit, telefono)
-          `);
+          `)
+          .eq("comercio_id", comercioId!);
 
         if (movError) throw movError;
 
@@ -111,9 +119,10 @@ export const useCuentaCorriente = () => {
 
   const createMovimientoMutation = useMutation({
     mutationFn: async (movimiento: Omit<CuentaCorriente, "id" | "created_at" | "updated_at">) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el movimiento.");
       const { data, error } = await supabase
         .from("cuenta_corriente")
-        .insert([movimiento])
+        .insert([{ ...movimiento, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -138,7 +147,8 @@ export const useCuentaCorriente = () => {
 
   const deleteMovimientoMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("cuenta_corriente").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar el movimiento.");
+      const { error } = await supabase.from("cuenta_corriente").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -159,10 +169,12 @@ export const useCuentaCorriente = () => {
 
   const deleteVentaFromCuentaMutation = useMutation({
     mutationFn: async (ventaId: string) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar la venta.");
       const { data: venta, error: ventaConsultaError } = await supabase
         .from("ventas")
         .select("cae")
         .eq("id", ventaId)
+        .eq("comercio_id", comercioId)
         .single();
 
       if (ventaConsultaError) throw ventaConsultaError;
@@ -175,7 +187,8 @@ export const useCuentaCorriente = () => {
       const { error: cuentaError } = await supabase
         .from("cuenta_corriente")
         .delete()
-        .eq("venta_id", ventaId);
+        .eq("venta_id", ventaId)
+        .eq("comercio_id", comercioId);
       
       if (cuentaError) throw cuentaError;
 
@@ -183,7 +196,8 @@ export const useCuentaCorriente = () => {
       const { error: ventaError } = await supabase
         .from("ventas")
         .delete()
-        .eq("id", ventaId);
+        .eq("id", ventaId)
+        .eq("comercio_id", comercioId);
       
       if (ventaError) throw ventaError;
     },

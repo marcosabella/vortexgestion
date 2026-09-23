@@ -2,21 +2,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Rubro } from "@/types/producto";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export const useRubros = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
 
   const {
     data: rubros = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["rubros"],
+    queryKey: ["rubros", comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rubros")
         .select("*")
+        .eq("comercio_id", comercioId!)
         .order("nombre", { ascending: true });
 
       if (error) throw error;
@@ -26,9 +29,10 @@ export const useRubros = () => {
 
   const createRubroMutation = useMutation({
     mutationFn: async (rubro: Omit<Rubro, "id" | "created_at" | "updated_at">) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de crear el rubro.");
       const { data, error } = await supabase
         .from("rubros")
-        .insert([rubro])
+        .insert([{ ...rubro, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -53,10 +57,12 @@ export const useRubros = () => {
 
   const updateRubroMutation = useMutation({
     mutationFn: async ({ id, ...rubro }: Partial<Rubro> & { id: string }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de actualizar el rubro.");
       const { data, error } = await supabase
         .from("rubros")
         .update(rubro)
         .eq("id", id)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -81,7 +87,8 @@ export const useRubros = () => {
 
   const deleteRubroMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("rubros").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar el rubro.");
+      const { error } = await supabase.from("rubros").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -10,6 +10,9 @@ export interface Cheque {
   cliente_id?: string;
   venta_id?: string;
   cuenta_corriente_id?: string;
+  tipo_cheque?: 'propio' | 'tercero';
+  proveedor_id?: string;
+  movimiento_proveedor_id?: string;
   estado: EstadoCheque;
   observaciones?: string;
   created_at?: string;
@@ -19,13 +22,19 @@ export interface Cheque {
     apellido: string;
     cuit: string;
   };
+  proveedor?: {
+    nombre?: string;
+    apellido?: string | null;
+    razon_social?: string | null;
+  } | null;
 }
 
-export type EstadoCheque = 'en_cartera' | 'depositado' | 'rechazado' | 'endosado';
+export type EstadoCheque = 'en_cartera' | 'depositado' | 'rechazado' | 'endosado' | 'emitido';
 
 export const ESTADOS_CHEQUE: { value: EstadoCheque; label: string }[] = [
   { value: 'en_cartera', label: 'En Cartera' },
   { value: 'depositado', label: 'Depositado' },
   { value: 'rechazado', label: 'Rechazado' },
   { value: 'endosado', label: 'Endosado' },
+  { value: 'emitido', label: 'Emitido' },
 ];

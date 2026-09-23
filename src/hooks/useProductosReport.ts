@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
+import { useComercio } from "@/hooks/useComercio";
 
 export interface ProductoReporte extends Producto {
   unidades_vendidas: number;
@@ -10,8 +11,10 @@ export interface ProductoReporte extends Producto {
 }
 
 export const useProductosReport = () => {
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["productos-report"],
+    queryKey: ["productos-report", comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       // Obtener productos con sus relaciones
       const { data: productos, error: productosError } = await supabase
@@ -23,6 +26,7 @@ export const useProductosReport = () => {
           rubro:rubros(nombre),
           subrubro:subrubros(nombre)
         `)
+        .eq("comercio_id", comercioId!)
         .order("descripcion");
 
       if (productosError) throw productosError;
@@ -34,7 +38,8 @@ export const useProductosReport = () => {
           producto_id,
           cantidad,
           venta:ventas(fecha_venta)
-        `);
+        `)
+        .eq("comercio_id", comercioId!);
 
       if (ventasError) throw ventasError;
 

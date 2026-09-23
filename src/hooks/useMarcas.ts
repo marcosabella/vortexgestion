@@ -2,21 +2,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Marca } from "@/types/producto";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export const useMarcas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
 
   const {
     data: marcas = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["marcas"],
+    queryKey: ["marcas", comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("marcas")
         .select("*")
+        .eq("comercio_id", comercioId!)
         .order("nombre", { ascending: true });
 
       if (error) throw error;
@@ -26,9 +29,10 @@ export const useMarcas = () => {
 
   const createMarcaMutation = useMutation({
     mutationFn: async (marca: Omit<Marca, "id" | "created_at" | "updated_at">) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de crear la marca.");
       const { data, error } = await supabase
         .from("marcas")
-        .insert([marca])
+        .insert([{ ...marca, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -53,10 +57,12 @@ export const useMarcas = () => {
 
   const updateMarcaMutation = useMutation({
     mutationFn: async ({ id, ...marca }: Partial<Marca> & { id: string }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de actualizar la marca.");
       const { data, error } = await supabase
         .from("marcas")
         .update(marca)
         .eq("id", id)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -81,7 +87,8 @@ export const useMarcas = () => {
 
   const deleteMarcaMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("marcas").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar la marca.");
+      const { error } = await supabase.from("marcas").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

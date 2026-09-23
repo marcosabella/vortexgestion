@@ -2,17 +2,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TarjetaCredito, TarjetaCuota, TarjetaConCuotas } from "@/types/tarjeta";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export const useTarjetas = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
 
   const {
     data: tarjetas = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["tarjetas"],
+    queryKey: ["tarjetas", comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tarjetas_credito")
@@ -20,6 +22,7 @@ export const useTarjetas = () => {
           *,
           tarjeta_cuotas(*)
         `)
+        .eq("comercio_id", comercioId!)
         .order("nombre", { ascending: true });
 
       if (error) throw error;
@@ -32,7 +35,7 @@ export const useTarjetas = () => {
     data: tarjetasActivas = [],
     isLoading: isLoadingActivas,
   } = useQuery({
-    queryKey: ["tarjetas", "activas"],
+    queryKey: ["tarjetas", comercioId, "activas"], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tarjetas_credito")
@@ -40,6 +43,7 @@ export const useTarjetas = () => {
           *,
           tarjeta_cuotas!inner(*)
         `)
+        .eq("comercio_id", comercioId!)
         .eq("activa", true)
         .eq("tarjeta_cuotas.activa", true)
         .order("nombre", { ascending: true });
@@ -58,9 +62,10 @@ export const useTarjetas = () => {
 
   const createTarjetaMutation = useMutation({
     mutationFn: async (tarjeta: Omit<TarjetaCredito, "id" | "created_at" | "updated_at">) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar la tarjeta.");
       const { data, error } = await supabase
         .from("tarjetas_credito")
-        .insert([tarjeta])
+        .insert([{ ...tarjeta, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -85,10 +90,12 @@ export const useTarjetas = () => {
 
   const updateTarjetaMutation = useMutation({
     mutationFn: async ({ id, tarjeta }: { id: string; tarjeta: Omit<TarjetaCredito, "id" | "created_at" | "updated_at"> }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de actualizar la tarjeta.");
       const { data, error } = await supabase
         .from("tarjetas_credito")
         .update(tarjeta)
         .eq("id", id)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -113,7 +120,8 @@ export const useTarjetas = () => {
 
   const deleteTarjetaMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("tarjetas_credito").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar la tarjeta.");
+      const { error } = await supabase.from("tarjetas_credito").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

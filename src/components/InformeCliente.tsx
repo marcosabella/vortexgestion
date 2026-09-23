@@ -13,6 +13,7 @@ import { es } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ReportPrintHeader } from "@/components/ReportPrintHeader";
+import { useComercio } from "@/hooks/useComercio";
 
 interface InformeClienteProps {
   cliente: Cliente;
@@ -21,6 +22,7 @@ interface InformeClienteProps {
 type PeriodoType = "mes_actual" | "mes_anterior" | "ultimos_3_meses" | "ultimos_6_meses" | "anio_actual" | "historico";
 
 export function InformeCliente({ cliente }: InformeClienteProps) {
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
   const [periodo, setPeriodo] = useState<PeriodoType>("historico");
 
   const getFechaRango = () => {
@@ -48,13 +50,14 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
 
   // Fetch movimientos de cuenta corriente
   const { data: movimientos = [], isLoading: loadingMovimientos } = useQuery({
-    queryKey: ['cuenta-corriente-cliente', cliente.id, periodo],
+    queryKey: ['cuenta-corriente-cliente', comercioId, cliente.id, periodo],
     queryFn: async () => {
       if (!cliente.id) return [];
       
       const { data, error } = await supabase
         .from('cuenta_corriente')
         .select('*')
+        .eq('comercio_id', comercioId!)
         .eq('cliente_id', cliente.id)
         .gte('fecha_movimiento', rango.desde.toISOString())
         .lte('fecha_movimiento', rango.hasta.toISOString())
@@ -63,12 +66,12 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!cliente.id,
+    enabled: Boolean(comercioId && cliente.id),
   });
 
   // Fetch ventas del cliente
   const { data: ventas = [], isLoading: loadingVentas } = useQuery({
-    queryKey: ['ventas-cliente', cliente.id, periodo],
+    queryKey: ['ventas-cliente', comercioId, cliente.id, periodo],
     queryFn: async () => {
       if (!cliente.id) return [];
       
@@ -81,6 +84,7 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
             producto:productos (descripcion)
           )
         `)
+        .eq('comercio_id', comercioId!)
         .eq('cliente_id', cliente.id)
         .gte('fecha_venta', rango.desde.toISOString())
         .lte('fecha_venta', rango.hasta.toISOString())
@@ -89,38 +93,40 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!cliente.id,
+    enabled: Boolean(comercioId && cliente.id),
   });
 
   // Fetch saldo actual (todos los movimientos para calcular saldo)
   const { data: todosMovimientos = [] } = useQuery({
-    queryKey: ['cuenta-corriente-cliente-total', cliente.id],
+    queryKey: ['cuenta-corriente-cliente-total', comercioId, cliente.id],
     queryFn: async () => {
       if (!cliente.id) return [];
       
       const { data, error } = await supabase
         .from('cuenta_corriente')
         .select('*')
+        .eq('comercio_id', comercioId!)
         .eq('cliente_id', cliente.id)
         .order('fecha_movimiento', { ascending: true });
       
       if (error) throw error;
       return data || [];
     },
-    enabled: !!cliente.id,
+    enabled: Boolean(comercioId && cliente.id),
   });
 
   // Fetch total de clientes para ranking
   const { data: totalClientes = 0 } = useQuery({
-    queryKey: ['total-clientes'],
+    queryKey: ['total-clientes', comercioId],
     queryFn: async () => {
       const { count, error } = await supabase
         .from('clientes')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('comercio_id', comercioId!);
       
       if (error) throw error;
       return count || 0;
-    },
+    }, enabled: Boolean(comercioId),
   });
 
   // Calcular estadísticas reales

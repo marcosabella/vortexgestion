@@ -2,21 +2,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Banco } from "@/types/banco";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 export const useBancos = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
 
   const {
     data: bancos = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["bancos"],
+    queryKey: ["bancos", comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bancos")
         .select("*")
+        .eq("comercio_id", comercioId!)
         .order("nombre_banco", { ascending: true });
 
       if (error) throw error;
@@ -29,11 +32,12 @@ export const useBancos = () => {
     data: bancosActivos = [],
     isLoading: isLoadingActivos,
   } = useQuery({
-    queryKey: ["bancos", "activos"],
+    queryKey: ["bancos", comercioId, "activos"], enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bancos")
         .select("*")
+        .eq("comercio_id", comercioId!)
         .eq("activo", true)
         .order("nombre_banco", { ascending: true });
 
@@ -44,9 +48,10 @@ export const useBancos = () => {
 
   const createBancoMutation = useMutation({
     mutationFn: async (banco: Omit<Banco, "id" | "created_at" | "updated_at">) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el banco.");
       const { data, error } = await supabase
         .from("bancos")
-        .insert([banco])
+        .insert([{ ...banco, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -71,10 +76,12 @@ export const useBancos = () => {
 
   const updateBancoMutation = useMutation({
     mutationFn: async ({ id, banco }: { id: string; banco: Omit<Banco, "id" | "created_at" | "updated_at"> }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de actualizar el banco.");
       const { data, error } = await supabase
         .from("bancos")
         .update(banco)
         .eq("id", id)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -99,7 +106,8 @@ export const useBancos = () => {
 
   const deleteBancoMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("bancos").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar el banco.");
+      const { error } = await supabase.from("bancos").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

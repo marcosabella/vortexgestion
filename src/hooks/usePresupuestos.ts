@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Presupuesto } from "@/types/presupuesto";
 import { PagoVenta, Venta, VentaItem } from "@/types/venta";
+import { useComercio } from "@/hooks/useComercio";
 
 // Las tablas de presupuestos se agregan por migracion y requieren regenerar los tipos de Supabase.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
-const comercioId = () => localStorage.getItem("selectedComercioId");
 
 type PresupuestoRow = Presupuesto & {
   presupuesto_items?: VentaItem[];
@@ -36,10 +36,12 @@ const presupuestoSaveError = (stage: string, error: unknown) => {
 export const usePresupuestos = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const selectedComercioId = comercioId();
+  const { comercio } = useComercio();
+  const selectedComercioId = comercio?.id;
 
   const query = useQuery({
     queryKey: ["presupuestos", selectedComercioId],
+    enabled: Boolean(selectedComercioId),
     queryFn: async () => {
       let request = db.from("presupuestos").select(`
         *,
@@ -60,15 +62,16 @@ export const usePresupuestos = () => {
   });
 
   const save = async (payload: PresupuestoPayload, presupuestoId?: string) => {
+    if (!selectedComercioId) throw new Error("Seleccioná un comercio antes de guardar el presupuesto.");
     // `origen_orden_trabajo` es un dato propio de ventas: la tabla de
     // presupuestos no tiene esa columna. Se excluye del encabezado para que
     // el mismo formulario pueda utilizarse en ambos circuitos.
     const { origen_orden_trabajo: _origenOrdenTrabajo, ...ventaHeader } = payload.venta;
-    const header = { ...ventaHeader, comercio_id: selectedComercioId || undefined };
+    const header = { ...ventaHeader, comercio_id: selectedComercioId };
     let id = presupuestoId;
     let createdId: string | undefined;
     if (id) {
-      const { error } = await db.from("presupuestos").update(header).eq("id", id).eq("estado", "pendiente");
+      const { error } = await db.from("presupuestos").update(header).eq("id", id).eq("comercio_id", selectedComercioId).eq("estado", "pendiente");
       if (error) throw presupuestoSaveError("actualizar los datos generales", error);
       const { error: itemsDeleteError } = await db.from("presupuesto_items").delete().eq("presupuesto_id", id);
       if (itemsDeleteError) throw presupuestoSaveError("reemplazar los productos", itemsDeleteError);
@@ -151,7 +154,8 @@ export const usePresupuestos = () => {
   });
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from("presupuestos").delete().eq("id", id).eq("estado", "pendiente");
+      if (!selectedComercioId) throw new Error("Seleccioná un comercio antes de eliminar el presupuesto.");
+      const { error } = await db.from("presupuestos").delete().eq("id", id).eq("comercio_id", selectedComercioId).eq("estado", "pendiente");
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["presupuestos"] }),

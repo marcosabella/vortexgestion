@@ -2,19 +2,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Cheque } from '@/types/cheque';
 import { toast } from 'sonner';
+import { useComercio } from '@/hooks/useComercio';
 
 export const useCheques = () => {
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
+  const comercioId = comercio?.id;
 
   const { data: cheques, isLoading, error } = useQuery({
-    queryKey: ['cheques'],
+    queryKey: ['cheques', comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cheques')
         .select(`
           *,
-          cliente:clientes(nombre, apellido, cuit)
+          cliente:clientes(nombre, apellido, cuit),
+          proveedor:proveedores(nombre, apellido, razon_social)
         `)
+        .eq('comercio_id', comercioId!)
         .order('fecha_vencimiento', { ascending: false });
 
       if (error) throw error;
@@ -24,9 +30,10 @@ export const useCheques = () => {
 
   const createChequeMutation = useMutation({
     mutationFn: async (cheque: Omit<Cheque, 'id' | 'created_at' | 'updated_at'>) => {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de registrar el cheque.');
       const { data, error } = await supabase
         .from('cheques')
-        .insert([cheque])
+        .insert([{ ...cheque, comercio_id: comercioId }])
         .select()
         .single();
 
@@ -44,10 +51,12 @@ export const useCheques = () => {
 
   const updateChequeMutation = useMutation({
     mutationFn: async ({ id, ...cheque }: Cheque) => {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de actualizar el cheque.');
       const { data, error } = await supabase
         .from('cheques')
         .update(cheque)
         .eq('id', id)
+        .eq('comercio_id', comercioId)
         .select()
         .single();
 
@@ -65,10 +74,12 @@ export const useCheques = () => {
 
   const deleteChequeMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de eliminar el cheque.');
       const { error } = await supabase
         .from('cheques')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('comercio_id', comercioId);
 
       if (error) throw error;
     },

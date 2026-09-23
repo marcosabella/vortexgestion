@@ -13,8 +13,9 @@ export interface GastoEgreso {
   estado: EstadoGasto;
   caja_id?: string | null;
   numero_comprobante?: string | null;
+  tipo_comprobante?: string | null;
   observaciones?: string | null;
-  proveedor?: { nombre?: string; apellido?: string | null; razon_social?: string | null } | null;
+  proveedor?: { nombre?: string; apellido?: string | null; razon_social?: string | null; cuit?: string | null } | null;
 }
 
 export const CATEGORIAS_GASTO = ["Alquiler", "Servicios", "Sueldos", "Fletes", "Compras", "Impuestos", "Mantenimiento", "Otros"];

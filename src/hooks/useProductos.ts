@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Producto } from "@/types/producto";
 import { useToast } from "@/hooks/use-toast";
+import { useComercio } from "@/hooks/useComercio";
 
 type ProductoInsert = Database["public"]["Tables"]["productos"]["Insert"];
 type ProductoUpdate = Database["public"]["Tables"]["productos"]["Update"];
@@ -29,13 +30,15 @@ const normalizeProductoPayload = <T extends ProductoInsert | ProductoUpdate>(pro
 export const useProductos = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
 
   const {
     data: productos = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["productos"],
+    queryKey: ["productos", comercioId],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("productos")
@@ -46,6 +49,7 @@ export const useProductos = () => {
           rubro:rubros(nombre),
           subrubro:subrubros(nombre)
         `)
+        .eq("comercio_id", comercioId!)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -55,6 +59,7 @@ export const useProductos = () => {
 
   const createProductoMutation = useMutation({
     mutationFn: async (producto: ProductoMutationPayload) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de crear el producto.");
       const {
         precio_venta: _precioVenta,
         proveedor: _proveedor,
@@ -66,7 +71,7 @@ export const useProductos = () => {
         id: _id,
         ...cleanProducto
       } = producto;
-      const payload = normalizeProductoPayload(cleanProducto as ProductoInsert);
+      const payload = normalizeProductoPayload({ ...cleanProducto, comercio_id: comercioId } as ProductoInsert);
 
       const { data, error } = await supabase
         .from("productos")
@@ -95,6 +100,7 @@ export const useProductos = () => {
 
   const updateProductoMutation = useMutation({
     mutationFn: async ({ id, ...producto }: Partial<Producto> & { id: string }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de actualizar el producto.");
       // Excluir campos relacionados y calculados que no existen en la tabla
       const {
         proveedor: _proveedor,
@@ -112,6 +118,7 @@ export const useProductos = () => {
         .from("productos")
         .update(payload)
         .eq("id", id)
+        .eq("comercio_id", comercioId)
         .select()
         .single();
 
@@ -136,7 +143,8 @@ export const useProductos = () => {
 
   const deleteProductoMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("productos").delete().eq("id", id);
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de eliminar el producto.");
+      const { error } = await supabase.from("productos").delete().eq("id", id).eq("comercio_id", comercioId);
       if (error) throw error;
     },
     onSuccess: () => {

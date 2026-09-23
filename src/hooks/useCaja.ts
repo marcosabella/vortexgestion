@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, CajaMovimiento, CajaMovimientoTipo } from "@/types/caja";
 import { esVentaCuentaCorriente, getVentaTotalFinal, Venta } from "@/types/venta";
+import { useComercio } from "@/hooks/useComercio";
 
 const db = supabase;
 
@@ -37,6 +38,7 @@ type RegistrarVentasPreviasResult = {
 export const useActualizarCierreCaja = (fecha?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
 
   return useMutation({
     mutationFn: async ({
@@ -59,6 +61,7 @@ export const useActualizarCierreCaja = (fecha?: string) => {
           observaciones_cierre: observaciones_cierre || null,
         })
         .eq("id", caja_id)
+        .eq("comercio_id", comercio?.id || "")
         .eq("estado", "cerrada")
         .select()
         .single();
@@ -67,7 +70,7 @@ export const useActualizarCierreCaja = (fecha?: string) => {
       return data as CajaDiaria;
     },
     onSuccess: () => {
-      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Cierre actualizado",
@@ -87,18 +90,20 @@ export const useActualizarCierreCaja = (fecha?: string) => {
 export const useEliminarCaja = (fecha?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
 
   return useMutation({
     mutationFn: async (cajaId: string) => {
       const { error } = await db
         .from("cajas_diarias")
         .delete()
-        .eq("id", cajaId);
+        .eq("id", cajaId)
+        .eq("comercio_id", comercio?.id || "");
 
       if (error) throw error;
     },
     onSuccess: () => {
-      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
@@ -120,6 +125,7 @@ export const useEliminarCaja = (fecha?: string) => {
 export const useReabrirCaja = (fecha?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
 
   return useMutation({
     mutationFn: async (cajaId: string) => {
@@ -134,6 +140,7 @@ export const useReabrirCaja = (fecha?: string) => {
           observaciones_cierre: null,
         })
         .eq("id", cajaId)
+        .eq("comercio_id", comercio?.id || "")
         .eq("estado", "cerrada")
         .select()
         .single();
@@ -142,7 +149,7 @@ export const useReabrirCaja = (fecha?: string) => {
       return data as CajaDiaria;
     },
     onSuccess: () => {
-      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      if (fecha) queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
@@ -164,17 +171,20 @@ export const useReabrirCaja = (fecha?: string) => {
 export const useCajaDiaria = (fecha: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { comercio } = useComercio();
+  const comercioId = comercio?.id;
   const actualizarCierreCajaMutation = useActualizarCierreCaja(fecha);
   const eliminarCajaMutation = useEliminarCaja(fecha);
   const reabrirCajaMutation = useReabrirCaja(fecha);
 
   const cajaQuery = useQuery({
-    queryKey: ["caja-diaria", fecha],
-    enabled: Boolean(fecha),
+    queryKey: ["caja-diaria", comercioId, fecha],
+    enabled: Boolean(comercioId && fecha),
     queryFn: async () => {
       const { data, error } = await db
         .from("cajas_diarias")
         .select("*, caja_movimientos(*)")
+        .eq("comercio_id", comercioId!)
         .eq("fecha", fecha)
         .order("abierto_at", { ascending: false });
 
@@ -187,8 +197,8 @@ export const useCajaDiaria = (fecha: string) => {
   const caja = cajaQuery.data;
 
   const ventasPreviasPendientesQuery = useQuery({
-    queryKey: ["caja-diaria-ventas-previas-pendientes", fecha, caja?.id, caja?.abierto_at],
-    enabled: Boolean(fecha && caja?.id && caja?.estado === "abierta" && caja?.abierto_at),
+    queryKey: ["caja-diaria-ventas-previas-pendientes", comercioId, fecha, caja?.id, caja?.abierto_at],
+    enabled: Boolean(comercioId && fecha && caja?.id && caja?.estado === "abierta" && caja?.abierto_at),
     queryFn: async () => {
       const abiertoAt = caja?.abierto_at;
       if (!abiertoAt) return [];
@@ -196,6 +206,7 @@ export const useCajaDiaria = (fecha: string) => {
       const { data: cajasDelDiaData, error: cajasDelDiaError } = await db
         .from("cajas_diarias")
         .select("*, caja_movimientos(*)")
+        .eq("comercio_id", comercioId!)
         .eq("fecha", fecha);
 
       if (cajasDelDiaError) throw cajasDelDiaError;
@@ -203,6 +214,7 @@ export const useCajaDiaria = (fecha: string) => {
       const { data: ventasDelDiaData, error: ventasDelDiaError } = await db
         .from("ventas")
         .select(VENTAS_CAJA_SELECT)
+        .eq("comercio_id", comercioId!)
         .gte("fecha_venta", `${fecha}T00:00:00`)
         .lt("fecha_venta", abiertoAt)
         .neq("tipo_pago", "cta_cte")
@@ -242,8 +254,8 @@ export const useCajaDiaria = (fecha: string) => {
   });
 
   const ventasQuery = useQuery({
-    queryKey: ["caja-diaria-ventas", fecha, caja?.id, caja?.abierto_at, caja?.cerrado_at],
-    enabled: Boolean(fecha && caja?.id),
+    queryKey: ["caja-diaria-ventas", comercioId, fecha, caja?.id, caja?.abierto_at, caja?.cerrado_at],
+    enabled: Boolean(comercioId && fecha && caja?.id),
     queryFn: async () => {
       const desde = caja?.abierto_at || `${fecha}T00:00:00`;
       const hasta = caja?.cerrado_at || new Date().toISOString();
@@ -258,6 +270,7 @@ export const useCajaDiaria = (fecha: string) => {
       const { data: ventasDelPeriodoData, error } = await db
         .from("ventas")
         .select(VENTAS_CAJA_SELECT)
+        .eq("comercio_id", comercioId!)
         .gte("fecha_venta", desde)
         .lte("fecha_venta", hasta)
         .order("fecha_venta", { ascending: true });
@@ -269,6 +282,7 @@ export const useCajaDiaria = (fecha: string) => {
       const { data: ventasEnlazadasData, error: ventasEnlazadasError } = await db
         .from("ventas")
         .select(VENTAS_CAJA_SELECT)
+        .eq("comercio_id", comercioId!)
         .in("id", ventasEnlazadasIds);
 
       if (ventasEnlazadasError) throw ventasEnlazadasError;
@@ -285,9 +299,11 @@ export const useCajaDiaria = (fecha: string) => {
       monto_apertura: number;
       observaciones_apertura?: string;
     }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de abrir la caja.");
       const { data, error } = await db
         .from("cajas_diarias")
         .insert({
+          comercio_id: comercioId,
           fecha,
           monto_apertura,
           observaciones_apertura: observaciones_apertura || null,
@@ -299,7 +315,7 @@ export const useCajaDiaria = (fecha: string) => {
       return data as CajaDiaria;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Caja abierta",
@@ -329,9 +345,11 @@ export const useCajaDiaria = (fecha: string) => {
       descripcion?: string;
       monto: number;
     }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el movimiento.");
       const { data, error } = await db
         .from("caja_movimientos")
         .insert({
+          comercio_id: comercioId,
           caja_id,
           tipo,
           concepto,
@@ -345,7 +363,7 @@ export const useCajaDiaria = (fecha: string) => {
       return data as CajaMovimiento;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Movimiento registrado",
@@ -369,6 +387,7 @@ export const useCajaDiaria = (fecha: string) => {
         .filter((venta) => !esVentaCuentaCorriente(venta));
       const movimientos = ventasPrevias
         .map((venta) => ({
+          comercio_id: comercioId,
           caja_id: caja.id,
           venta_id: venta.id,
           tipo: "ingreso" as CajaMovimientoTipo,
@@ -397,7 +416,7 @@ export const useCajaDiaria = (fecha: string) => {
     },
     onSuccess: ({ movimientos, ventasRegistradas }) => {
       if (movimientos.length > 0) {
-        queryClient.setQueryData<CajaDiaria | null>(["caja-diaria", fecha], (cajaActual) => {
+        queryClient.setQueryData<CajaDiaria | null>(["caja-diaria", comercioId, fecha], (cajaActual) => {
           if (!cajaActual || cajaActual.id !== caja?.id) return cajaActual;
 
           const movimientosActuales = cajaActual.caja_movimientos || [];
@@ -415,12 +434,12 @@ export const useCajaDiaria = (fecha: string) => {
         const ventasRegistradasIds = new Set(ventasRegistradas.map((venta) => venta.id).filter(Boolean));
 
         queryClient.setQueriesData<Venta[]>(
-          { queryKey: ["caja-diaria-ventas", fecha] },
+          { queryKey: ["caja-diaria-ventas", comercioId, fecha] },
           (ventasActuales) => mergeVentas((ventasActuales || []) as Venta[], ventasRegistradas),
         );
 
         queryClient.setQueriesData<Venta[]>(
-          { queryKey: ["caja-diaria-ventas-previas-pendientes", fecha] },
+          { queryKey: ["caja-diaria-ventas-previas-pendientes", comercioId, fecha] },
           (ventasPendientesActuales) =>
             ((ventasPendientesActuales || []) as Venta[]).filter(
               (venta) => !venta.id || !ventasRegistradasIds.has(venta.id),
@@ -428,9 +447,9 @@ export const useCajaDiaria = (fecha: string) => {
         );
       }
 
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas-previas-pendientes", fecha] });
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas-previas-pendientes"] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria-ventas"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Ventas registradas en caja",
@@ -470,6 +489,7 @@ export const useCajaDiaria = (fecha: string) => {
           monto,
         })
         .eq("id", movimiento_id)
+        .eq("comercio_id", comercioId || "")
         .select()
         .single();
 
@@ -477,7 +497,7 @@ export const useCajaDiaria = (fecha: string) => {
       return data as CajaMovimiento;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Movimiento actualizado",
@@ -498,12 +518,13 @@ export const useCajaDiaria = (fecha: string) => {
       const { error } = await db
         .from("caja_movimientos")
         .delete()
-        .eq("id", movimientoId);
+        .eq("id", movimientoId)
+        .eq("comercio_id", comercioId || "");
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
     },
   });
@@ -531,6 +552,7 @@ export const useCajaDiaria = (fecha: string) => {
           observaciones_cierre: observaciones_cierre || null,
         })
         .eq("id", caja_id)
+        .eq("comercio_id", comercioId || "")
         .select()
         .single();
 
@@ -538,7 +560,7 @@ export const useCajaDiaria = (fecha: string) => {
       return data as CajaDiaria;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["caja-diaria", fecha] });
+      queryClient.invalidateQueries({ queryKey: ["caja-diaria"] });
       queryClient.invalidateQueries({ queryKey: ["cajas-diarias"] });
       toast({
         title: "Caja cerrada",
@@ -579,13 +601,16 @@ export const useCajaDiaria = (fecha: string) => {
   };
 };
 
-export const useCajasDiarias = (fechaDesde?: string, fechaHasta?: string) =>
-  useQuery({
-    queryKey: ["cajas-diarias", fechaDesde, fechaHasta],
+export const useCajasDiarias = (fechaDesde?: string, fechaHasta?: string) => {
+  const { comercio } = useComercio(); const comercioId = comercio?.id;
+  return useQuery({
+    queryKey: ["cajas-diarias", comercioId, fechaDesde, fechaHasta],
+    enabled: Boolean(comercioId),
     queryFn: async () => {
       let query = db
         .from("cajas_diarias")
         .select("*, caja_movimientos(*)")
+        .eq("comercio_id", comercioId!)
         .order("fecha", { ascending: false })
         .order("abierto_at", { ascending: false });
 
@@ -605,6 +630,7 @@ export const useCajasDiarias = (fechaDesde?: string, fechaHasta?: string) =>
       const { data: ventasData, error: ventasError } = await db
         .from("ventas")
         .select(VENTAS_CAJA_SELECT)
+        .eq("comercio_id", comercioId!)
         .gte("fecha_venta", desde)
         .lte("fecha_venta", hasta)
         .order("fecha_venta", { ascending: true });
@@ -633,3 +659,4 @@ export const useCajasDiarias = (fechaDesde?: string, fechaHasta?: string) =>
       });
     },
   });
+};

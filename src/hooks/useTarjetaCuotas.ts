@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { TarjetaCuota } from '@/types/tarjeta'
+import { useComercio } from '@/hooks/useComercio'
 
 export const useTarjetaCuotas = (tarjetaId?: string) => {
+  const { comercio } = useComercio()
+  const comercioId = comercio?.id
   const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTarjetaCuotas = async (id?: string) => {
+  const fetchTarjetaCuotas = useCallback(async (id?: string) => {
     try {
       setLoading(true)
       setError(null)
+      if (!comercioId) { setTarjetaCuotas([]); return }
 
       let query = supabase
         .from('tarjeta_cuotas')
@@ -20,6 +24,7 @@ export const useTarjetaCuotas = (tarjetaId?: string) => {
             nombre
           )
         `)
+        .eq('comercio_id', comercioId)
         .order('cantidad_cuotas')
 
       // Solo filtrar por tarjeta_id si se proporciona y no es "all"
@@ -37,17 +42,18 @@ export const useTarjetaCuotas = (tarjetaId?: string) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [comercioId])
 
   useEffect(() => {
     fetchTarjetaCuotas(tarjetaId || '')
-  }, [tarjetaId])
+  }, [tarjetaId, fetchTarjetaCuotas])
 
   const createTarjetaCuota = async (cuotaData: Omit<TarjetaCuota, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de registrar las cuotas.')
       const { data, error } = await supabase
         .from('tarjeta_cuotas')
-        .insert([cuotaData])
+        .insert([{ ...cuotaData, comercio_id: comercioId }])
         .select()
         .single()
 
@@ -66,10 +72,12 @@ export const useTarjetaCuotas = (tarjetaId?: string) => {
 
   const updateTarjetaCuota = async (id: string, cuotaData: Partial<TarjetaCuota>) => {
     try {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de actualizar las cuotas.')
       const { data, error } = await supabase
         .from('tarjeta_cuotas')
         .update(cuotaData)
         .eq('id', id)
+        .eq('comercio_id', comercioId)
         .select()
         .single()
 
@@ -88,10 +96,12 @@ export const useTarjetaCuotas = (tarjetaId?: string) => {
 
   const deleteTarjetaCuota = async (id: string) => {
     try {
+      if (!comercioId) throw new Error('Seleccioná un comercio antes de eliminar las cuotas.')
       const { error } = await supabase
         .from('tarjeta_cuotas')
         .delete()
         .eq('id', id)
+        .eq('comercio_id', comercioId)
 
       if (error) throw error
       

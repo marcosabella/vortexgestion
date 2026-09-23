@@ -19,7 +19,7 @@ export const ChequesList = () => {
   const [selectedCheque, setSelectedCheque] = useState<Cheque | undefined>();
   const [chequeToDelete, setChequeToDelete] = useState<string | null>(null);
 
-  const handleSubmit = (data: any) => {
+  const handleSubmit = (data: Omit<Cheque, 'id' | 'created_at' | 'updated_at' | 'cliente' | 'proveedor'>) => {
     if (selectedCheque) {
       updateCheque({ ...data, id: selectedCheque.id });
     } else {
@@ -79,6 +79,7 @@ export const ChequesList = () => {
               <TableRow>
                 <TableHead>N° Cheque</TableHead>
                 <TableHead>Banco</TableHead>
+                <TableHead>Origen</TableHead>
                 <TableHead>Emisor</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Monto</TableHead>
@@ -94,6 +95,7 @@ export const ChequesList = () => {
                   <TableRow key={cheque.id}>
                     <TableCell className="font-medium">{cheque.numero_cheque}</TableCell>
                     <TableCell>{cheque.banco_emisor}</TableCell>
+                    <TableCell><Badge variant="outline">{cheque.tipo_cheque === 'propio' ? 'Propio' : 'De terceros'}</Badge>{cheque.proveedor && <div className="mt-1 text-xs text-muted-foreground">Entregado a {cheque.proveedor.razon_social || [cheque.proveedor.nombre, cheque.proveedor.apellido].filter(Boolean).join(' ')}</div>}</TableCell>
                     <TableCell>
                       <div className="text-sm">
                         <div>{cheque.emisor_nombre}</div>
@@ -131,6 +133,7 @@ export const ChequesList = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(cheque)}
+                          disabled={Boolean(cheque.movimiento_proveedor_id)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -138,6 +141,7 @@ export const ChequesList = () => {
                           variant="destructive"
                           size="icon"
                           onClick={() => setChequeToDelete(cheque.id!)}
+                          disabled={Boolean(cheque.movimiento_proveedor_id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -147,7 +151,7 @@ export const ChequesList = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">
                     No hay cheques registrados
                   </TableCell>
                 </TableRow>
