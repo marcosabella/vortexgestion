@@ -22,6 +22,7 @@ export type ModuloSistema =
 
 export type FuncionSistema =
   | "venta_items_manuales"
+  | "ingreso_manual_numero_comprobante"
   | "descuentos_recargos"
   | "facturacion_afip"
   | "impresion_comprobantes"
@@ -78,6 +79,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
   { key: "venta_items_manuales", label: "Items manuales en ventas", description: "Permite agregar conceptos sin producto asociado." },
+  { key: "ingreso_manual_numero_comprobante", label: "Numeración manual de comprobantes", description: "Permite elegir entre numeración automática o ingresar manualmente un número con formato 0000 - 00000000." },
   { key: "descuentos_recargos", label: "Descuentos y recargos", description: "Habilita ajustes por item y sobre el total de la venta." },
   { key: "facturacion_afip", label: "Facturacion ARCA", description: "Permite solicitar CAE y operar con comprobantes fiscales." },
   { key: "impresion_comprobantes", label: "Impresion de comprobantes", description: "Permite imprimir comprobantes desde ventas." },
@@ -108,6 +110,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
       (acc, funcion) => ({ ...acc, [funcion.key]: true }),
       {} as Record<FuncionSistema, boolean>,
     ),
+    ingreso_manual_numero_comprobante: false,
     publicacion_tienda_online: false,
     descripcion_enriquecida_productos: false,
     talles_colores_productos: false,

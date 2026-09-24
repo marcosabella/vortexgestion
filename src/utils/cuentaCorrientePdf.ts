@@ -1,6 +1,7 @@
-import { format } from "date-fns";
-import { CuentaCorriente, CuentaCorrienteResumen, CONCEPTOS_MOVIMIENTO } from "@/types/cuenta-corriente";
+import { format, subDays } from "date-fns";
+import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { Comercio } from "@/types/comercio";
+import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -73,6 +74,9 @@ type PdfImage = {
 
 type CuentaCorrientePdfOptions = {
   comercio?: Comercio | null;
+  saldoInicial?: number;
+  fechaDesde?: string;
+  fechaHasta?: string;
 };
 
 type ListadoCuentaCorrientePdfOptions = CuentaCorrientePdfOptions & {
@@ -108,6 +112,8 @@ const formatDate = (value?: string | null) => {
   return format(date, "dd/MM/yyyy");
 };
 
+const formatInputDate = (value?: string) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "";
+
 const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
 const isPrintableComercioValue = (value?: string | null) => {
@@ -125,9 +131,6 @@ const resolveAssetUrl = (url: string) => {
   }
 };
 
-const getConceptoLabel = (concepto: string) =>
-  CONCEPTOS_MOVIMIENTO.find((item) => item.value === concepto)?.label || concepto;
-
 const textWidth = (text: string, size: number) => toPlainText(text).length * size * 0.5;
 
 const fitText = (text: string, maxWidth: number, size: number) => {
@@ -141,37 +144,48 @@ const fitText = (text: string, maxWidth: number, size: number) => {
   return `${result}...`;
 };
 
-const buildRows = (movimientos: CuentaCorriente[]) => {
+const buildRows = (movimientos: CuentaCorriente[], options: CuentaCorrientePdfOptions) => {
   const orderedMovimientos = [...movimientos].sort(
-    (a, b) => new Date(a.fecha_movimiento).getTime() - new Date(b.fecha_movimiento).getTime()
+    (a, b) => new Date(a.fecha_movimiento).getTime() - new Date(b.fecha_movimiento).getTime() || a.id.localeCompare(b.id)
   );
-  let saldo = 0;
+  let saldo = Number(options.saldoInicial || 0);
+  const rows: PdfRow[] = [];
 
-  if (!orderedMovimientos.length) {
-    return [{ fecha: "", comprobante: "Sin movimientos registrados", debe: "", haber: "", saldo: formatMoney(0) }];
+  if (options.fechaDesde) {
+    const previousDate = subDays(new Date(`${options.fechaDesde}T12:00:00`), 1);
+    rows.push({
+      fecha: format(previousDate, "dd/MM/yyyy"),
+      comprobante: `SALDO ANTERIOR AL ${formatInputDate(options.fechaDesde)}`,
+      debe: "",
+      haber: "",
+      saldo: formatMoney(saldo),
+    });
   }
 
-  return orderedMovimientos.map((movimiento) => {
+  orderedMovimientos.forEach((movimiento) => {
     const monto = Number(movimiento.monto || 0);
     const isDebito = movimiento.tipo_movimiento === "debito";
     saldo += isDebito ? monto : -monto;
+    const presentacion = formatCuentaCorrienteMovimiento(movimiento);
 
     const comprobante = [
-      movimiento.venta?.numero_comprobante ? `FACTURA ${movimiento.venta.numero_comprobante}` : getConceptoLabel(movimiento.concepto),
+      movimiento.venta?.numero_comprobante ? `FACTURA ${movimiento.venta.numero_comprobante}` : presentacion.concepto,
       movimiento.tarjeta ? `Tarjeta ${movimiento.tarjeta.nombre}` : "",
-      movimiento.observaciones || "",
+      presentacion.observaciones,
     ]
       .filter(Boolean)
       .join(" - ");
 
-    return {
+    rows.push({
       fecha: formatDate(movimiento.fecha_movimiento),
       comprobante,
       debe: isDebito ? formatMoney(monto) : "",
       haber: !isDebito ? formatMoney(monto) : "",
       saldo: formatMoney(saldo),
-    };
+    });
   });
+
+  return rows.length ? rows : [{ fecha: "", comprobante: "Sin movimientos registrados", debe: "", haber: "", saldo: formatMoney(saldo) }];
 };
 
 const buildListadoRows = (clientes: CuentaCorrienteResumen[]): ListadoCuentaCorrienteRow[] => {
@@ -649,7 +663,7 @@ export const buildCuentaCorrientePdfFile = (
   movimientos: CuentaCorriente[],
   options: CuentaCorrientePdfOptions = {}
 ) => {
-  const rows = buildRows(movimientos);
+  const rows = buildRows(movimientos, options);
   const pageRows: PdfRow[][] = [];
 
   for (let index = 0; index < rows.length; index += MAX_ROWS_PER_PAGE) {
@@ -664,7 +678,10 @@ export const buildCuentaCorrientePdfFile = (
   return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
     const blob = createPdfBlob(contents(logoImage), logoImage);
     const clienteFilename = sanitizeFilename(`${resumen.cliente_nombre}-${resumen.cliente_apellido}`) || "cliente";
-    const filename = `resumen-cta-cte-${clienteFilename}.pdf`;
+    const periodFilename = options.fechaDesde || options.fechaHasta
+      ? `-${options.fechaDesde || "inicio"}-${options.fechaHasta || "actual"}`
+      : "";
+    const filename = `resumen-cta-cte-${clienteFilename}${periodFilename}.pdf`;
 
     return new File([blob], filename, { type: "application/pdf" });
   });
@@ -697,7 +714,8 @@ export const buildListadoCuentaCorrientePdfFile = (
 
 export const buildCuentaCorrienteWhatsAppMessage = (
   resumen: CuentaCorrienteResumen,
-  movimientos: CuentaCorriente[]
+  movimientos: CuentaCorriente[],
+  options: CuentaCorrientePdfOptions = {}
 ) => {
   const cliente = `${resumen.cliente_nombre} ${resumen.cliente_apellido}`.trim() || "Cliente";
   const saldoLabel =
@@ -707,6 +725,10 @@ export const buildCuentaCorrienteWhatsAppMessage = (
     "Resumen de cuenta corriente",
     `Cliente: ${cliente}`,
     `CUIT: ${resumen.cliente_cuit || "N/A"}`,
+    ...(options.fechaDesde || options.fechaHasta
+      ? [`Periodo: ${formatInputDate(options.fechaDesde) || "Inicio"} al ${formatInputDate(options.fechaHasta) || "Actual"}`]
+      : []),
+    ...(options.fechaDesde ? [`Saldo anterior: ${formatMoney(options.saldoInicial)}`] : []),
     "",
     `Total debitos: ${formatMoney(resumen.total_debitos)}`,
     `Total creditos: ${formatMoney(resumen.total_creditos)}`,

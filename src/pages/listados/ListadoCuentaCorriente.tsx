@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { buildCuentaCorrientePdfFile, buildListadoCuentaCorrientePdfFile } from '@/utils/cuentaCorrientePdf';
 
 const ListadoCuentaCorriente = () => {
-  const { getResumenCuentaCorreinte, movimientos, isLoading: isLoadingMovimientos } = useCuentaCorriente();
-  const { data: resumen = [], isLoading } = getResumenCuentaCorreinte();
+  const { useResumenCuentaCorriente, movimientos, isLoading: isLoadingMovimientos } = useCuentaCorriente();
+  const { data: resumen = [], isLoading } = useResumenCuentaCorriente();
   const { comercio } = useComercio();
   const { toast } = useToast();
 

@@ -4,6 +4,25 @@ import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corrient
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 
+const CUENTA_CORRIENTE_PAGE_SIZE = 1000;
+
+const fetchAllPages = async <T,>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: Error | null }>
+) => {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += CUENTA_CORRIENTE_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + CUENTA_CORRIENTE_PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < CUENTA_CORRIENTE_PAGE_SIZE) break;
+  }
+
+  return rows;
+};
+
 export const useCuentaCorriente = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -19,18 +38,19 @@ export const useCuentaCorriente = () => {
     queryKey: ["cuenta-corriente", comercioId],
     enabled: Boolean(comercioId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cuenta_corriente")
-        .select(`
-          *,
-          cliente:clientes(nombre, apellido, cuit, telefono),
-          venta:ventas(numero_comprobante, cae)
-        `)
-        .eq("comercio_id", comercioId!)
-        .order("fecha_movimiento", { ascending: false });
-
-      if (error) throw error;
-      return data as CuentaCorriente[];
+      return fetchAllPages<CuentaCorriente>((from, to) =>
+        supabase
+          .from("cuenta_corriente")
+          .select(`
+            *,
+            cliente:clientes(nombre, apellido, cuit, telefono),
+            venta:ventas(numero_comprobante, cae)
+          `)
+          .eq("comercio_id", comercioId!)
+          .order("fecha_movimiento", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to) as unknown as PromiseLike<{ data: CuentaCorriente[] | null; error: Error | null }>
+      );
     },
   });
 
@@ -40,49 +60,52 @@ export const useCuentaCorriente = () => {
       queryKey: ["cuenta-corriente", comercioId, "cliente", clienteId],
       queryFn: async () => {
         if (!clienteId) return [];
-        
-        const { data, error } = await supabase
-          .from("cuenta_corriente")
-          .select(`
-            *,
-            cliente:clientes(nombre, apellido, cuit, telefono),
-            venta:ventas(numero_comprobante, cae)
-          `)
-          .eq("comercio_id", comercioId!)
-          .eq("cliente_id", clienteId)
-          .order("fecha_movimiento", { ascending: false });
 
-        if (error) throw error;
-        return data as CuentaCorriente[];
+        return fetchAllPages<CuentaCorriente>((from, to) =>
+          supabase
+            .from("cuenta_corriente")
+            .select(`
+              *,
+              cliente:clientes(nombre, apellido, cuit, telefono),
+              venta:ventas(numero_comprobante, cae)
+            `)
+            .eq("comercio_id", comercioId!)
+            .eq("cliente_id", clienteId)
+            .order("fecha_movimiento", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, to) as unknown as PromiseLike<{ data: CuentaCorriente[] | null; error: Error | null }>
+        );
       },
       enabled: Boolean(comercioId && clienteId),
     });
   };
 
   // Get account summary by client
-  const getResumenCuentaCorreinte = () => {
+  const useResumenCuentaCorriente = () => {
     return useQuery({
       queryKey: ["cuenta-corriente", comercioId, "resumen"],
       enabled: Boolean(comercioId),
       queryFn: async () => {
-        // Manual calculation since RPC function doesn't exist yet
-        const { data: movimientos, error: movError } = await supabase
-          .from("cuenta_corriente")
-          .select(`
-            cliente_id,
-            tipo_movimiento,
-            monto,
-            fecha_movimiento,
-            cliente:clientes(nombre, apellido, cuit, telefono)
-          `)
-          .eq("comercio_id", comercioId!);
-
-        if (movError) throw movError;
+        const movimientos = await fetchAllPages((from, to) =>
+          supabase
+            .from("cuenta_corriente")
+            .select(`
+              id,
+              cliente_id,
+              tipo_movimiento,
+              monto,
+              fecha_movimiento,
+              cliente:clientes(nombre, apellido, cuit, telefono)
+            `)
+            .eq("comercio_id", comercioId!)
+            .order("id", { ascending: true })
+            .range(from, to)
+        );
 
         // Group by cliente_id and calculate totals
-        const resumenMap = new Map<string, any>();
+        const resumenMap = new Map<string, CuentaCorrienteResumen>();
         
-        movimientos?.forEach((mov) => {
+        movimientos.forEach((mov) => {
           const key = mov.cliente_id;
           if (!resumenMap.has(key)) {
             resumenMap.set(key, {
@@ -224,7 +247,7 @@ export const useCuentaCorriente = () => {
     isLoading,
     error,
     useMovimientosByCliente,
-    getResumenCuentaCorreinte,
+    useResumenCuentaCorriente,
     createMovimiento: createMovimientoMutation.mutate,
     deleteMovimiento: deleteMovimientoMutation.mutate,
     deleteVentaFromCuenta: deleteVentaFromCuentaMutation.mutate,

@@ -6,6 +6,7 @@ const numeric = (value: unknown) => {
   const result = Number(text(value).replace(",", "."));
   return Number.isFinite(result) ? result : 0;
 };
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const source = (row: AccessRow, name: string) => text(field(row, name));
 const date = (value: unknown) => {
   if (value instanceof Date) return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate(), 3)).toISOString();
@@ -38,16 +39,26 @@ export function buildOperationalPayload(tables: Record<string, AccessRow[]>): Op
 
   const ventas = sales.map((row) => {
     const sourceId = source(row, "idVenta");
-    const lineTotal = (detailBySale.get(sourceId) || []).reduce((sum, item) => sum + numeric(field(item, "cantidad")) * numeric(field(item, "precioUnitario")), 0);
+    const saleDetails = detailBySale.get(sourceId) || [];
+    const lineTotal = saleDetails.reduce((sum, item) => sum + numeric(field(item, "cantidad")) * numeric(field(item, "precioUnitario")), 0);
+    const lineSubtotal = saleDetails.reduce((sum, item) => {
+      const gross = numeric(field(item, "cantidad")) * numeric(field(item, "precioUnitario"));
+      const product = products.get(source(item, "idArticulo"));
+      const iva = numeric(product && field(product, "iva"));
+      return sum + roundMoney(iva > 0 ? gross / (1 + iva / 100) : gross);
+    }, 0);
     const total = numeric(field(row, "monto"));
     const difference = total - lineTotal;
+    const factor = lineTotal > 0 ? total / lineTotal : 1;
+    const subtotal = roundMoney(lineSubtotal * factor);
+    const totalIva = roundMoney(total - subtotal);
     const warnings: string[] = [];
     if (!date(field(row, "fecha_venta"))) warnings.push("Fecha de venta invalida");
     if (Math.abs(difference) > 0.01) warnings.push(`Ajuste historico cabecera/detalle: ${difference.toFixed(2)}`);
     return { sourceId, warnings, data: {
       fecha: date(field(row, "fecha_venta")), cliente_source_id: source(row, "idCliente") || null,
       tipo_pago: paymentType(field(row, "idCondicion_venta")), tipo_comprobante: receiptType(field(row, "idComprobante")),
-      comprobante_origen: source(row, "idComprobante"), subtotal: lineTotal, total, ajuste: difference,
+      comprobante_origen: source(row, "idComprobante"), subtotal, total_iva: totalIva, total, ajuste: difference,
       porcentaje_descuento: numeric(field(row, "descuento_venta")), porcentaje_recargo: numeric(field(row, "recargo_venta")),
       observaciones: text(field(row, "observaciones")) || null,
     } };
@@ -59,9 +70,12 @@ export function buildOperationalPayload(tables: Record<string, AccessRow[]>): Op
     const product = products.get(productId);
     const cantidad = numeric(field(row, "cantidad"));
     const precio = numeric(field(row, "precioUnitario"));
+    const total = cantidad * precio;
+    const porcentajeIva = numeric(product && field(product, "iva"));
+    const subtotal = roundMoney(porcentajeIva > 0 ? total / (1 + porcentajeIva / 100) : total);
     return { sourceId, warnings: [], data: {
       venta_source_id: source(row, "idVenta"), producto_source_id: productId,
-      cantidad, precio_unitario: precio, porcentaje_iva: numeric(product && field(product, "iva")), total: cantidad * precio,
+      cantidad, precio_unitario: precio, porcentaje_iva: porcentajeIva, subtotal, monto_iva: roundMoney(total - subtotal), total,
     } };
   });
 

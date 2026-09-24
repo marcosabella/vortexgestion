@@ -16,13 +16,27 @@ type CrearVentaPayload = {
   pagos?: PagoVentaNuevo[];
   idempotencyKey: string;
   mercadoPago?: boolean;
+  numeroManual?: string;
 };
 
 const getRpcErrorMessage = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error
+    ? error.message
+    : error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : String(error);
 
   if (message.includes("ventas_numeracion_no_disponible")) {
     return "No se pudo asignar un número de comprobante. Intente nuevamente.";
+  }
+  if (message.includes("ventas_numero_manual_no_habilitado")) {
+    return "La numeración manual no está habilitada para este comercio.";
+  }
+  if (message.includes("ventas_numero_manual_invalido")) {
+    return "El número manual debe respetar el formato 0000 - 00000000.";
+  }
+  if (message.includes("ventas_numero_manual_duplicado") || message.includes("ventas_numeracion_canonica_unica")) {
+    return "El número de comprobante ingresado ya existe para este tipo de comprobante.";
   }
   if (message.includes("ventas_idempotency_conflicto")) {
     return "Este intento de venta ya fue procesado con datos diferentes. Inicie una venta nueva.";
@@ -103,7 +117,7 @@ export const useVentas = () => {
   });
 
   const createVentaMutation = useMutation({
-    mutationFn: async ({ venta, items, pagos = [], idempotencyKey, mercadoPago = false }: CrearVentaPayload) => {
+    mutationFn: async ({ venta, items, pagos = [], idempotencyKey, mercadoPago = false, numeroManual }: CrearVentaPayload) => {
       // Mercado Pago conserva su alta previa: la venta se crea antes de solicitar
       // el QR y ese flujo no forma parte de la RPC transaccional normal.
       if (mercadoPago) {
@@ -197,7 +211,7 @@ export const useVentas = () => {
             ...(pago.cheque_id ? { cheque_id: pago.cheque_id } : {}),
           }));
 
-      const { data: ventaData, error: ventaError } = await supabase.rpc("registrar_venta_transaccional", {
+      const rpcArgs = {
         p_comercio_id: comercio.id,
         p_tipo_comprobante: venta.tipo_comprobante,
         p_punto_venta: puntoVenta,
@@ -214,7 +228,13 @@ export const useVentas = () => {
         p_monto_descuento: Number(venta.monto_descuento || 0),
         p_porcentaje_recargo: Number(venta.porcentaje_recargo || 0),
         p_monto_recargo: Number(venta.monto_recargo || 0),
-      });
+      };
+      const { data: ventaData, error: ventaError } = numeroManual
+        ? await supabase.rpc("registrar_venta_manual_transaccional", {
+            ...rpcArgs,
+            p_numero_comprobante: numeroManual,
+          })
+        : await supabase.rpc("registrar_venta_transaccional", rpcArgs);
 
       if (ventaError) throw new Error(getRpcErrorMessage(ventaError));
       if (!ventaData) throw new Error("La venta no devolvió una confirmación.");

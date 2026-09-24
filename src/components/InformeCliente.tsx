@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ReportPrintHeader } from "@/components/ReportPrintHeader";
 import { useComercio } from "@/hooks/useComercio";
+import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
 
 interface InformeClienteProps {
   cliente: Cliente;
@@ -30,9 +31,10 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
     switch (periodo) {
       case "mes_actual":
         return { desde: startOfMonth(hoy), hasta: endOfMonth(hoy) };
-      case "mes_anterior":
+      case "mes_anterior": {
         const mesAnterior = subMonths(hoy, 1);
         return { desde: startOfMonth(mesAnterior), hasta: endOfMonth(mesAnterior) };
+      }
       case "ultimos_3_meses":
         return { desde: subMonths(hoy, 3), hasta: hoy };
       case "ultimos_6_meses":
@@ -148,7 +150,7 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
     // Productos más comprados
     const productosCount: Record<string, { nombre: string; cantidad: number }> = {};
     ventas.forEach(venta => {
-      venta.venta_items?.forEach((item: any) => {
+      venta.venta_items?.forEach((item) => {
         const nombre = item.producto?.descripcion || item.descripcion_manual || 'Item manual';
         if (!productosCount[nombre]) {
           productosCount[nombre] = { nombre, cantidad: 0 };
@@ -359,7 +361,7 @@ export function InformeCliente({ cliente }: InformeClienteProps) {
                             {mov.tipo_movimiento === 'debito' || mov.tipo_movimiento === 'venta' ? "Débito" : "Crédito"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{mov.concepto}</TableCell>
+                        <TableCell>{formatCuentaCorrienteMovimiento(mov).concepto}</TableCell>
                         <TableCell className={`text-right ${mov.montoDisplay > 0 ? 'text-red-600' : 'text-green-600'}`}>
                           {mov.montoDisplay > 0 ? '+' : ''}{mov.montoDisplay.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </TableCell>

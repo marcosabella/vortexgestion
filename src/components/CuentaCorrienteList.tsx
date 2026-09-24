@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { FileDown, MessageCircle, Plus, Printer, Search, Trash2, Eye } from "lucide-react";
 import { useCuentaCorriente } from "@/hooks/useCuentaCorriente";
 import { CuentaCorrienteForm } from "./CuentaCorrienteForm";
@@ -15,6 +17,17 @@ import { buildCuentaCorrientePdfFile, buildCuentaCorrienteWhatsAppMessage } from
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import { format } from "date-fns";
+import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
+
+const moneyFormatter = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatMoney = (value: number) => `$${moneyFormatter.format(Math.abs(value))}`;
+const formatInputDate = (value: string) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "";
+const formatPreviousDate = (value: string) => {
+  if (!value) return "";
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() - 1);
+  return format(date, "dd/MM/yyyy");
+};
 
 export const CuentaCorrienteList = () => {
   const { toast } = useToast();
@@ -24,16 +37,19 @@ export const CuentaCorrienteList = () => {
     isLoading, 
     deleteMovimiento, 
     deleteVentaFromCuenta,
-    getResumenCuentaCorreinte,
+    useResumenCuentaCorriente,
     useMovimientosByCliente 
   } = useCuentaCorriente();
   
-  const { data: resumen = [], isLoading: isLoadingResumen } = getResumenCuentaCorreinte();
+  const { data: resumen = [], isLoading: isLoadingResumen } = useResumenCuentaCorriente();
   
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [showClientDetail, setShowClientDetail] = useState(false);
+  const [filtrarPeriodo, setFiltrarPeriodo] = useState(false);
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
 
   // Get movements for selected client - always call the hook
   const { data: clientMovimientos = [], isLoading: isLoadingClientMovimientos } = 
@@ -41,6 +57,71 @@ export const CuentaCorrienteList = () => {
 
   const selectedClientData = selectedClientId ? 
     resumen.find(r => r.cliente_id === selectedClientId) : null;
+
+  useEffect(() => {
+    setFiltrarPeriodo(false);
+    setFechaDesde("");
+    setFechaHasta("");
+  }, [selectedClientId]);
+
+  const rangoInvalido = filtrarPeriodo && Boolean(fechaDesde && fechaHasta && fechaDesde > fechaHasta);
+  const detallePeriodo = useMemo(() => {
+    const ordered = [...clientMovimientos].sort((a, b) => {
+      const dateDifference = new Date(a.fecha_movimiento).getTime() - new Date(b.fecha_movimiento).getTime();
+      return dateDifference || a.id.localeCompare(b.id);
+    });
+    let saldoAnterior = 0;
+    let totalDebitos = 0;
+    let totalCreditos = 0;
+    const movimientosPeriodo = [];
+
+    for (const movimiento of ordered) {
+      const fecha = format(new Date(movimiento.fecha_movimiento), "yyyy-MM-dd");
+      const monto = Number(movimiento.monto || 0);
+      const variacion = movimiento.tipo_movimiento === "debito" ? monto : -monto;
+
+      if (filtrarPeriodo && fechaDesde && fecha < fechaDesde) {
+        saldoAnterior += variacion;
+        continue;
+      }
+      if (filtrarPeriodo && fechaHasta && fecha > fechaHasta) continue;
+
+      movimientosPeriodo.push(movimiento);
+      if (movimiento.tipo_movimiento === "debito") totalDebitos += monto;
+      else totalCreditos += monto;
+    }
+
+    let saldoAcumulado = filtrarPeriodo && fechaDesde ? saldoAnterior : 0;
+    const movimientosConSaldo = movimientosPeriodo.map((movimiento) => {
+      const monto = Number(movimiento.monto || 0);
+      saldoAcumulado += movimiento.tipo_movimiento === "debito" ? monto : -monto;
+      return { movimiento, saldoAcumulado };
+    });
+
+    return {
+      saldoAnterior: filtrarPeriodo && fechaDesde ? saldoAnterior : 0,
+      totalDebitos,
+      totalCreditos,
+      saldoFinal: saldoAcumulado,
+      movimientos: movimientosPeriodo,
+      movimientosConSaldo,
+    };
+  }, [clientMovimientos, fechaDesde, fechaHasta, filtrarPeriodo]);
+
+  const resumenDetalle = selectedClientData ? {
+    ...selectedClientData,
+    total_debitos: detallePeriodo.totalDebitos,
+    total_creditos: detallePeriodo.totalCreditos,
+    saldo_actual: detallePeriodo.saldoFinal,
+    ultimo_movimiento: detallePeriodo.movimientos.at(-1)?.fecha_movimiento || selectedClientData.ultimo_movimiento,
+  } : null;
+
+  const pdfOptions = {
+    comercio,
+    saldoInicial: detallePeriodo.saldoAnterior,
+    fechaDesde: filtrarPeriodo ? fechaDesde || undefined : undefined,
+    fechaHasta: filtrarPeriodo ? fechaHasta || undefined : undefined,
+  };
 
   const filteredMovimientos = movimientos.filter(mov =>
     mov.cliente?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -95,9 +176,9 @@ export const CuentaCorrienteList = () => {
   };
 
   const openResumenPdf = async () => {
-    if (!selectedClientData) return;
+    if (!resumenDetalle || rangoInvalido) return;
 
-    const file = await buildCuentaCorrientePdfFile(selectedClientData, clientMovimientos, { comercio });
+    const file = await buildCuentaCorrientePdfFile(resumenDetalle, detallePeriodo.movimientos, pdfOptions);
     const url = URL.createObjectURL(file);
     const pdfWindow = window.open(url, "_blank");
 
@@ -116,18 +197,18 @@ export const CuentaCorrienteList = () => {
   };
 
   const exportResumenPdf = async () => {
-    if (!selectedClientData) return;
+    if (!resumenDetalle || rangoInvalido) return;
 
-    downloadFile(await buildCuentaCorrientePdfFile(selectedClientData, clientMovimientos, { comercio }));
+    downloadFile(await buildCuentaCorrientePdfFile(resumenDetalle, detallePeriodo.movimientos, pdfOptions));
   };
 
   const sendResumenWhatsApp = async () => {
-    if (!selectedClientData) return;
+    if (!resumenDetalle || rangoInvalido) return;
 
-    const file = await buildCuentaCorrientePdfFile(selectedClientData, clientMovimientos, { comercio });
-    const message = buildCuentaCorrienteWhatsAppMessage(selectedClientData, clientMovimientos);
+    const file = await buildCuentaCorrientePdfFile(resumenDetalle, detallePeriodo.movimientos, pdfOptions);
+    const message = buildCuentaCorrienteWhatsAppMessage(resumenDetalle, detallePeriodo.movimientos, pdfOptions);
     const shareData: ShareData = {
-      title: `Resumen cuenta corriente ${selectedClientData.cliente_nombre} ${selectedClientData.cliente_apellido}`,
+      title: `Resumen cuenta corriente ${resumenDetalle.cliente_nombre} ${resumenDetalle.cliente_apellido}`,
       text: message,
       files: [file],
     };
@@ -144,7 +225,7 @@ export const CuentaCorrienteList = () => {
 
     downloadFile(file);
 
-    const phone = getWhatsAppPhone(selectedClientData.cliente_telefono);
+    const phone = getWhatsAppPhone(resumenDetalle.cliente_telefono);
     const text = encodeURIComponent(message);
     const url = phone
       ? `https://wa.me/${phone}?text=${text}`
@@ -370,7 +451,7 @@ export const CuentaCorrienteList = () => {
                     size="sm"
                     variant="print"
                     onClick={openResumenPdf}
-                    disabled={isLoadingClientMovimientos}
+                    disabled={isLoadingClientMovimientos || rangoInvalido}
                   >
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir
@@ -379,7 +460,7 @@ export const CuentaCorrienteList = () => {
                     size="sm"
                     className="bg-red-600 text-white hover:bg-red-700"
                     onClick={exportResumenPdf}
-                    disabled={isLoadingClientMovimientos}
+                    disabled={isLoadingClientMovimientos || rangoInvalido}
                   >
                     <FileDown className="mr-2 h-4 w-4" />
                     PDF
@@ -388,7 +469,7 @@ export const CuentaCorrienteList = () => {
                     size="sm"
                     className="bg-[#25D366] text-white hover:bg-[#1DA851]"
                     onClick={sendResumenWhatsApp}
-                    disabled={isLoadingClientMovimientos}
+                    disabled={isLoadingClientMovimientos || rangoInvalido}
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
                     WhatsApp
@@ -401,26 +482,54 @@ export const CuentaCorrienteList = () => {
           {selectedClientData && (
             <div className="space-y-4">
               {/* Client Summary */}
-              <div className="grid grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
+              <div className="grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-4">
                 <div>
                   <p className="text-sm font-medium">CUIT</p>
                   <p className="text-lg">{selectedClientData.cliente_cuit}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Total Débitos</p>
-                  <p className="text-lg text-red-600">${selectedClientData.total_debitos.toFixed(2)}</p>
+                  <p className="text-lg text-red-600">{formatMoney(selectedClientData.total_debitos)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Total Créditos</p>
-                  <p className="text-lg text-green-600">${selectedClientData.total_creditos.toFixed(2)}</p>
+                  <p className="text-lg text-green-600">{formatMoney(selectedClientData.total_creditos)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Saldo Actual</p>
                   <Badge variant={getSaldoBadgeVariant(selectedClientData.saldo_actual)} className="text-base">
-                    ${Math.abs(selectedClientData.saldo_actual).toFixed(2)} 
+                    {formatMoney(selectedClientData.saldo_actual)}
                     {selectedClientData.saldo_actual > 0 ? ' (Debe)' : selectedClientData.saldo_actual < 0 ? ' (Favor)' : ''}
                   </Badge>
                 </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                  <div className="flex min-h-10 items-center gap-2">
+                    <Checkbox
+                      id="filtrar-periodo-cta-cte"
+                      checked={filtrarPeriodo}
+                      onCheckedChange={(checked) => {
+                        const enabled = checked === true;
+                        setFiltrarPeriodo(enabled);
+                        if (enabled && !fechaHasta) setFechaHasta(format(new Date(), "yyyy-MM-dd"));
+                      }}
+                    />
+                    <Label htmlFor="filtrar-periodo-cta-cte">Histórico por movimiento</Label>
+                  </div>
+                  {filtrarPeriodo && <>
+                    <div className="flex items-center gap-2">
+                      <Label className="whitespace-nowrap" htmlFor="fecha-desde-cta-cte">Desde</Label>
+                      <Input className="w-40" id="fecha-desde-cta-cte" type="date" value={fechaDesde} onChange={(event) => setFechaDesde(event.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="whitespace-nowrap" htmlFor="fecha-hasta-cta-cte">Hasta</Label>
+                      <Input className="w-40" id="fecha-hasta-cta-cte" type="date" value={fechaHasta} onChange={(event) => setFechaHasta(event.target.value)} />
+                    </div>
+                  </>}
+                </div>
+                {rangoInvalido && <p className="mt-2 text-sm text-destructive">La fecha desde no puede ser posterior a la fecha hasta.</p>}
               </div>
 
               {/* Client Movements */}
@@ -439,13 +548,22 @@ export const CuentaCorrienteList = () => {
                           <TableHead>Tipo</TableHead>
                           <TableHead>Concepto</TableHead>
                           <TableHead>Monto</TableHead>
+                          <TableHead>Saldo acumulado</TableHead>
                           <TableHead>Observaciones</TableHead>
                           <TableHead>Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {clientMovimientos.map((movimiento) => (
-                          <TableRow key={movimiento.id}>
+                        {filtrarPeriodo && fechaDesde && <TableRow className="bg-muted/60 font-medium">
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell colSpan={2}>Saldo correspondiente al {formatPreviousDate(fechaDesde)}</TableCell>
+                          <TableCell>{formatMoney(detallePeriodo.saldoAnterior)} {detallePeriodo.saldoAnterior > 0 ? "(Debe)" : detallePeriodo.saldoAnterior < 0 ? "(Favor)" : ""}</TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                        </TableRow>}
+                        {detallePeriodo.movimientosConSaldo.map(({ movimiento, saldoAcumulado }) => {
+                          const presentacion = formatCuentaCorrienteMovimiento(movimiento);
+                          return <TableRow key={movimiento.id}>
                             <TableCell>
                               {format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy HH:mm")}
                             </TableCell>
@@ -456,7 +574,7 @@ export const CuentaCorrienteList = () => {
                             </TableCell>
                             <TableCell>
                               <div>
-                                {getConceptoLabel(movimiento.concepto)}
+                                {presentacion.concepto}
                                 {movimiento.venta_id && (
                                   <div className="text-xs text-muted-foreground">
                                     Venta: {movimiento.venta?.numero_comprobante}
@@ -474,7 +592,10 @@ export const CuentaCorrienteList = () => {
                             }`}>
                               ${movimiento.monto.toFixed(2)}
                             </TableCell>
-                            <TableCell>{movimiento.observaciones}</TableCell>
+                            <TableCell className="font-medium">
+                              {formatMoney(saldoAcumulado)} {saldoAcumulado > 0 ? "(Debe)" : saldoAcumulado < 0 ? "(Favor)" : ""}
+                            </TableCell>
+                            <TableCell>{presentacion.observaciones}</TableCell>
                             <TableCell>
                               {movimiento.venta_id ? (
                                 <div className="flex gap-2">
@@ -507,8 +628,11 @@ export const CuentaCorrienteList = () => {
                                 </Button>
                               )}
                             </TableCell>
-                          </TableRow>
-                        ))}
+                          </TableRow>;
+                        })}
+                        {!rangoInvalido && detallePeriodo.movimientosConSaldo.length === 0 && <TableRow>
+                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No hay movimientos en el período seleccionado.</TableCell>
+                        </TableRow>}
                       </TableBody>
                     </Table>
                   </div>

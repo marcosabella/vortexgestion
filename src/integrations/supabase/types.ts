@@ -5417,6 +5417,66 @@ export type Database = {
         }
         Returns: undefined
       }
+      registrar_venta_manual_transaccional: {
+        Args: {
+          p_cliente_id: string
+          p_cliente_nombre: string
+          p_comercio_id: string
+          p_fecha_venta: string
+          p_idempotency_key: string
+          p_items: Json
+          p_modalidad: string
+          p_moneda: string
+          p_monto_descuento: number
+          p_monto_recargo: number
+          p_numero_comprobante: string
+          p_observaciones: string
+          p_pagos: Json
+          p_porcentaje_descuento: number
+          p_porcentaje_recargo: number
+          p_punto_venta: number
+          p_tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+        }
+        Returns: {
+          banco_id: string | null
+          cae: string | null
+          cae_error: string | null
+          cae_solicitado_at: string | null
+          cae_vencimiento: string | null
+          cliente_id: string | null
+          cliente_nombre: string | null
+          comercio_id: string | null
+          created_at: string
+          cuotas: number | null
+          fecha_venta: string
+          id: string
+          idempotency_key: string | null
+          idempotency_payload: Json | null
+          moneda: string
+          monto_descuento: number
+          monto_recargo: number
+          numero_comprobante: string
+          numero_secuencial: number | null
+          observaciones: string | null
+          porcentaje_descuento: number
+          porcentaje_recargo: number
+          punto_venta: number | null
+          recargo_cuotas: number | null
+          subtotal: number
+          tarjeta_id: string | null
+          tipo_comprobante: Database["public"]["Enums"]["tipo_comprobante"]
+          tipo_pago: Database["public"]["Enums"]["tipo_pago"]
+          total: number
+          total_iva: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ventas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       registrar_venta_transaccional: {
         Args: {
           p_cliente_id: string
