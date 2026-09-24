@@ -82,6 +82,7 @@ import NuevaCompra from "./pages/NuevaCompra";
 import EditarCompra from "./pages/EditarCompra";
 import CuentaCorrienteProveedores from "./pages/CuentaCorrienteProveedores";
 import CuentaCorrienteProveedorDetalle from "./pages/CuentaCorrienteProveedorDetalle";
+import CuentaCorrienteClienteDetalle from "./pages/CuentaCorrienteClienteDetalle";
 
 const queryClient = new QueryClient();
 
@@ -248,6 +249,7 @@ function AuthenticatedLayout() {
               <Route path="/caja" element={<ParametrizedRoute modulo="caja"><CajaDiaria /></ParametrizedRoute>} />
               <Route path="/gastos-egresos" element={<ParametrizedRoute modulo="gastos_egresos"><GastosEgresos /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorriente /></ParametrizedRoute>} />
+              <Route path="/cuenta-corriente/:clienteId" element={<ParametrizedRoute modulo="cuenta_corriente"><CuentaCorrienteClienteDetalle /></ParametrizedRoute>} />
               <Route path="/cuenta-corriente/nuevo" element={<ParametrizedRoute modulo="cuenta_corriente"><NuevoMovimientoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="/comercio" element={<Comercio />} />
               <Route path="/whatsapp" element={<ParametrizedRoute modulo="whatsapp"><WhatsApp /></ParametrizedRoute>} />

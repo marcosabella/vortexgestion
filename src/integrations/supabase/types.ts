@@ -5407,6 +5407,20 @@ export type Database = {
         }
         Returns: string
       }
+      eliminar_pago_cliente: {
+        Args: { p_movimiento_id: string }
+        Returns: undefined
+      }
+      registrar_pagos_cliente_mixtos: {
+        Args: {
+          p_cliente_id: string
+          p_fecha: string
+          p_observaciones: string
+          p_pagos: Json
+          p_venta_id: string
+        }
+        Returns: undefined
+      }
       registrar_pago_mercadopago_aprobado: {
         Args: {
           p_cuotas: number

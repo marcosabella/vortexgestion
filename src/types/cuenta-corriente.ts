@@ -20,6 +20,8 @@ export interface CuentaCorriente {
   venta?: {
     numero_comprobante: string;
     cae?: string;
+    fecha_venta?: string;
+    tipo_comprobante?: string;
   };
   tarjeta?: {
     nombre: string;

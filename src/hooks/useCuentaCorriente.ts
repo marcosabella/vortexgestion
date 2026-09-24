@@ -3,6 +3,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
+import type { Json } from "@/integrations/supabase/types";
+
+export type ChequeClientePago = {
+  numero_cheque: string;
+  banco_emisor: string;
+  fecha_emision: string;
+  fecha_vencimiento: string;
+  emisor_nombre: string;
+  emisor_cuit?: string;
+  observaciones?: string;
+};
+
+export type PagoClienteBorrador = {
+  tipo: "contado" | "transferencia" | "tarjeta" | "cheque";
+  monto: number;
+  cheque?: ChequeClientePago;
+  observaciones?: string;
+};
 
 const CUENTA_CORRIENTE_PAGE_SIZE = 1000;
 
@@ -44,7 +62,7 @@ export const useCuentaCorriente = () => {
           .select(`
             *,
             cliente:clientes(nombre, apellido, cuit, telefono),
-            venta:ventas(numero_comprobante, cae)
+            venta:ventas(numero_comprobante, cae, fecha_venta, tipo_comprobante)
           `)
           .eq("comercio_id", comercioId!)
           .order("fecha_movimiento", { ascending: false })
@@ -67,7 +85,7 @@ export const useCuentaCorriente = () => {
             .select(`
               *,
               cliente:clientes(nombre, apellido, cuit, telefono),
-              venta:ventas(numero_comprobante, cae)
+              venta:ventas(numero_comprobante, cae, fecha_venta, tipo_comprobante)
             `)
             .eq("comercio_id", comercioId!)
             .eq("cliente_id", clienteId)
@@ -242,6 +260,66 @@ export const useCuentaCorriente = () => {
     },
   });
 
+  const registrarPagosMixtosMutation = useMutation({
+    mutationFn: async ({
+      clienteId,
+      ventaId,
+      fecha,
+      observaciones,
+      pagos,
+    }: {
+      clienteId: string;
+      ventaId: string;
+      fecha: string;
+      observaciones?: string;
+      pagos: PagoClienteBorrador[];
+    }) => {
+      if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el pago.");
+      const { error } = await supabase.rpc("registrar_pagos_cliente_mixtos", {
+        p_cliente_id: clienteId,
+        p_venta_id: ventaId,
+        p_fecha: fecha,
+        p_observaciones: observaciones || null,
+        p_pagos: pagos as unknown as Json,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["cheques"] });
+      toast({
+        title: "Pago registrado",
+        description: "La cuenta corriente del cliente y los medios de cobro fueron actualizados.",
+      });
+    },
+    onError: (error: Error) => {
+      const description = error.message.includes("pagos_cliente_superan_saldo")
+        ? "Los pagos ingresados superan el saldo pendiente."
+        : error.message.includes("comprobante_cliente_sin_saldo")
+          ? "El comprobante seleccionado ya no tiene saldo pendiente."
+          : error.message;
+      toast({ title: "No se pudo registrar el pago", description, variant: "destructive" });
+    },
+  });
+
+  const eliminarPagoClienteMutation = useMutation({
+    mutationFn: async (movimientoId: string) => {
+      const { error } = await supabase.rpc("eliminar_pago_cliente", { p_movimiento_id: movimientoId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["cheques"] });
+      toast({ title: "Pago eliminado", description: "La cuenta corriente y la cartera de cheques fueron actualizadas." });
+    },
+    onError: (error: Error) => {
+      const description = error.message.includes("cheque_cliente_pago_ya_utilizado")
+        ? "El pago no puede eliminarse porque el cheque ya fue depositado, endosado o utilizado."
+        : error.message;
+      toast({ title: "No se pudo eliminar el pago", description, variant: "destructive" });
+    },
+  });
+
   return {
     movimientos,
     isLoading,
@@ -251,6 +329,8 @@ export const useCuentaCorriente = () => {
     createMovimiento: createMovimientoMutation.mutate,
     deleteMovimiento: deleteMovimientoMutation.mutate,
     deleteVentaFromCuenta: deleteVentaFromCuentaMutation.mutate,
+    registrarPagosMixtos: registrarPagosMixtosMutation,
+    eliminarPagoCliente: eliminarPagoClienteMutation,
     isCreating: createMovimientoMutation.isPending,
     isDeleting: deleteMovimientoMutation.isPending,
     isDeletingVenta: deleteVentaFromCuentaMutation.isPending,
