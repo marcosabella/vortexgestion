@@ -33,6 +33,7 @@ const paymentLabels: Record<string, string> = {
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
   cheque: "Cheque",
+  multiple: "Pago parcial o mixto",
   cta_cte: "Cuenta corriente",
 };
 const itemAdjustment = (

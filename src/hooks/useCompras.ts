@@ -61,6 +61,7 @@ function compraErrorMessage(error: Error) {
   if (error.message.includes("datos_cheque_propio_incompletos")) return "Completá todos los datos obligatorios del cheque propio.";
   if (error.message.includes("pagos_proveedor_superan_saldo")) return "La suma de los medios de pago supera el saldo pendiente.";
   if (error.message.includes("pagos_proveedor_mixtos_invalidos") || error.message.includes("pago_proveedor_mixto_item_invalido")) return "Revisá los medios de pago y sus importes.";
+  if (error.message.includes("compra_pagos_invalidos") || error.message.includes("compra_pago_cheque_invalido")) return "Agregá al menos un medio de pago válido para la compra.";
   return error.message;
 }
 export type CompraNuevaItem = {
@@ -211,6 +212,7 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
         recargo: number;
         observaciones: string;
         items: CompraNuevaItem[];
+        pagos?: PagoProveedorBorrador[];
       },
     ) => {
       if (!comercioId) throw new Error("No hay un comercio seleccionado.");
@@ -228,7 +230,10 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
         monto_recargo: i.monto_recargo,
         actualizar_costo: i.actualizar_costo,
       }));
-      const { error } = await db.rpc("registrar_compra_confirmada_v2", {
+      const rpcName = args.modalidadPago === "cheque" || args.modalidadPago === "multiple"
+        ? "registrar_compra_confirmada_con_pagos"
+        : "registrar_compra_confirmada_v2";
+      const rpcArgs: Record<string, unknown> = {
         p_comercio_id: comercioId,
         p_proveedor_id: args.proveedorId,
         p_fecha: args.fecha,
@@ -241,7 +246,9 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
         p_monto_recargo: args.recargo,
         p_items: items,
         p_observaciones: args.observaciones,
-      });
+      };
+      if (rpcName === "registrar_compra_confirmada_con_pagos") rpcArgs.p_pagos = args.pagos || [];
+      const { error } = await db.rpc(rpcName, rpcArgs);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -289,7 +296,7 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
         monto_recargo: i.monto_recargo,
         actualizar_costo: i.actualizar_costo,
       }));
-      const { error } = await db.rpc("editar_compra_confirmada", {
+      const { error } = await db.rpc("editar_compra_confirmada_v2", {
         p_compra_id: args.compraId,
         p_proveedor_id: args.proveedorId,
         p_fecha: args.fecha,
@@ -318,10 +325,18 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
   });
   const eliminarCompra = useMutation({
     mutationFn: async (compraId: string) => {
-      const { error } = await db.rpc("eliminar_compra_confirmada", {
+      const { error } = await db.rpc("eliminar_compra_confirmada_con_cheques", {
         p_compra_id: compraId,
       });
-      if (error) throw error;
+      if (!error) return;
+      const funcionNuevaNoDisponible = error.message.includes("eliminar_compra_confirmada_con_cheques") &&
+        (error.message.includes("Could not find the function") || error.message.includes("schema cache"));
+      if (!funcionNuevaNoDisponible) throw error;
+
+      const { error: fallbackError } = await db.rpc("eliminar_compra_confirmada", {
+        p_compra_id: compraId,
+      });
+      if (fallbackError) throw fallbackError;
     },
     onSuccess: () => {
       refresh();

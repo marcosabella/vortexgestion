@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { ProductoForm } from "@/components/ProductoForm";
+import { CompraPagosEditor, type CompraPagoBorrador } from "@/components/CompraPagosEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -50,6 +51,7 @@ const paymentLabels: Record<string, string> = {
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
   cheque: "Cheque",
+  multiple: "Pago parcial o mixto",
   cta_cte: "Cuenta corriente",
 };
 const comprobantePattern = /^\d{4}-\d{8}$/;
@@ -97,7 +99,8 @@ export default function CompraForm(
   const [vencimiento, setVencimiento] = useState(
     compra?.fecha_vencimiento || "",
   );
-  const [pago, setPago] = useState(compra?.modalidad_pago || "cta_cte");
+  const [pago] = useState(compra?.modalidad_pago || "cta_cte");
+  const [pagos, setPagos] = useState<CompraPagoBorrador[]>([]);
   const [observaciones, setObservaciones] = useState(
     compra?.observaciones || "",
   );
@@ -157,21 +160,34 @@ export default function CompraForm(
     base - totalDiscount + recargo + base * recargoPct / 100,
     0,
   );
+  const totalPagos = pagos.reduce((sum, item) => sum + Number(item.monto), 0);
   const comprobanteValido = comprobantePattern.test(factura);
   const pending = api.confirmarCompra.isPending || api.editarCompra.isPending;
   const submit = () => {
+    const modalidadPago = compra
+      ? pago
+      : pagos.length === 0
+      ? "cta_cte"
+      : pagos.every((item) => item.tipo === "cheque")
+      ? "cheque"
+      : pagos.length === 1 && totalPagos === total
+      ? pagos[0].tipo
+      : "multiple";
     const payload = {
       proveedorId,
       fecha,
       facturaNumero: factura,
       vencimiento,
-      modalidadPago: pago,
+      modalidadPago,
       porcentajeDescuento: descuentoPct,
       descuento,
       porcentajeRecargo: recargoPct,
       recargo,
       observaciones,
       items,
+      pagos: modalidadPago === "cheque" || modalidadPago === "multiple"
+        ? pagos.map(({ localId: _localId, detalle: _detalle, ...item }) => item)
+        : undefined,
     };
     if (compra) {
       api.editarCompra.mutate({ compraId: compra.id, ...payload }, {
@@ -240,20 +256,12 @@ export default function CompraForm(
                 onChange={(event) => setVencimiento(event.target.value)}
               />
             </div>
-            <div>
+            {compra && <div>
               <Label>Modalidad de pago</Label>
-              <Select value={pago} onValueChange={setPago}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(paymentLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
+              <p className="mt-2 font-medium">{paymentLabels[pago] || pago}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Los pagos existentes se administran desde la cuenta corriente del proveedor.</p>
+            </div>}
+            <div className={compra ? "md:col-span-2" : "md:col-span-3"}>
               <Label>Observaciones</Label>
               <Input
                 className="mt-1"
@@ -623,11 +631,14 @@ export default function CompraForm(
               <p className="pt-2 text-xl font-bold">{money(total)}</p>
             </div>
           </div>
+          {!compra && (
+            <CompraPagosEditor total={total} pagos={pagos} onChange={setPagos} />
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onCancel}>Cancelar</Button>
             <Button
               disabled={!proveedorId || !comprobanteValido || !items.length ||
-                total <= 0 || pending}
+                total <= 0 || pending || (!compra && totalPagos > total)}
               onClick={submit}
             >
               {pending
