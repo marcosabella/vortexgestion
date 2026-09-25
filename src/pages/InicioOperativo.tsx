@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useComercio } from "@/hooks/useComercio";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { supabase } from "@/integrations/supabase/client";
+import { isLegacyDeletedClient, isLegacyDeletedClientName } from "@/utils/legacyVisibility";
 
 const money = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
@@ -43,9 +44,15 @@ export default function InicioOperativo() {
     queryKey: ["inicio-operativo", "ventas", comercioId, fecha],
     enabled: Boolean(comercioId && cards.ventas_hoy),
     queryFn: async () => {
-      const { data, error } = await supabase.from("ventas").select("id,total").eq("fecha_venta", fecha);
+      const { data, error } = await supabase
+        .from("ventas")
+        .select("id,total,cliente_nombre,cliente:clientes(nombre)")
+        .eq("comercio_id", comercioId!)
+        .eq("fecha_venta", fecha);
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(
+        (venta) => !isLegacyDeletedClient(venta.cliente) && !isLegacyDeletedClientName(venta.cliente_nombre),
+      );
     },
   });
   const caja = useQuery({
@@ -70,11 +77,17 @@ export default function InicioOperativo() {
     queryKey: ["inicio-operativo", "cuenta-corriente", comercioId],
     enabled: Boolean(comercioId && cards.cuenta_corriente),
     queryFn: async () => {
-      const { data, error } = await supabase.from("cuenta_corriente").select("cliente_id,tipo_movimiento,monto");
+      const { data, error } = await supabase
+        .from("cuenta_corriente")
+        .select("cliente_id,tipo_movimiento,monto,cliente:clientes(nombre)")
+        .eq("comercio_id", comercioId!);
       if (error) throw error;
       const balances = new Map<string, number>();
-      (data || []).forEach((item) => balances.set(item.cliente_id, (balances.get(item.cliente_id) || 0) + (item.tipo_movimiento === "debito" ? Number(item.monto) : -Number(item.monto))));
-      const pending = [...balances.values()].filter((balance) => balance > 0);
+      (data || []).forEach((item) => {
+        if (isLegacyDeletedClient(item.cliente)) return;
+        balances.set(item.cliente_id, (balances.get(item.cliente_id) || 0) + (item.tipo_movimiento === "debito" ? Number(item.monto) : -Number(item.monto)));
+      });
+      const pending = [...balances.values()].filter((balance) => Math.round(balance * 100) > 0);
       return { clients: pending.length, total: pending.reduce((sum, balance) => sum + balance, 0) };
     },
   });

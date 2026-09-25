@@ -79,7 +79,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
   { key: "venta_items_manuales", label: "Items manuales en ventas", description: "Permite agregar conceptos sin producto asociado." },
-  { key: "ingreso_manual_numero_comprobante", label: "Numeración manual de comprobantes", description: "Permite elegir entre numeración automática o ingresar manualmente un número con formato 0000 - 00000000." },
+  { key: "ingreso_manual_numero_comprobante", label: "Numeración manual de comprobantes", description: "Permite editar el número automático respetando el formato 0000 - 00000000." },
   { key: "descuentos_recargos", label: "Descuentos y recargos", description: "Habilita ajustes por item y sobre el total de la venta." },
   { key: "facturacion_afip", label: "Facturacion ARCA", description: "Permite solicitar CAE y operar con comprobantes fiscales." },
   { key: "impresion_comprobantes", label: "Impresion de comprobantes", description: "Permite imprimir comprobantes desde ventas." },

@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
-import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
+import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
 import { useComercio } from "@/hooks/useComercio";
@@ -51,6 +51,7 @@ export const VentasList = () => {
   const [qrPreview, setQrPreview] = useState("");
   const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const mostrarNumeroComprobante = (numero: string) => formatNumeroComprobante(numero, afipConfig?.punto_venta);
   const { data: whatsappEnvios = [] } = useQuery({
     queryKey: ["whatsapp-envios", selectedVenta?.id],
     enabled: Boolean(selectedVenta?.id),
@@ -162,7 +163,8 @@ export const VentasList = () => {
 
   const filteredVentas = ventas
     .filter(venta =>
-      venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        mostrarNumeroComprobante(venta.numero_comprobante).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (venta.cliente_nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
@@ -416,39 +418,43 @@ export const VentasList = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>N° Comprobante</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo Pago</TableHead>
-                  <TableHead>Comprobante</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Acciones</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">Fecha</TableHead>
+                  <TableHead className="w-px whitespace-nowrap px-2" title="Número de comprobante">N° Comp.</TableHead>
+                  <TableHead className="w-full min-w-[220px]">Cliente</TableHead>
+                  <TableHead className="w-px whitespace-nowrap px-2">Tipo Pago</TableHead>
+                  <TableHead className="w-px whitespace-nowrap px-2">Comprobante</TableHead>
+                  <TableHead className="w-px whitespace-nowrap px-2">Total</TableHead>
+                  <TableHead className="w-px whitespace-nowrap px-2">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredVentas.map((venta) => (
                   <TableRow key={venta.id}>
-                    <TableCell>
+                    <TableCell className="w-px whitespace-nowrap">
                       {format(new Date(venta.fecha_venta), "dd/MM/yyyy")}
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {venta.numero_comprobante}
+                    <TableCell className="w-px whitespace-nowrap px-2 font-medium">
+                      {mostrarNumeroComprobante(venta.numero_comprobante)}
                     </TableCell>
-                    <TableCell>{venta.cliente_nombre}</TableCell>
-                    <TableCell>
-                      <Badge variant={getTipoPagoBadgeVariant((venta.pagos_venta?.length || 0) > 1 ? "mixto" : venta.tipo_pago)}>
+                    <TableCell className="w-full min-w-[220px] max-w-0">
+                      <div className="truncate" title={venta.cliente_nombre || "Consumidor Final"}>
+                        {venta.cliente_nombre || "Consumidor Final"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-px whitespace-nowrap px-2">
+                      <Badge className="whitespace-nowrap" variant={getTipoPagoBadgeVariant((venta.pagos_venta?.length || 0) > 1 ? "mixto" : venta.tipo_pago)}>
                         {getVentaTipoPagoLabel(venta)}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={getTipoComprobanteBadgeVariant(venta.tipo_comprobante)}>
+                    <TableCell className="w-px whitespace-nowrap px-2">
+                      <Badge className="whitespace-nowrap" variant={getTipoComprobanteBadgeVariant(venta.tipo_comprobante)}>
                         {TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold">
+                    <TableCell className="w-px whitespace-nowrap px-2 font-semibold">
                       ${getVentaTotalFinal(venta).toFixed(2)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-px whitespace-nowrap px-2">
                       <div className="flex space-x-2">
                         <Button
                           variant="outline"
@@ -512,7 +518,7 @@ export const VentasList = () => {
                 <div className="grid grid-cols-1 gap-x-10 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <p className="whitespace-nowrap"><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
                   <p className="whitespace-nowrap"><strong>Comprobante:</strong> {TIPOS_COMPROBANTE.find(t => t.value === selectedVenta.tipo_comprobante)?.label}</p>
-                  <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {selectedVenta.numero_comprobante}</p>
+                  <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {mostrarNumeroComprobante(selectedVenta.numero_comprobante)}</p>
                   <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
                 <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>

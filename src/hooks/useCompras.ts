@@ -181,7 +181,10 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
           "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), factura:compras_facturas(numero_comprobante,fecha_vencimiento,compra_id), gasto:gastos_egresos(concepto,numero_comprobante), cheque:cheques!cuenta_corriente_proveedores_cheque_id_fkey(numero_cheque,banco_emisor,monto,tipo_cheque)",
         ).eq("comercio_id", comercioId);
       if (proveedorId) query = query.eq("proveedor_id", proveedorId);
-      const { data, error } = await query.order("fecha", { ascending: false });
+      const { data, error } = await query
+        .order("fecha", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
       if (error) throw error;
       return (data || []) as MovimientoProveedor[];
     },

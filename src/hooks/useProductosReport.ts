@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
 import { useComercio } from "@/hooks/useComercio";
+import { isLegacyDeletedClientName } from "@/utils/legacyVisibility";
 
 export interface ProductoReporte extends Producto {
   unidades_vendidas: number;
@@ -37,7 +38,7 @@ export const useProductosReport = () => {
         .select(`
           producto_id,
           cantidad,
-          venta:ventas(fecha_venta)
+          venta:ventas(fecha_venta, cliente_nombre)
         `)
         .eq("comercio_id", comercioId!);
 
@@ -47,7 +48,7 @@ export const useProductosReport = () => {
       const ventasPorProducto = new Map<string, { cantidad: number; ultima_venta?: string }>();
       
       ventasData?.forEach((item: any) => {
-        if (!item.producto_id) return;
+        if (!item.producto_id || isLegacyDeletedClientName(item.venta?.cliente_nombre)) return;
 
         const existing = ventasPorProducto.get(item.producto_id) || { cantidad: 0 };
         existing.cantidad += item.cantidad;

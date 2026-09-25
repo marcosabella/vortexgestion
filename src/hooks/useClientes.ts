@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useComercio } from '@/hooks/useComercio';
+import { isLegacyDeletedClient } from '@/utils/legacyVisibility';
 
 export interface Cliente {
   id?: string;
@@ -33,7 +34,7 @@ export function useClientes() {
         .order('apellido', { ascending: true });
       
       if (error) throw error;
-      return data as Cliente[];
+      return (data as Cliente[]).filter((cliente) => !isLegacyDeletedClient(cliente));
     },
   });
 }

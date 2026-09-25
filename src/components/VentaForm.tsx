@@ -229,8 +229,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [qrCobro, setQrCobro] = useState<{ image: string; ventaId: string; operacionId: string; importe: number } | null>(null)
   const [ventaMercadoPagoPendienteId, setVentaMercadoPagoPendienteId] = useState("")
   const [cancelarMercadoPagoTarget, setCancelarMercadoPagoTarget] = useState<"qr" | "pendiente" | null>(null)
-  const [numeracionManual, setNumeracionManual] = useState(false)
-  const usaNumeracionManual = permiteNumeracionManual && numeracionManual
+  const [numeroComprobanteEditado, setNumeroComprobanteEditado] = useState(false)
+  const usaNumeracionManual = permiteNumeracionManual && numeroComprobanteEditado
   const idempotencyKeyRef = useRef<string | null>(null)
   const mercadoPagoData = mercadoPagoStatus.data || {}
   const mercadoPagoCajas = mercadoPagoData.cajas || []
@@ -337,7 +337,6 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const puedePrevisualizarNumero =
     !venta &&
     !esPresupuesto &&
-    !usaNumeracionManual &&
     Boolean(comercio?.id && user?.id && watchTipoComprobante)
   const numeroPreview = useQuery({
     queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null],
@@ -387,7 +386,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
   useEffect(() => {
     if (!venta && !esPresupuesto && !usaNumeracionManual && numeroPreview.data) {
-      form.setValue("numero_comprobante", numeroPreview.data, { shouldValidate: false })
+      form.setValue("numero_comprobante", formatNumeroComprobanteInput(numeroPreview.data), { shouldValidate: false })
     }
   }, [esPresupuesto, form, numeroPreview.data, usaNumeracionManual, venta])
 
@@ -718,7 +717,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           return
         }
 
-        form.setValue("numero_comprobante", numeroComprobante, {
+        form.setValue("numero_comprobante", formatNumeroComprobanteInput(numeroComprobante), {
           shouldDirty: false,
           shouldValidate: true,
         })
@@ -839,7 +838,11 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
               pagos: pagosConfirmados,
               idempotencyKey: idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID()),
               mercadoPago: Boolean(pagoMercadoPago),
-              numeroManual: usaNumeracionManual ? normalizeNumeroComprobante(data.numero_comprobante) : undefined,
+              numeroManual:
+                permiteNumeracionManual &&
+                normalizeNumeroComprobante(data.numero_comprobante) !== normalizeNumeroComprobante(numeroPreview.data || "")
+                  ? normalizeNumeroComprobante(data.numero_comprobante)
+                  : undefined,
             })
         idempotencyKeyRef.current = null
         if (!pagoMercadoPago && "numero_comprobante" in nuevaVenta && typeof nuevaVenta.numero_comprobante === "string") {
@@ -916,7 +919,17 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Comprobante</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        setNumeroComprobanteEditado(false)
+                        form.clearErrors("numero_comprobante")
+                        if (!venta && !esPresupuesto) {
+                          form.setValue("numero_comprobante", "", { shouldDirty: false, shouldValidate: false })
+                        }
+                        field.onChange(value)
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar tipo" />
@@ -941,56 +954,32 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de Comprobante</FormLabel>
-                    <div className="flex gap-2">
-                      {permiteNumeracionManual && (
-                        <Select
-                          value={usaNumeracionManual ? "manual" : "automatica"}
-                          onValueChange={(value) => {
-                            const manual = value === "manual"
-                            setNumeracionManual(manual)
-                            form.clearErrors("numero_comprobante")
-                            form.setValue(
-                              "numero_comprobante",
-                              manual ? "" : numeroPreview.data ?? "",
-                              { shouldDirty: manual, shouldValidate: false },
-                            )
-                          }}
-                        >
-                          <SelectTrigger className="w-32 shrink-0" aria-label="Modo de numeración">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="automatica">Automática</SelectItem>
-                            <SelectItem value="manual">Manual</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={
-                            usaNumeracionManual
-                              ? field.value
-                              : esPresupuesto || venta
-                                ? field.value
-                                : numeroPreviewEnCarga
-                                  ? "..."
-                                  : numeroPreview.isError
-                                    ? "No disponible"
-                                    : numeroPreview.data
-                                      ? formatNumeroComprobanteInput(numeroPreview.data)
-                                      : "..."
-                          }
-                          onChange={(event) => {
-                            if (usaNumeracionManual) field.onChange(formatNumeroComprobanteInput(event.target.value))
-                          }}
-                          placeholder="0000 - 00000000"
-                          inputMode={usaNumeracionManual ? "numeric" : undefined}
-                          readOnly={!usaNumeracionManual || esPresupuesto || Boolean(venta)}
-                          className={usaNumeracionManual ? "font-mono" : "bg-muted font-mono"}
-                        />
-                      </FormControl>
-                    </div>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={
+                          permiteNumeracionManual || esPresupuesto || venta
+                            ? field.value
+                            : numeroPreviewEnCarga
+                              ? "..."
+                              : numeroPreview.isError
+                                ? "No disponible"
+                                : numeroPreview.data
+                                  ? formatNumeroComprobanteInput(numeroPreview.data)
+                                  : "..."
+                        }
+                        onChange={(event) => {
+                          if (!permiteNumeracionManual) return
+                          setNumeroComprobanteEditado(true)
+                          form.clearErrors("numero_comprobante")
+                          field.onChange(formatNumeroComprobanteInput(event.target.value))
+                        }}
+                        placeholder="0000 - 00000000"
+                        inputMode={permiteNumeracionManual ? "numeric" : undefined}
+                        readOnly={!permiteNumeracionManual || esPresupuesto || Boolean(venta)}
+                        className={permiteNumeracionManual ? "font-mono" : "bg-muted font-mono"}
+                      />
+                    </FormControl>
                     {!esPresupuesto && !venta && !numeroPreviewEnCarga && numeroPreview.isError && (
                       <p className="text-sm text-destructive">No se pudo consultar la numeración.</p>
                     )}

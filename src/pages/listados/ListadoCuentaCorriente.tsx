@@ -23,7 +23,7 @@ const ListadoCuentaCorriente = () => {
   const [fechaHasta, setFechaHasta] = useState('');
 
   const clientesConSaldo = useMemo(() => {
-    return resumen.filter((cliente) => cliente.saldo_actual !== 0);
+    return resumen.filter((cliente) => Math.round(cliente.saldo_actual * 100) !== 0);
   }, [resumen]);
 
   const filteredClientes = useMemo(() => {

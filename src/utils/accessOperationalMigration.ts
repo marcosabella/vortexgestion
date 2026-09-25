@@ -19,9 +19,12 @@ const date = (value: unknown) => {
 
 const paymentType = (condition: unknown) => ({ "1": "contado", "2": "cta_cte", "3": "tarjeta", "4": "cheque" }[text(condition)] || "contado");
 const receiptType = (code: unknown) => ({
-  "1": "factura_a", "5": "factura_a", "6": "factura_b", "9": "recibo_b",
-  "11": "factura_c", "64": "factura_b", "82": "factura_b", "121": "recibo_c",
+  "1": "factura_a", "2": "nota_debito_a", "3": "nota_credito_a", "5": "factura_a",
+  "6": "factura_b", "7": "nota_debito_b", "8": "nota_credito_b", "9": "recibo_b",
+  "11": "factura_c", "12": "nota_debito_c", "13": "nota_credito_c", "64": "factura_b",
+  "82": "factura_b", "121": "recibo_c",
 }[text(code)] || "ticket_fiscal");
+const truthyAccessValue = (value: unknown) => value === true || ["true", "1", "-1", "x", "si", "sí"].includes(text(value).toLocaleLowerCase("es-AR"));
 
 export type OperationalPayload = Record<"ventas" | "items" | "pagos" | "cheques", PreviewRow[]> & { presupuestosOmitidos: number };
 
@@ -29,6 +32,7 @@ export function buildOperationalPayload(tables: Record<string, AccessRow[]>): Op
   const allSales = tables.Ventas || [];
   const details = tables.Detalle_Venta || [];
   const products = new Map((tables.Articulos || []).map((row) => [source(row, "idArticulo"), row]));
+  const receipts = new Map((tables.Comprobantes || []).map((row) => [source(row, "Codigo"), row]));
   const detailBySale = new Map<string, AccessRow[]>();
   for (const row of details) {
     const key = source(row, "idVenta");
@@ -48,6 +52,9 @@ export function buildOperationalPayload(tables: Record<string, AccessRow[]>): Op
       return sum + roundMoney(iva > 0 ? gross / (1 + iva / 100) : gross);
     }, 0);
     const total = numeric(field(row, "monto"));
+    const receiptCode = source(row, "idComprobante");
+    const receipt = receipts.get(receiptCode);
+    const isCreditNote = truthyAccessValue(receipt && field(receipt, "Resta")) || ["3", "8", "13"].includes(receiptCode);
     const difference = total - lineTotal;
     const factor = lineTotal > 0 ? total / lineTotal : 1;
     const subtotal = roundMoney(lineSubtotal * factor);
@@ -58,7 +65,8 @@ export function buildOperationalPayload(tables: Record<string, AccessRow[]>): Op
     return { sourceId, warnings, data: {
       fecha: date(field(row, "fecha_venta")), cliente_source_id: source(row, "idCliente") || null,
       tipo_pago: paymentType(field(row, "idCondicion_venta")), tipo_comprobante: receiptType(field(row, "idComprobante")),
-      comprobante_origen: source(row, "idComprobante"), subtotal, total_iva: totalIva, total, ajuste: difference,
+      comprobante_origen: receiptCode, tipo_movimiento_cuenta: isCreditNote ? "credito" : "debito",
+      subtotal, total_iva: totalIva, total, ajuste: difference,
       porcentaje_descuento: numeric(field(row, "descuento_venta")), porcentaje_recargo: numeric(field(row, "recargo_venta")),
       observaciones: text(field(row, "observaciones")) || null,
     } };

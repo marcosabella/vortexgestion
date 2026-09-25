@@ -160,6 +160,25 @@ export const getVentaTipoPagoLabel = (venta: Pick<Venta, "tipo_pago" | "pagos_ve
   return getTipoPagoLabel(venta.tipo_pago);
 };
 
+export const formatNumeroComprobante = (value: string | null | undefined, puntoVenta?: number | null) => {
+  const original = String(value || "").trim();
+  if (!original) return "";
+
+  const normalized = original.replace(/\s/g, "");
+  const formattedMatch = normalized.match(/^(\d{1,4})-(\d{1,8})$/);
+  if (formattedMatch) {
+    return `${formattedMatch[1].padStart(4, "0")} - ${formattedMatch[2].padStart(8, "0")}`;
+  }
+
+  if (!/^\d{1,8}$/.test(normalized)) return original;
+
+  const puntoVentaValido = Number.isInteger(puntoVenta) && Number(puntoVenta) > 0
+    ? Number(puntoVenta)
+    : 1;
+
+  return `${String(puntoVentaValido).padStart(4, "0")} - ${normalized.padStart(8, "0")}`;
+};
+
 export const getPagoMontoBase = (pago: Pick<PagoVenta, "monto" | "recargo_cuotas">) =>
   Math.max(Number(pago.monto || 0) - Number(pago.recargo_cuotas || 0), 0);
 

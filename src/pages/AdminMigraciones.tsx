@@ -236,6 +236,7 @@ export default function AdminMigraciones() {
       const payload = buildOperationalPayload({
         Ventas: tableData("Ventas"), Detalle_Venta: tableData("Detalle_Venta"), Pagos: tableData("Pagos"),
         Cheques: tableData("Cheques"), Banco: tableData("Banco"), Articulos: tableData("Articulos"),
+        Comprobantes: tableData("Comprobantes"),
       });
       const id = await rpc<string>("migracion_crear_operaciones", { p_comercio_id: comercioId, p_archivo_nombre: file.name, p_archivo_hash: hash, p_archivo_tamano: file.size });
       setOperationalMigrationId(id);

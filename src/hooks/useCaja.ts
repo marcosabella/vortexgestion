@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, CajaMovimiento, CajaMovimientoTipo } from "@/types/caja";
 import { esVentaCuentaCorriente, getVentaTotalFinal, Venta } from "@/types/venta";
 import { useComercio } from "@/hooks/useComercio";
+import { isLegacyDeletedClientName } from "@/utils/legacyVisibility";
 
 const db = supabase;
 
@@ -22,6 +23,7 @@ const mergeVentas = (...grupos: Venta[][]) => {
   const ventasPorId = new Map<string, Venta>();
 
   grupos.flat().forEach((venta) => {
+    if (isLegacyDeletedClientName(venta.cliente_nombre)) return;
     if (venta.id) ventasPorId.set(venta.id, venta);
   });
 
@@ -223,7 +225,9 @@ export const useCajaDiaria = (fecha: string) => {
       if (ventasDelDiaError) throw ventasDelDiaError;
 
       const cajasDelDia = (cajasDelDiaData || []) as CajaDiaria[];
-      const ventasDelDia = (ventasDelDiaData || []) as Venta[];
+      const ventasDelDia = ((ventasDelDiaData || []) as Venta[]).filter(
+        (venta) => !isLegacyDeletedClientName(venta.cliente_nombre),
+      );
       const movimientosVentaIds = new Set(
         cajasDelDia.flatMap((cajaDelDia) =>
           (cajaDelDia.caja_movimientos || [])
@@ -277,7 +281,11 @@ export const useCajaDiaria = (fecha: string) => {
 
       if (error) throw error;
 
-      if (ventasEnlazadasIds.length === 0) return ventasDelPeriodoData as Venta[];
+      if (ventasEnlazadasIds.length === 0) {
+        return ((ventasDelPeriodoData || []) as Venta[]).filter(
+          (venta) => !isLegacyDeletedClientName(venta.cliente_nombre),
+        );
+      }
 
       const { data: ventasEnlazadasData, error: ventasEnlazadasError } = await db
         .from("ventas")
@@ -647,6 +655,7 @@ export const useCajasDiarias = (fechaDesde?: string, fechaHasta?: string) => {
         return {
           ...caja,
           ventas: ((ventasData || []) as Venta[]).filter((venta) => {
+            if (isLegacyDeletedClientName(venta.cliente_nombre)) return false;
             const fechaVenta = venta.fecha_venta ? new Date(venta.fecha_venta).getTime() : 0;
             const desdeCaja = new Date(caja.abierto_at || `${caja.fecha}T00:00:00`).getTime();
             const hastaCaja = caja.cerrado_at

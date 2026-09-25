@@ -101,7 +101,7 @@ export default function CuentaCorrienteClienteDetalle() {
       totalCreditos,
       saldoFinal: saldoAcumulado,
       movimientos: movimientosPeriodo,
-      movimientosConSaldo,
+      movimientosConSaldo: [...movimientosConSaldo].reverse(),
     };
   }, [fechaDesde, fechaHasta, filtrarPeriodo, movimientos]);
 
@@ -185,11 +185,11 @@ export default function CuentaCorrienteClienteDetalle() {
       </div>
 
       <div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Concepto</TableHead><TableHead className="text-right">Monto</TableHead><TableHead className="text-right">Saldo acumulado</TableHead><TableHead>Observaciones</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>
-        {filtrarPeriodo && fechaDesde && <TableRow className="bg-muted/60 font-medium"><TableCell /><TableCell /><TableCell colSpan={2}>Saldo correspondiente al {formatPreviousDate(fechaDesde)}</TableCell><TableCell className="text-right">{money(detallePeriodo.saldoAnterior)} {detallePeriodo.saldoAnterior > 0 ? "(Debe)" : detallePeriodo.saldoAnterior < 0 ? "(Favor)" : ""}</TableCell><TableCell colSpan={2} /></TableRow>}
         {detallePeriodo.movimientosConSaldo.map(({ movimiento, saldoAcumulado }) => {
           const presentation = formatCuentaCorrienteMovimiento(movimiento);
           return <TableRow key={movimiento.id}><TableCell>{format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy HH:mm")}</TableCell><TableCell><Badge variant={movimiento.tipo_movimiento === "debito" ? "destructive" : "default"}>{movimiento.tipo_movimiento === "debito" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell>{presentation.concepto}{movimiento.venta_id && <div className="text-xs text-muted-foreground">Venta: {movimiento.venta?.numero_comprobante}</div>}</TableCell><TableCell className={`text-right font-semibold ${movimiento.tipo_movimiento === "debito" ? "text-red-600" : "text-green-600"}`}>{money(movimiento.monto)}</TableCell><TableCell className="text-right font-medium">{money(saldoAcumulado)} {saldoAcumulado > 0 ? "(Debe)" : saldoAcumulado < 0 ? "(Favor)" : ""}</TableCell><TableCell>{presentation.observaciones}</TableCell><TableCell className="text-right">{movimiento.venta_id && movimiento.tipo_movimiento === "debito" ? <Button variant="ghost" size="icon" className="text-destructive" disabled={Boolean(movimiento.venta?.cae?.trim())} title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : "Eliminar venta"} onClick={() => { if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) deleteVentaFromCuenta(movimiento.venta_id!); }}><Trash2 className="h-4 w-4" /></Button> : <Button variant="ghost" size="icon" className="text-destructive" title={movimiento.tipo_movimiento === "credito" ? "Eliminar pago" : "Eliminar movimiento"} onClick={() => { if (confirm(movimiento.tipo_movimiento === "credito" ? "¿Eliminar este pago?" : "¿Eliminar este movimiento?")) { if (movimiento.tipo_movimiento === "credito") eliminarPagoCliente.mutate(movimiento.id); else deleteMovimiento(movimiento.id); } }}><Trash2 className="h-4 w-4" /></Button>}</TableCell></TableRow>;
         })}
+        {filtrarPeriodo && fechaDesde && <TableRow className="bg-muted/60 font-medium"><TableCell /><TableCell /><TableCell colSpan={2}>Saldo correspondiente al {formatPreviousDate(fechaDesde)}</TableCell><TableCell className="text-right">{money(detallePeriodo.saldoAnterior)} {detallePeriodo.saldoAnterior > 0 ? "(Debe)" : detallePeriodo.saldoAnterior < 0 ? "(Favor)" : ""}</TableCell><TableCell colSpan={2} /></TableRow>}
         {!rangoInvalido && detallePeriodo.movimientosConSaldo.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No hay movimientos en el período seleccionado.</TableCell></TableRow>}
       </TableBody></Table></div>
     </CardContent></Card>

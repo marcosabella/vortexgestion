@@ -8,14 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useCreateProveedor, useUpdateProveedor, type Proveedor } from '@/hooks/useProveedores';
 import { useConsultarArca } from '@/hooks/useConsultarArca';
+import { toast } from '@/hooks/use-toast';
 import { SITUACIONES_AFIP, PROVINCIAS_ARGENTINA } from '@/types/cliente';
 import { validateCUIT, esDNI, formatCUIT } from '@/utils/validations';
 import { Search, Loader2 } from 'lucide-react';
 
 const proveedorSchema = z.object({
-  nombre: z.string().min(1, 'El nombre es requerido'),
+  nombre: z.string().optional(),
   apellido: z.string().optional(),
-  razon_social: z.string().optional(),
+  razon_social: z.string().trim().min(1, 'La razón social es requerida'),
   cuit: z.string().refine((val) => {
     const limpio = val.replace(/[-\s]/g, '');
     // Aceptar DNI (7-8 dígitos) o CUIT (11 dígitos válido)
@@ -23,11 +24,11 @@ const proveedorSchema = z.object({
     if (limpio.length === 11) return validateCUIT(val);
     return false;
   }, 'Ingrese un DNI (7-8 dígitos) o CUIT válido (11 dígitos)'),
-  calle: z.string().min(1, 'La calle es requerida'),
-  numero: z.string().min(1, 'El número es requerido'),
-  codigo_postal: z.string().min(1, 'El código postal es requerido'),
-  localidad: z.string().min(1, 'La localidad es requerida'),
-  provincia: z.string().min(1, 'La provincia es requerida'),
+  calle: z.string().optional(),
+  numero: z.string().optional(),
+  codigo_postal: z.string().optional(),
+  localidad: z.string().optional(),
+  provincia: z.string().optional(),
   telefono: z.string().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   situacion_afip: z.string().min(1, 'La situación AFIP es requerida'),
@@ -87,6 +88,8 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
         // Para persona física
         if (datos.nombre) form.setValue('nombre', datos.nombre);
         if (datos.apellido) form.setValue('apellido', datos.apellido);
+        const nombreCompleto = [datos.nombre, datos.apellido].filter(Boolean).join(' ').trim();
+        if (nombreCompleto) form.setValue('razon_social', nombreCompleto);
       }
       
       if (datos.situacionAfip) form.setValue('situacion_afip', datos.situacionAfip);
@@ -109,15 +112,18 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
   const onSubmit = async (data: ProveedorFormData) => {
     const proveedorData: Proveedor = {
       ...data,
-      nombre: data.nombre,
+      // La tabla conserva `nombre` como NOT NULL por compatibilidad. Para una
+      // persona jurídica (o si no se informa un nombre de fantasía), la razón
+      // social es también el nombre con el que se identifica al proveedor.
+      nombre: data.nombre?.trim() || data.razon_social.trim(),
       apellido: data.apellido || undefined,
-      razon_social: data.razon_social || undefined,
+      razon_social: data.razon_social.trim(),
       cuit: data.cuit,
-      calle: data.calle,
-      numero: data.numero,
-      codigo_postal: data.codigo_postal,
-      localidad: data.localidad,
-      provincia: data.provincia,
+      calle: data.calle || '',
+      numero: data.numero || '',
+      codigo_postal: data.codigo_postal || '',
+      localidad: data.localidad || '',
+      provincia: data.provincia || '',
       telefono: data.telefono || undefined,
       email: data.email || undefined,
       situacion_afip: data.situacion_afip,
@@ -136,15 +142,20 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
       onSuccess?.();
     } catch (error) {
       console.error('Error al guardar proveedor:', error);
+      toast({
+        title: 'No se pudo guardar el proveedor',
+        description: error instanceof Error ? error.message : 'Intentá nuevamente.',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
         {/* CUIT/DNI - Primer campo con búsqueda ARCA */}
         <div className="space-y-2">
-          <Label htmlFor="cuit">CUIT o DNI</Label>
+          <Label htmlFor="cuit">CUIT o DNI *</Label>
           <div className="flex gap-2">
             <FormField
               control={form.control}
@@ -191,7 +202,7 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
           name="tipo_persona"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tipo de Persona</FormLabel>
+              <FormLabel>Tipo de Persona *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -208,22 +219,22 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
           )}
         />
 
-        {/* Datos según tipo de persona */}
-        {form.watch('tipo_persona') === 'juridica' ? (
-          <FormField
-            control={form.control}
-            name="razon_social"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Razón Social</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ) : (
+        <FormField
+          control={form.control}
+          name="razon_social"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Razón Social *</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Nombre y apellido son datos opcionales para personas físicas. */}
+        {form.watch('tipo_persona') === 'fisica' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -261,7 +272,7 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
           name="situacion_afip"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Situación AFIP</FormLabel>
+              <FormLabel>Condición ante ARCA *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>

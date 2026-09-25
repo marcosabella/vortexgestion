@@ -5,6 +5,7 @@ import { PagoVenta, Venta, VentaItem } from "@/types/venta";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
+import { isLegacyDeletedClient, isLegacyDeletedClientName } from "@/utils/legacyVisibility";
 
 type VentaNueva = Omit<Venta, "id" | "created_at" | "updated_at">;
 type VentaItemNuevo = Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">;
@@ -112,7 +113,9 @@ export const useVentas = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as any[];
+      return (data as any[]).filter((venta) =>
+        !isLegacyDeletedClient(venta.cliente) && !isLegacyDeletedClientName(venta.cliente_nombre)
+      );
     },
   });
 

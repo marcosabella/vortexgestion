@@ -4,6 +4,7 @@ import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corrient
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import type { Json } from "@/integrations/supabase/types";
+import { isLegacyDeletedClient } from "@/utils/legacyVisibility";
 
 export type ChequeClientePago = {
   numero_cheque: string;
@@ -56,7 +57,7 @@ export const useCuentaCorriente = () => {
     queryKey: ["cuenta-corriente", comercioId],
     enabled: Boolean(comercioId),
     queryFn: async () => {
-      return fetchAllPages<CuentaCorriente>((from, to) =>
+      const rows = await fetchAllPages<CuentaCorriente>((from, to) =>
         supabase
           .from("cuenta_corriente")
           .select(`
@@ -69,6 +70,7 @@ export const useCuentaCorriente = () => {
           .order("id", { ascending: false })
           .range(from, to) as unknown as PromiseLike<{ data: CuentaCorriente[] | null; error: Error | null }>
       );
+      return rows.filter((movimiento) => !isLegacyDeletedClient(movimiento.cliente));
     },
   });
 
@@ -79,7 +81,7 @@ export const useCuentaCorriente = () => {
       queryFn: async () => {
         if (!clienteId) return [];
 
-        return fetchAllPages<CuentaCorriente>((from, to) =>
+        const rows = await fetchAllPages<CuentaCorriente>((from, to) =>
           supabase
             .from("cuenta_corriente")
             .select(`
@@ -93,6 +95,7 @@ export const useCuentaCorriente = () => {
             .order("id", { ascending: false })
             .range(from, to) as unknown as PromiseLike<{ data: CuentaCorriente[] | null; error: Error | null }>
         );
+        return rows.filter((movimiento) => !isLegacyDeletedClient(movimiento.cliente));
       },
       enabled: Boolean(comercioId && clienteId),
     });
@@ -153,7 +156,9 @@ export const useCuentaCorriente = () => {
           }
         });
 
-        return Array.from(resumenMap.values()) as CuentaCorrienteResumen[];
+        return Array.from(resumenMap.values()).filter(
+          (item) => Math.round(item.saldo_actual * 100) !== 0 && !isLegacyDeletedClient({ nombre: item.cliente_nombre }),
+        ) as CuentaCorrienteResumen[];
       },
     });
   };

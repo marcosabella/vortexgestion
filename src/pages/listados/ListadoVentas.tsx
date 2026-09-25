@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
-import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getVentaTipoPagoLabel, getVentaTotalFinal } from '@/types/venta';
+import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getVentaTipoPagoLabel, getVentaTotalFinal } from '@/types/venta';
 import { useComercio } from '@/hooks/useComercio';
+import { useAfipConfig } from '@/hooks/useAfipConfig';
 import { useToast } from '@/hooks/use-toast';
 import { buildListadoVentasPdfFile } from '@/utils/listadoVentasPdf';
 
@@ -25,6 +26,7 @@ const ListadoVentas = () => {
   const { ventas, isLoading } = useVentas();
   const { data: clientes } = useClientes();
   const { comercio } = useComercio();
+  const { data: afipConfig } = useAfipConfig();
   const { toast } = useToast();
   
   const [fechaDesde, setFechaDesde] = useState('');
@@ -378,8 +380,8 @@ const ListadoVentas = () => {
                   <TableHead>Fecha</TableHead>
                   <TableHead>N° Comprobante</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Forma de Pago</TableHead>
+                  <TableHead className="w-[180px] max-w-[180px]">Cliente</TableHead>
+                  <TableHead className="whitespace-nowrap">Forma de Pago</TableHead>
                   <TableHead className="text-right">Subtotal neto</TableHead>
                   <TableHead className="text-right">IVA</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -398,16 +400,25 @@ const ListadoVentas = () => {
                       <TableCell>
                         {format(new Date(venta.fecha_venta), 'dd/MM/yyyy', { locale: es })}
                       </TableCell>
-                      <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
+                      <TableCell className="whitespace-nowrap font-medium">
+                        {formatNumeroComprobante(venta.numero_comprobante, afipConfig?.punto_venta)}
+                      </TableCell>
                       <TableCell>
                         {TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label || venta.tipo_comprobante}
                       </TableCell>
-                      <TableCell>
-                        {venta.cliente 
-                          ? `${venta.cliente.nombre} ${venta.cliente.apellido}`
-                          : venta.cliente_nombre || 'Consumidor Final'}
+                      <TableCell className="w-[180px] max-w-[180px]">
+                        <div
+                          className="truncate"
+                          title={venta.cliente
+                            ? `${venta.cliente.nombre} ${venta.cliente.apellido}`
+                            : venta.cliente_nombre || 'Consumidor Final'}
+                        >
+                          {venta.cliente
+                            ? `${venta.cliente.nombre} ${venta.cliente.apellido}`
+                            : venta.cliente_nombre || 'Consumidor Final'}
+                        </div>
                       </TableCell>
-                      <TableCell>{getVentaTipoPagoLabel(venta)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{getVentaTipoPagoLabel(venta)}</TableCell>
                       <TableCell className="text-right">
                         {discriminaIvaEnComprobante(venta.tipo_comprobante)
                           ? `$${Number(venta.subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
