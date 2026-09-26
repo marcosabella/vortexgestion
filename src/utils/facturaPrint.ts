@@ -452,17 +452,22 @@ const getTipoComprobanteNombre = (tipo: string) => {
 
 const formatNumeroComprobante = (venta: Venta, afipConfig?: AfipConfig | null) => {
   const parts = venta.numero_comprobante.split("-");
+  const numero = (parts.length === 2 ? parts[1] : venta.numero_comprobante).trim().padStart(8, "0");
+
+  if (venta.tipo_comprobante === "recibo_x") {
+    return { puntoVenta: "000X", numero };
+  }
 
   if (parts.length === 2) {
     return {
       puntoVenta: parts[0].padStart(5, "0"),
-      numero: parts[1].padStart(8, "0"),
+      numero,
     };
   }
 
   return {
     puntoVenta: afipConfig?.punto_venta?.toString().padStart(5, "0") || "00001",
-    numero: venta.numero_comprobante.padStart(8, "0"),
+    numero,
   };
 };
 

@@ -160,12 +160,21 @@ export const getVentaTipoPagoLabel = (venta: Pick<Venta, "tipo_pago" | "pagos_ve
   return getTipoPagoLabel(venta.tipo_pago);
 };
 
-export const formatNumeroComprobante = (value: string | null | undefined, puntoVenta?: number | null) => {
+export const formatNumeroComprobante = (
+  value: string | null | undefined,
+  puntoVenta?: number | null,
+  tipoComprobante?: string | null,
+) => {
   const original = String(value || "").trim();
   if (!original) return "";
 
   const normalized = original.replace(/\s/g, "");
   const formattedMatch = normalized.match(/^(\d{1,4})-(\d{1,8})$/);
+  if (tipoComprobante === "recibo_x") {
+    const numero = formattedMatch?.[2] || (/^\d{1,8}$/.test(normalized) ? normalized : "");
+    return numero ? `000X - ${numero.padStart(8, "0")}` : original;
+  }
+
   if (formattedMatch) {
     return `${formattedMatch[1].padStart(4, "0")} - ${formattedMatch[2].padStart(8, "0")}`;
   }

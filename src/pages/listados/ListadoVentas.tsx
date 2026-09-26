@@ -401,7 +401,7 @@ const ListadoVentas = () => {
                         {format(new Date(venta.fecha_venta), 'dd/MM/yyyy', { locale: es })}
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-medium">
-                        {formatNumeroComprobante(venta.numero_comprobante, afipConfig?.punto_venta)}
+                        {formatNumeroComprobante(venta.numero_comprobante, afipConfig?.punto_venta, venta.tipo_comprobante)}
                       </TableCell>
                       <TableCell>
                         {TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label || venta.tipo_comprobante}

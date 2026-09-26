@@ -51,7 +51,8 @@ export const VentasList = () => {
   const [qrPreview, setQrPreview] = useState("");
   const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
-  const mostrarNumeroComprobante = (numero: string) => formatNumeroComprobante(numero, afipConfig?.punto_venta);
+  const mostrarNumeroComprobante = (venta: Pick<Venta, "numero_comprobante" | "tipo_comprobante">) =>
+    formatNumeroComprobante(venta.numero_comprobante, afipConfig?.punto_venta, venta.tipo_comprobante);
   const { data: whatsappEnvios = [] } = useQuery({
     queryKey: ["whatsapp-envios", selectedVenta?.id],
     enabled: Boolean(selectedVenta?.id),
@@ -164,7 +165,7 @@ export const VentasList = () => {
   const filteredVentas = ventas
     .filter(venta =>
       (venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        mostrarNumeroComprobante(venta.numero_comprobante).toLowerCase().includes(searchTerm.toLowerCase())) ||
+        mostrarNumeroComprobante(venta).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (venta.cliente_nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
@@ -434,7 +435,7 @@ export const VentasList = () => {
                       {format(new Date(venta.fecha_venta), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell className="w-px whitespace-nowrap px-2 font-medium">
-                      {mostrarNumeroComprobante(venta.numero_comprobante)}
+                      {mostrarNumeroComprobante(venta)}
                     </TableCell>
                     <TableCell className="w-full min-w-[220px] max-w-0">
                       <div className="truncate" title={venta.cliente_nombre || "Consumidor Final"}>
@@ -518,7 +519,7 @@ export const VentasList = () => {
                 <div className="grid grid-cols-1 gap-x-10 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <p className="whitespace-nowrap"><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
                   <p className="whitespace-nowrap"><strong>Comprobante:</strong> {TIPOS_COMPROBANTE.find(t => t.value === selectedVenta.tipo_comprobante)?.label}</p>
-                  <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {mostrarNumeroComprobante(selectedVenta.numero_comprobante)}</p>
+                  <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {mostrarNumeroComprobante(selectedVenta)}</p>
                   <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
                 <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>

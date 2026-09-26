@@ -22,7 +22,7 @@ const receiptType = (code: unknown) => ({
   "1": "factura_a", "2": "nota_debito_a", "3": "nota_credito_a", "5": "factura_a",
   "6": "factura_b", "7": "nota_debito_b", "8": "nota_credito_b", "9": "recibo_b",
   "11": "factura_c", "12": "nota_debito_c", "13": "nota_credito_c", "64": "factura_b",
-  "82": "factura_b", "121": "recibo_c",
+  "82": "factura_b", "121": "recibo_x",
 }[text(code)] || "ticket_fiscal");
 const truthyAccessValue = (value: unknown) => value === true || ["true", "1", "-1", "x", "si", "sí"].includes(text(value).toLocaleLowerCase("es-AR"));
 

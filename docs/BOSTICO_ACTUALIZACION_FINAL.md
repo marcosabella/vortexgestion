@@ -1,6 +1,6 @@
 # Continuidad: actualización final de Bostico
 
-Última actualización de esta nota: 24/09/2026.
+Última actualización de esta nota: 26/09/2026.
 
 ## Identificación
 
@@ -55,6 +55,17 @@ Las eliminaciones no deben aplicarse automáticamente. Se deben conservar o arch
 - `supabase/migrations/20260924161000_reparar_notas_bostico.sql`
 
 Ambas fueron aplicadas y verificadas en producción. No volver a ejecutarlas como mecanismo de actualización incremental.
+
+## Corrección de Recibos X
+
+- El código de comprobante Access `121` corresponde a `recibo_x`, no a `recibo_c`.
+- El mapeo del importador fue corregido para las próximas importaciones.
+- La reparación acotada de las ventas ya importadas está en
+  `supabase/migrations/20260925130000_reclasificar_recibos_x_bostico.sql`.
+- Se conservan sin cambios los cuatro Recibos C que tienen CAE.
+- La migración fue aplicada y verificada en producción el 26/09/2026: se
+  reclasificaron 1.089 ventas como Recibo X y se conservaron los cuatro Recibos
+  C con CAE. La conciliación final no arrojó inconsistencias.
 
 ## Frase sugerida para retomar
 

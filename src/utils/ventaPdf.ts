@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
-import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
+import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -88,7 +88,9 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
     comercio?.cuit ? `CUIT: ${comercio.cuit}` : "",
     comercioDireccion ? `Domicilio: ${comercioDireccion}` : "",
     "",
-    `${tipoComprobante} ${venta.numero_comprobante}`,
+    `${tipoComprobante} ${venta.tipo_comprobante === "recibo_x"
+      ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante)
+      : venta.numero_comprobante}`,
     `Fecha: ${formatDateTime(venta.fecha_venta)}`,
     `Cliente: ${venta.cliente_nombre || "Consumidor Final"}`,
     `Condicion de venta: ${getVentaTipoPagoLabel(venta)}`,

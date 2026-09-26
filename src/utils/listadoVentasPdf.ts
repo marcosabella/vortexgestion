@@ -4,6 +4,7 @@ import {
   TIPOS_COMPROBANTE,
   Venta,
   discriminaIvaEnComprobante,
+  formatNumeroComprobante,
   getVentaTipoPagoLabel,
   getVentaTotalFinal,
 } from "@/types/venta";
@@ -235,7 +236,9 @@ const buildDetalleRows = (ventas: Venta[]) => {
 
     return {
       fecha: formatDate(venta.fecha_venta, "dd/MM/yyyy HH:mm") || "-",
-      comprobante: venta.numero_comprobante || "-",
+      comprobante: venta.tipo_comprobante === "recibo_x"
+        ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante)
+        : venta.numero_comprobante || "-",
       tipo: getTipoComprobanteLabel(venta.tipo_comprobante),
       cliente: getClienteVenta(venta),
       formaPago: getVentaTipoPagoLabel(venta),
