@@ -8,18 +8,46 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-declare global { interface Window { FB?: { init: (options: Record<string, unknown>) => void; login: (callback: (response: any) => void, options: Record<string, unknown>) => void; }; } }
+type MetaLoginResponse = { authResponse?: { code?: string } };
+type WhatsAppConnection = {
+  estado?: string;
+  numero_telefono?: string | null;
+  nombre_visible?: string | null;
+  plantilla_factura_nombre?: string | null;
+  plantilla_factura_estado?: string | null;
+};
 
-const metaAppId = import.meta.env.VITE_META_APP_ID || "1507426614484981";
+declare global { interface Window { FB?: { init: (options: Record<string, unknown>) => void; login: (callback: (response: MetaLoginResponse) => void, options: Record<string, unknown>) => void; }; } }
+
+const metaAppId = import.meta.env.VITE_META_APP_ID;
 const embeddedSignupConfigId = import.meta.env.VITE_META_WHATSAPP_CONFIG_ID;
 
 const loadFacebookSdk = () => new Promise<void>((resolve, reject) => {
   if (window.FB) return resolve();
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timeoutId);
+    if (window.FB) resolve();
+    else reject(new Error("El navegador bloqueó el SDK de Meta. Permití rastreadores y ventanas emergentes para este sitio."));
+  };
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timeoutId);
+    reject(new Error("No se pudo cargar el acceso de Meta. Revisá la conexión y los bloqueadores del navegador."));
+  };
+  const timeoutId = window.setTimeout(fail, 15000);
   const existing = document.getElementById("facebook-jssdk");
-  if (existing) { existing.addEventListener("load", () => resolve(), { once: true }); return; }
+  if (existing) {
+    existing.addEventListener("load", finish, { once: true });
+    existing.addEventListener("error", fail, { once: true });
+    return;
+  }
   const script = document.createElement("script");
   script.id = "facebook-jssdk"; script.async = true; script.src = "https://connect.facebook.net/es_LA/sdk.js";
-  script.onload = () => resolve(); script.onerror = () => reject(new Error("No se pudo cargar el acceso de Meta")); document.body.appendChild(script);
+  script.onload = finish; script.onerror = fail; document.body.appendChild(script);
 });
 
 const statusLabel: Record<string, string> = {
@@ -39,13 +67,21 @@ export default function WhatsApp() {
     queryKey: ["whatsapp-comercio", comercio?.id],
     enabled: Boolean(comercio?.id),
     queryFn: async () => {
+      // The generated database types do not include the WhatsApp tables yet.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from("whatsapp_comercios")
         .select("*").eq("comercio_id", comercio!.id).maybeSingle();
       if (error) throw error;
-      return data as any | null;
+      return data as WhatsAppConnection | null;
     },
   });
   const estado = conexion?.estado || "no_conectado";
+
+  useEffect(() => {
+    loadFacebookSdk().catch(() => {
+      // The actionable error is shown if the user attempts to connect.
+    });
+  }, []);
 
   useEffect(() => {
     const receiveSignupResult = (event: MessageEvent) => {
@@ -61,19 +97,53 @@ export default function WhatsApp() {
 
   const connectWhatsApp = async () => {
     if (!comercio) return;
+    if (!metaAppId) { setConnectionMessage("La integración de Meta no está configurada: falta el App ID de VORTEX."); return; }
     if (!embeddedSignupConfigId) { setConnectionMessage("Meta Embedded Signup todavía está pendiente: falta cargar el Configuration ID aprobado en VORTEX."); return; }
+    if (!window.FB) {
+      setIsConnecting(true);
+      setConnectionMessage("Preparando el acceso de Meta...");
+      try {
+        await loadFacebookSdk();
+        setConnectionMessage("Meta ya está listo. Volvé a presionar “Iniciar autorización con Meta”.");
+      } catch (error) {
+        setConnectionMessage(error instanceof Error ? error.message : "No se pudo cargar el acceso de Meta.");
+      } finally {
+        setIsConnecting(false);
+      }
+      return;
+    }
     setIsConnecting(true); setConnectionMessage(""); signupResult.current = {};
     try {
-      await loadFacebookSdk();
-      window.FB?.init({ appId: metaAppId, cookie: true, xfbml: false, version: "v26.0" });
-      window.FB?.login(async (response) => {
-        const code = response?.authResponse?.code;
-        const { wabaId, phoneNumberId } = signupResult.current;
-        if (!code || !wabaId || !phoneNumberId) { setConnectionMessage("Meta no completó la selección de la cuenta y el número. Volvé a intentarlo."); setIsConnecting(false); return; }
-        const { data, error } = await supabase.functions.invoke("whatsapp-conectar", { body: { comercioId: comercio.id, code, wabaId, phoneNumberId } });
-        if (error || data?.error) { setConnectionMessage(data?.error || error?.message || "No se pudo guardar la conexión de WhatsApp."); setIsConnecting(false); return; }
-        await queryClient.invalidateQueries({ queryKey: ["whatsapp-comercio", comercio.id] });
-        setConnectionMessage("WhatsApp Business fue conectado correctamente."); setIsConnecting(false);
+      const facebook = window.FB;
+      facebook.init({ appId: metaAppId, cookie: true, xfbml: false, version: "v26.0" });
+      const loginTimeoutId = window.setTimeout(() => {
+        setConnectionMessage("Meta no respondió. Permití las ventanas emergentes y desactivá temporalmente el bloqueo de rastreadores para VORTEX.");
+        setIsConnecting(false);
+      }, 60000);
+      const handleLoginResponse = async (response: MetaLoginResponse) => {
+        try {
+          const code = response?.authResponse?.code;
+          const { wabaId, phoneNumberId } = signupResult.current;
+          if (!code || !wabaId || !phoneNumberId) {
+            setConnectionMessage("Meta no completó la selección de la cuenta y el número. Verificá que la ventana emergente no esté bloqueada y volvé a intentarlo.");
+            return;
+          }
+          const { data, error } = await supabase.functions.invoke("whatsapp-conectar", { body: { comercioId: comercio.id, code, wabaId, phoneNumberId } });
+          if (error || data?.error) {
+            setConnectionMessage(data?.error || error?.message || "No se pudo guardar la conexión de WhatsApp.");
+            return;
+          }
+          await queryClient.invalidateQueries({ queryKey: ["whatsapp-comercio", comercio.id] });
+          setConnectionMessage("WhatsApp Business fue conectado correctamente.");
+        } catch (error) {
+          setConnectionMessage(error instanceof Error ? error.message : "No se pudo completar la conexión con Meta.");
+        } finally {
+          setIsConnecting(false);
+        }
+      };
+      facebook.login((response) => {
+        window.clearTimeout(loginTimeoutId);
+        void handleLoginResponse(response);
       }, { config_id: embeddedSignupConfigId, response_type: "code", override_default_response_type: true, extras: { setup: {} } });
     } catch (error) { setConnectionMessage(error instanceof Error ? error.message : "No se pudo iniciar la conexión con Meta."); setIsConnecting(false); }
   };

@@ -15,6 +15,9 @@ const requiredNames = [
   'VITE_SUPABASE_PROJECT_ID',
   'VITE_SUPABASE_URL',
   'VITE_SUPABASE_PUBLISHABLE_KEY',
+  'VITE_META_APP_ID',
+  'VITE_META_WHATSAPP_CONFIG_ID',
+  'VITE_WHATSAPP_API_ENABLED',
 ];
 
 for (const name of requiredNames) {
@@ -27,6 +30,9 @@ const appEnv = env.VITE_APP_ENV;
 const projectId = env.VITE_SUPABASE_PROJECT_ID;
 const supabaseUrl = env.VITE_SUPABASE_URL;
 const publishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const metaAppId = env.VITE_META_APP_ID;
+const metaWhatsappConfigId = env.VITE_META_WHATSAPP_CONFIG_ID;
+const whatsappApiEnabled = env.VITE_WHATSAPP_API_ENABLED;
 
 if (appEnv !== 'development' && appEnv !== 'production') {
   fail('VITE_APP_ENV debe ser development o production');
@@ -52,6 +58,18 @@ if (urlProjectRef !== projectId) {
 
 if (publishableKey.startsWith('sb_secret_')) {
   fail('no se permite una clave sb_secret_ en el frontend');
+}
+
+if (!/^\d+$/.test(metaAppId)) {
+  fail('VITE_META_APP_ID debe ser un identificador numerico de Meta');
+}
+
+if (!/^\d+$/.test(metaWhatsappConfigId)) {
+  fail('VITE_META_WHATSAPP_CONFIG_ID debe ser un identificador numerico de Meta');
+}
+
+if (whatsappApiEnabled !== 'true' && whatsappApiEnabled !== 'false') {
+  fail('VITE_WHATSAPP_API_ENABLED debe ser true o false');
 }
 
 const parts = publishableKey.split('.');

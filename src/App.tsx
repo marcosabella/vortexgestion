@@ -62,7 +62,7 @@ import GastosEgresos from "./pages/GastosEgresos";
 import ListadoGastosEgresos from "./pages/listados/ListadoGastosEgresos";
 import WhatsApp from "./pages/WhatsApp";
 import TiendaOnline from "./pages/TiendaOnline";
-import { DataDeletion, PrivacyPolicy } from "./pages/Privacy";
+import { DataDeletion, PrivacyPolicy, TermsOfService } from "./pages/Privacy";
 import CampoEstablecimientos from "./pages/CampoEstablecimientos";
 import CampoLotes from "./pages/CampoLotes";
 import CampoOrdenes from "./pages/CampoOrdenes";
@@ -328,6 +328,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/privacidad" element={<PrivacyPolicy />} />
+            <Route path="/terminos" element={<TermsOfService />} />
             <Route path="/eliminacion-de-datos" element={<DataDeletion />} />
             <Route path="/login" element={<Login />} />
             <Route path="/login/:comercioId" element={<Login />} />

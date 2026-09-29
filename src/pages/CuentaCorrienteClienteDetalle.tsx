@@ -12,12 +12,15 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useComercio } from "@/hooks/useComercio";
 import { useCuentaCorriente } from "@/hooks/useCuentaCorriente";
+import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { useToast } from "@/hooks/use-toast";
+import { formatNumeroComprobante } from "@/types/venta";
 import { buildCuentaCorrientePdfFile, buildCuentaCorrienteWhatsAppMessage } from "@/utils/cuentaCorrientePdf";
 import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
 
 const moneyFormatter = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
 const money = (value: number) => moneyFormatter.format(Math.abs(value));
+const currentMonthStart = () => format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "yyyy-MM-dd");
 const formatPreviousDate = (value: string) => {
   if (!value) return "";
   const date = new Date(`${value}T12:00:00`);
@@ -48,6 +51,7 @@ export default function CuentaCorrienteClienteDetalle() {
   const { clienteId = "" } = useParams();
   const { toast } = useToast();
   const { comercio } = useComercio();
+  const { data: afipConfig } = useAfipConfig();
   const {
     useResumenCuentaCorriente,
     useMovimientosByCliente,
@@ -58,12 +62,14 @@ export default function CuentaCorrienteClienteDetalle() {
   const resumenQuery = useResumenCuentaCorriente();
   const movimientosQuery = useMovimientosByCliente(clienteId || null);
   const [filtrarPeriodo, setFiltrarPeriodo] = useState(false);
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
+  const [fechaDesde, setFechaDesde] = useState(currentMonthStart);
+  const [fechaHasta, setFechaHasta] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   const resumen = resumenQuery.data?.find((item) => item.cliente_id === clienteId);
   const movimientos = useMemo(() => movimientosQuery.data || [], [movimientosQuery.data]);
+  const fechaDesdeAplicada = filtrarPeriodo ? fechaDesde : currentMonthStart();
+  const fechaHastaAplicada = filtrarPeriodo ? fechaHasta : "";
   const rangoInvalido = filtrarPeriodo && Boolean(fechaDesde && fechaHasta && fechaDesde > fechaHasta);
   const detallePeriodo = useMemo(() => {
     const ordered = [...movimientos].sort((a, b) => {
@@ -79,31 +85,31 @@ export default function CuentaCorrienteClienteDetalle() {
       const fecha = format(new Date(movimiento.fecha_movimiento), "yyyy-MM-dd");
       const monto = Number(movimiento.monto || 0);
       const variacion = movimiento.tipo_movimiento === "debito" ? monto : -monto;
-      if (filtrarPeriodo && fechaDesde && fecha < fechaDesde) {
+      if (fechaDesdeAplicada && fecha < fechaDesdeAplicada) {
         saldoAnterior += variacion;
         continue;
       }
-      if (filtrarPeriodo && fechaHasta && fecha > fechaHasta) continue;
+      if (fechaHastaAplicada && fecha > fechaHastaAplicada) continue;
       movimientosPeriodo.push(movimiento);
       if (movimiento.tipo_movimiento === "debito") totalDebitos += monto;
       else totalCreditos += monto;
     }
 
-    let saldoAcumulado = filtrarPeriodo && fechaDesde ? saldoAnterior : 0;
+    let saldoAcumulado = fechaDesdeAplicada ? saldoAnterior : 0;
     const movimientosConSaldo = movimientosPeriodo.map((movimiento) => {
       const monto = Number(movimiento.monto || 0);
       saldoAcumulado += movimiento.tipo_movimiento === "debito" ? monto : -monto;
       return { movimiento, saldoAcumulado };
     });
     return {
-      saldoAnterior: filtrarPeriodo && fechaDesde ? saldoAnterior : 0,
+      saldoAnterior: fechaDesdeAplicada ? saldoAnterior : 0,
       totalDebitos,
       totalCreditos,
       saldoFinal: saldoAcumulado,
       movimientos: movimientosPeriodo,
-      movimientosConSaldo: [...movimientosConSaldo].reverse(),
+      movimientosConSaldo,
     };
-  }, [fechaDesde, fechaHasta, filtrarPeriodo, movimientos]);
+  }, [fechaDesdeAplicada, fechaHastaAplicada, movimientos]);
 
   const resumenPdf = resumen ? {
     ...resumen,
@@ -115,8 +121,8 @@ export default function CuentaCorrienteClienteDetalle() {
   const pdfOptions = {
     comercio,
     saldoInicial: detallePeriodo.saldoAnterior,
-    fechaDesde: filtrarPeriodo ? fechaDesde || undefined : undefined,
-    fechaHasta: filtrarPeriodo ? fechaHasta || undefined : undefined,
+    fechaDesde: fechaDesdeAplicada || undefined,
+    fechaHasta: fechaHastaAplicada || undefined,
   };
 
   const openPdf = async () => {
@@ -178,19 +184,22 @@ export default function CuentaCorrienteClienteDetalle() {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border p-4">
-        <div className="flex min-h-10 items-center gap-2"><Checkbox id="historico-cliente" checked={filtrarPeriodo} onCheckedChange={(checked) => { const enabled = checked === true; setFiltrarPeriodo(enabled); if (enabled && !fechaHasta) setFechaHasta(format(new Date(), "yyyy-MM-dd")); }} /><Label htmlFor="historico-cliente">Histórico por movimiento</Label></div>
+        <div className="flex min-h-10 items-center gap-2"><Checkbox id="historico-cliente" checked={filtrarPeriodo} onCheckedChange={(checked) => setFiltrarPeriodo(checked === true)} /><Label htmlFor="historico-cliente">Ver histórico</Label></div>
         {filtrarPeriodo && <><div className="flex items-center gap-2"><Label className="whitespace-nowrap" htmlFor="desde-cliente">Desde</Label><Input className="w-40" id="desde-cliente" type="date" value={fechaDesde} onChange={(event) => setFechaDesde(event.target.value)} /></div><div className="flex items-center gap-2"><Label className="whitespace-nowrap" htmlFor="hasta-cliente">Hasta</Label><Input className="w-40" id="hasta-cliente" type="date" value={fechaHasta} onChange={(event) => setFechaHasta(event.target.value)} /></div></>}
         <Button className="ml-auto shrink-0" onClick={() => setPaymentOpen(true)} disabled={saldo <= 0}><Plus className="mr-2 h-4 w-4" />Registrar pago</Button>
         {rangoInvalido && <p className="w-full text-sm text-destructive">La fecha desde no puede ser posterior a la fecha hasta.</p>}
       </div>
 
-      <div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Concepto</TableHead><TableHead className="text-right">Monto</TableHead><TableHead className="text-right">Saldo acumulado</TableHead><TableHead>Observaciones</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>
+      <div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Concepto</TableHead><TableHead className="text-right">Debe</TableHead><TableHead className="text-right">Haber</TableHead><TableHead className="text-right">Saldo acumulado</TableHead><TableHead>Observaciones</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody className="[&_td]:py-1">
+        {fechaDesdeAplicada && <TableRow className="bg-muted/60 font-medium"><TableCell /><TableCell /><TableCell colSpan={3}>Saldo correspondiente al {formatPreviousDate(fechaDesdeAplicada)}</TableCell><TableCell className={`text-right ${detallePeriodo.saldoAnterior > 0 ? "text-red-600" : detallePeriodo.saldoAnterior < 0 ? "text-green-600" : ""}`}>{money(detallePeriodo.saldoAnterior)}</TableCell><TableCell colSpan={2} /></TableRow>}
         {detallePeriodo.movimientosConSaldo.map(({ movimiento, saldoAcumulado }) => {
           const presentation = formatCuentaCorrienteMovimiento(movimiento);
-          return <TableRow key={movimiento.id}><TableCell>{format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy HH:mm")}</TableCell><TableCell><Badge variant={movimiento.tipo_movimiento === "debito" ? "destructive" : "default"}>{movimiento.tipo_movimiento === "debito" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell>{presentation.concepto}{movimiento.venta_id && <div className="text-xs text-muted-foreground">Venta: {movimiento.venta?.numero_comprobante}</div>}</TableCell><TableCell className={`text-right font-semibold ${movimiento.tipo_movimiento === "debito" ? "text-red-600" : "text-green-600"}`}>{money(movimiento.monto)}</TableCell><TableCell className="text-right font-medium">{money(saldoAcumulado)} {saldoAcumulado > 0 ? "(Debe)" : saldoAcumulado < 0 ? "(Favor)" : ""}</TableCell><TableCell>{presentation.observaciones}</TableCell><TableCell className="text-right">{movimiento.venta_id && movimiento.tipo_movimiento === "debito" ? <Button variant="ghost" size="icon" className="text-destructive" disabled={Boolean(movimiento.venta?.cae?.trim())} title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : "Eliminar venta"} onClick={() => { if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) deleteVentaFromCuenta(movimiento.venta_id!); }}><Trash2 className="h-4 w-4" /></Button> : <Button variant="ghost" size="icon" className="text-destructive" title={movimiento.tipo_movimiento === "credito" ? "Eliminar pago" : "Eliminar movimiento"} onClick={() => { if (confirm(movimiento.tipo_movimiento === "credito" ? "¿Eliminar este pago?" : "¿Eliminar este movimiento?")) { if (movimiento.tipo_movimiento === "credito") eliminarPagoCliente.mutate(movimiento.id); else deleteMovimiento(movimiento.id); } }}><Trash2 className="h-4 w-4" /></Button>}</TableCell></TableRow>;
+          const concepto = movimiento.venta_id && movimiento.venta?.numero_comprobante
+            ? `Venta: ${formatNumeroComprobante(movimiento.venta.numero_comprobante, afipConfig?.punto_venta, movimiento.venta.tipo_comprobante)}`
+            : presentation.concepto;
+          return <TableRow key={movimiento.id}><TableCell>{format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy")}</TableCell><TableCell><Badge variant={movimiento.tipo_movimiento === "debito" ? "destructive" : "default"}>{movimiento.tipo_movimiento === "debito" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell className="whitespace-nowrap">{concepto}</TableCell><TableCell className="text-right font-semibold text-red-600">{movimiento.tipo_movimiento === "debito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className="text-right font-semibold text-green-600">{movimiento.tipo_movimiento === "credito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className={`text-right font-medium ${saldoAcumulado > 0 ? "text-red-600" : saldoAcumulado < 0 ? "text-green-600" : ""}`}>{money(saldoAcumulado)}</TableCell><TableCell>{presentation.observaciones}</TableCell><TableCell className="text-right">{movimiento.venta_id && movimiento.tipo_movimiento === "debito" ? <Button variant="destructive" size="icon" className="h-7 w-7" disabled={Boolean(movimiento.venta?.cae?.trim())} title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : "Eliminar venta"} onClick={() => { if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) deleteVentaFromCuenta(movimiento.venta_id!); }}><Trash2 className="h-3.5 w-3.5" /></Button> : <Button variant="destructive" size="icon" className="h-7 w-7" title={movimiento.tipo_movimiento === "credito" ? "Eliminar pago" : "Eliminar movimiento"} onClick={() => { if (confirm(movimiento.tipo_movimiento === "credito" ? "¿Eliminar este pago?" : "¿Eliminar este movimiento?")) { if (movimiento.tipo_movimiento === "credito") eliminarPagoCliente.mutate(movimiento.id); else deleteMovimiento(movimiento.id); } }}><Trash2 className="h-3.5 w-3.5" /></Button>}</TableCell></TableRow>;
         })}
-        {filtrarPeriodo && fechaDesde && <TableRow className="bg-muted/60 font-medium"><TableCell /><TableCell /><TableCell colSpan={2}>Saldo correspondiente al {formatPreviousDate(fechaDesde)}</TableCell><TableCell className="text-right">{money(detallePeriodo.saldoAnterior)} {detallePeriodo.saldoAnterior > 0 ? "(Debe)" : detallePeriodo.saldoAnterior < 0 ? "(Favor)" : ""}</TableCell><TableCell colSpan={2} /></TableRow>}
-        {!rangoInvalido && detallePeriodo.movimientosConSaldo.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No hay movimientos en el período seleccionado.</TableCell></TableRow>}
+        {!rangoInvalido && detallePeriodo.movimientosConSaldo.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">No hay movimientos en el período seleccionado.</TableCell></TableRow>}
       </TableBody></Table></div>
     </CardContent></Card>
 

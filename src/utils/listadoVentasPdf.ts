@@ -393,9 +393,9 @@ const drawTable = <TRow extends PrintableRow>(
   return { ops, tableBottom };
 };
 
-const drawFooter = () => [
+const drawFooter = (options: ListadoVentasPdfOptions) => [
   opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Reporte de Ventas", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText(options.titulo || "Reporte de Ventas", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
 ];
 
 const createPageContent = (
@@ -418,7 +418,7 @@ const createPageContent = (
     `18 18 576 ${PAGE_HEIGHT - 36} re W n`,
     ...drawHeader(options, pageNumber, totalPages, logoImage),
     ...sectionOps,
-    ...drawFooter(),
+    ...drawFooter(options),
     "Q",
   ].join("\n");
 };

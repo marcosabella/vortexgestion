@@ -1,4 +1,4 @@
-const updatedAt = "15 de septiembre de 2026";
+const updatedAt = "28 de septiembre de 2026";
 
 export function PrivacyPolicy() {
   return <PublicDocument title="Política de privacidad">
@@ -29,6 +29,27 @@ export function DataDeletion() {
     </Section>
     <Section title="Plazo">
       Revisaremos la solicitud y responderemos dentro de los plazos legales aplicables. Algunos datos pueden conservarse cuando sea necesario para obligaciones contables, fiscales, prevención de fraude o defensa de derechos.
+    </Section>
+  </PublicDocument>;
+}
+
+export function TermsOfService() {
+  return <PublicDocument title="Condiciones del servicio">
+    <p>Estas condiciones regulan el uso de VORTEX Gestión Comercial ("VORTEX"), una plataforma de gestión comercial para empresas y comercios.</p>
+    <Section title="Uso autorizado">
+      VORTEX debe utilizarse únicamente para fines comerciales lícitos. Cada usuario es responsable de la exactitud de la información que carga, de proteger sus credenciales y de las actividades realizadas desde su cuenta.
+    </Section>
+    <Section title="WhatsApp Business">
+      La conexión con WhatsApp Business es opcional. Cada comercio conecta y administra su propia cuenta y debe contar con autorización para comunicarse con sus clientes. VORTEX utiliza la conexión para enviar comprobantes y comunicaciones transaccionales solicitadas por el comercio, conforme a las políticas de Meta y WhatsApp.
+    </Section>
+    <Section title="Disponibilidad y cambios">
+      Procuramos mantener el servicio disponible y seguro, pero pueden existir interrupciones por mantenimiento, proveedores externos o causas fuera de nuestro control. Las funciones del servicio pueden actualizarse para mejorar su seguridad, cumplimiento o funcionamiento.
+    </Section>
+    <Section title="Suspensión">
+      Podremos limitar o suspender el acceso ante usos ilegales, abusivos, fraudulentos o contrarios a estas condiciones y a las políticas aplicables de los servicios integrados.
+    </Section>
+    <Section title="Contacto">
+      Para consultas sobre estas condiciones, escribí a <a href="mailto:ms_abella@hotmail.com">ms_abella@hotmail.com</a>.
     </Section>
   </PublicDocument>;
 }

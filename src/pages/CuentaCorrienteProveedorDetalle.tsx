@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { type MovimientoProveedor, useCompras } from "@/hooks/useCompras";
 import { useGastosEgresos } from "@/hooks/useGastosEgresos";
 import { useProveedores } from "@/hooks/useProveedores";
+import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { MEDIOS_PAGO_GASTO } from "@/types/gasto";
+import { formatNumeroComprobante } from "@/types/venta";
 import { PagoProveedorMultipleDialog } from "@/components/PagoProveedorMultipleDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +33,7 @@ export default function CuentaCorrienteProveedorDetalle() {
   } = useCompras({ proveedorId, cargarCompras: false, cargarFacturas: false });
   const { data: gastos = [], isLoading: gastosLoading } = useGastosEgresos(undefined, undefined, proveedorId);
   const { data: proveedores = [], isLoading: proveedoresLoading } = useProveedores(proveedorId);
+  const { data: afipConfig } = useAfipConfig();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<MovimientoProveedor | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<MovimientoProveedor | null>(null);
@@ -41,6 +44,13 @@ export default function CuentaCorrienteProveedorDetalle() {
 
   const provider = proveedores.find((item) => item.id === proveedorId);
   const providerMovements = movimientos.filter((movement) => movement.proveedor_id === proveedorId);
+  const providerMovementsWithBalance = useMemo(() => {
+    let accumulatedBalance = 0;
+    return [...providerMovements].reverse().map((movement) => {
+      accumulatedBalance += movement.tipo === "deuda" ? Number(movement.monto) : -Number(movement.monto);
+      return { movement, accumulatedBalance };
+    }).reverse();
+  }, [providerMovements]);
   const providerExpenses = gastos.filter((expense) => expense.proveedor_id === proveedorId);
   const debits = providerMovements.filter((item) => item.tipo === "deuda").reduce((sum, item) => sum + Number(item.monto), 0);
   const credits = providerMovements.filter((item) => item.tipo === "pago").reduce((sum, item) => sum + Number(item.monto), 0);
@@ -82,7 +92,18 @@ export default function CuentaCorrienteProveedorDetalle() {
       <div className={`flex flex-col gap-4 sm:flex-row sm:items-center ${balance > 0 ? "justify-between rounded-lg border border-destructive/40 bg-destructive/10 p-4" : "sm:justify-end"}`}>{balance > 0 && <div className="flex items-center gap-3 text-destructive"><AlertTriangle className="h-6 w-6 shrink-0" /><div><p className="font-semibold">Tenés un saldo pendiente de {money(balance)}</p><p className="text-sm">Podés cancelarlo total o parcialmente desde “Registrar pago”.</p></div></div>}<Button className="shrink-0" onClick={openNewPayment} disabled={!hasPendingDocuments}><Plus className="mr-2 h-4 w-4" />Registrar pago</Button></div>
       {!hasPendingDocuments && <p className="text-right text-sm text-muted-foreground">El proveedor no tiene facturas ni gastos con saldo pendiente.</p>}
       <Tabs defaultValue="cuenta"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="cuenta">Cuenta corriente</TabsTrigger><TabsTrigger value="gastos">Histórico de gastos y egresos</TabsTrigger></TabsList>
-        <TabsContent value="cuenta"><div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Concepto</TableHead><TableHead>Vencimiento</TableHead><TableHead>Medio</TableHead><TableHead className="text-right">Monto</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>{providerMovements.map((movement) => <TableRow key={movement.id}><TableCell>{new Date(`${movement.fecha}T00:00:00`).toLocaleDateString("es-AR")}</TableCell><TableCell><Badge variant={movement.tipo === "deuda" ? "destructive" : "default"}>{movement.tipo === "deuda" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell>{movement.observaciones || movement.factura?.numero_comprobante || movement.gasto?.concepto}{movement.cheque && <div className="text-xs text-muted-foreground">Cheque {movement.cheque.tipo_cheque === "propio" ? "propio" : "de terceros"} N° {movement.cheque.numero_cheque} · {movement.cheque.banco_emisor}</div>}</TableCell><TableCell>{movement.factura?.fecha_vencimiento || "—"}</TableCell><TableCell>{movement.medio_pago || "—"}</TableCell><TableCell className="text-right">{money(Number(movement.monto))}</TableCell><TableCell className="text-right">{movement.tipo === "pago" && <div className="flex justify-end gap-1">{!movement.cheque_id && <Button size="icon" variant="ghost" aria-label="Modificar pago" onClick={() => openEditPayment(movement)}><Pencil className="h-4 w-4" /></Button>}<Button size="icon" variant="ghost" className="text-destructive" aria-label="Eliminar pago" onClick={() => setDeletingPayment(movement)}><Trash2 className="h-4 w-4" /></Button></div>}</TableCell></TableRow>)}</TableBody></Table></div></TabsContent>
+        <TabsContent value="cuenta"><div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Concepto</TableHead><TableHead>Vencimiento</TableHead><TableHead>Medio</TableHead><TableHead className="text-right">Debe</TableHead><TableHead className="text-right">Haber</TableHead><TableHead className="text-right">Saldo acumulado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody className="[&_td]:py-1">{providerMovementsWithBalance.map(({ movement, accumulatedBalance }) => {
+          const documentNumber = movement.factura?.numero_comprobante || movement.gasto?.numero_comprobante;
+          const formattedDocumentNumber = documentNumber ? formatNumeroComprobante(documentNumber, afipConfig?.punto_venta) : "";
+          const concept = movement.factura
+            ? `Factura: ${formattedDocumentNumber}`
+            : movement.gasto
+              ? `${movement.gasto.concepto}${formattedDocumentNumber ? `: ${formattedDocumentNumber}` : ""}`
+              : movement.cheque
+                ? `Cheque ${movement.cheque.numero_cheque} · ${movement.cheque.banco_emisor}`
+                : movement.observaciones || (movement.tipo === "pago" ? "Pago" : "Movimiento");
+          return <TableRow key={movement.id}><TableCell>{new Date(`${movement.fecha}T00:00:00`).toLocaleDateString("es-AR")}</TableCell><TableCell><Badge variant={movement.tipo === "deuda" ? "destructive" : "default"}>{movement.tipo === "deuda" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell className="whitespace-nowrap">{concept}</TableCell><TableCell>{movement.factura?.fecha_vencimiento ? new Date(`${movement.factura.fecha_vencimiento}T00:00:00`).toLocaleDateString("es-AR") : "—"}</TableCell><TableCell>{movement.medio_pago || "—"}</TableCell><TableCell className="text-right font-semibold text-red-600">{movement.tipo === "deuda" ? money(Number(movement.monto)) : "—"}</TableCell><TableCell className="text-right font-semibold text-green-600">{movement.tipo === "pago" ? money(Number(movement.monto)) : "—"}</TableCell><TableCell className={`text-right font-medium ${accumulatedBalance > 0 ? "text-red-600" : accumulatedBalance < 0 ? "text-green-600" : ""}`}>{money(Math.abs(accumulatedBalance))}</TableCell><TableCell className="text-right">{movement.tipo === "pago" && <div className="flex justify-end gap-1">{!movement.cheque_id && <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Modificar pago" onClick={() => openEditPayment(movement)}><Pencil className="h-3.5 w-3.5" /></Button>}<Button size="icon" variant="destructive" className="h-7 w-7" aria-label="Eliminar pago" onClick={() => setDeletingPayment(movement)}><Trash2 className="h-3.5 w-3.5" /></Button></div>}</TableCell></TableRow>;
+        })}</TableBody></Table></div></TabsContent>
         <TabsContent value="gastos"><div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background shadow-sm"><TableRow><TableHead>Fecha</TableHead><TableHead>Comprobante</TableHead><TableHead>Concepto</TableHead><TableHead>Categoría</TableHead><TableHead>Medio</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Importe</TableHead></TableRow></TableHeader><TableBody>{providerExpenses.length === 0 ? <TableRow><TableCell colSpan={7} className="py-6 text-center text-muted-foreground">No hay gastos vinculados a este proveedor.</TableCell></TableRow> : providerExpenses.map((expense) => <TableRow key={expense.id}><TableCell>{new Date(`${expense.fecha}T00:00:00`).toLocaleDateString("es-AR")}</TableCell><TableCell>{expense.numero_comprobante || "—"}</TableCell><TableCell>{expense.concepto}</TableCell><TableCell>{expense.categoria}</TableCell><TableCell>{expensePaymentLabel(expense.medio_pago)}</TableCell><TableCell><Badge variant={expense.estado === "pagado" ? "default" : "secondary"}>{expense.estado}</Badge></TableCell><TableCell className="text-right font-medium">{money(Number(expense.monto))}</TableCell></TableRow>)}</TableBody></Table></div></TabsContent>
       </Tabs>
     </CardContent></Card>

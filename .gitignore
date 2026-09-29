@@ -32,3 +32,6 @@ vite.config.ts.timestamp-*.mjs
 
 # Backups privados de bases legacy (nunca publicar ni versionar)
 private-backups/
+
+# Local Netlify folder
+.netlify
