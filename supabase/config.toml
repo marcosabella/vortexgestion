@@ -27,6 +27,12 @@ verify_jwt = false
 [functions.mercadopago-metodos]
 verify_jwt = false
 
+[functions.membresia-checkout]
+verify_jwt = false
+
+[functions.membresia-webhook]
+verify_jwt = false
+
 [functions.whatsapp-enviar-comprobante]
 verify_jwt = false
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, ChevronDown, ChevronUp, Eye, ReceiptText } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Bell, CheckCircle2, ChevronDown, ChevronUp, CreditCard, Eye, Loader2, ReceiptText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +8,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Separator } from "@/components/ui/separator";
 import { categoriaLabels, Notificacion, prioridadLabels, useNotificaciones } from "@/hooks/useNotificaciones";
 import { useComercio } from "@/hooks/useComercio";
-import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { Venta, getVentaTotalFinal } from "@/types/venta";
+import type { Comercio } from "@/types/comercio";
+import type { AfipConfig } from "@/types/afip";
+import type { FormatoComprobante } from "@/config/parametrizacion";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaPrintHtml } from "@/utils/facturaPrint";
 import { FacturaImpresion } from "@/components/FacturaImpresion";
+import { useToast } from "@/hooks/use-toast";
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "short",
@@ -29,47 +32,53 @@ function formatDate(value: string | null) {
   return value ? dateFormatter.format(new Date(value)) : "-";
 }
 
+function getMetadata(notificacion: Notificacion) {
+  const metadata = notificacion.metadata;
+  return typeof metadata === "object" && metadata !== null && !Array.isArray(metadata)
+    ? metadata
+    : {};
+}
+
 function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
   const { comercio } = useComercio();
-  const { data: afipConfig } = useAfipConfig();
   const [qrDataUrl, setQrDataUrl] = useState("");
+  const metadata = getMetadata(notificacion);
+  const tieneReferenciaOriginal = typeof metadata.venta_id === "string"
+    && typeof metadata.comercio_emisor_id === "string";
   const ventaQuery = useQuery({
-    queryKey: ["notificacion-venta", comercio?.id, notificacion.comprobante_numero],
-    enabled: Boolean(comercio?.id && notificacion.comprobante_numero),
+    queryKey: ["notificacion-comprobante-original", comercio?.id, notificacion.id],
+    enabled: Boolean(comercio?.id && tieneReferenciaOriginal),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ventas")
-        .select(`
-          *,
-          cliente:clientes(nombre, apellido, cuit, calle, numero, codigo_postal, localidad, provincia, telefono, situacion_afip, tipo_persona),
-          banco:bancos(nombre_banco, numero_cuenta),
-          tarjeta:tarjetas_credito(nombre),
-          venta_items(*, producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva)),
-          pagos_venta(*, banco:bancos(nombre_banco), tarjeta:tarjetas_credito(nombre), cheque:cheques(numero_cheque, monto, banco_emisor))
-        `)
-        .eq("comercio_id", comercio!.id)
-        .eq("numero_comprobante", notificacion.comprobante_numero!)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("get_comprobante_notificacion", {
+        p_notificacion_id: notificacion.id,
+        p_comercio_id: comercio!.id,
+      });
 
       if (error) throw error;
-      return data as Venta | null;
+      return data as unknown as {
+        venta: Venta;
+        comercio: Comercio;
+        afip_config: AfipConfig | null;
+        formato: FormatoComprobante;
+      } | null;
     },
   });
 
-  const venta = ventaQuery.data;
+  const venta = ventaQuery.data?.venta;
+  const comercioEmisor = ventaQuery.data?.comercio;
+  const afipConfigEmisor = ventaQuery.data?.afip_config;
+  const formatoEmisor = ventaQuery.data?.formato;
 
   useEffect(() => {
     let active = true;
     setQrDataUrl("");
 
-    if (!venta?.cae?.trim() || !comercio || !afipConfig) return () => { active = false; };
+    if (!venta?.cae?.trim() || !comercioEmisor || !afipConfigEmisor) return () => { active = false; };
 
     generarQRAfip({
       fecha: venta.fecha_venta,
-      cuit: comercio.cuit,
-      puntoVenta: afipConfig.punto_venta,
+      cuit: comercioEmisor.cuit,
+      puntoVenta: afipConfigEmisor.punto_venta,
       tipoComprobante: venta.tipo_comprobante,
       numeroComprobante: venta.numero_comprobante,
       importe: getVentaTotalFinal(venta),
@@ -79,14 +88,22 @@ function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
     }).catch((error) => console.error("Error generando QR ARCA:", error));
 
     return () => { active = false; };
-  }, [venta, comercio, afipConfig]);
+  }, [venta, comercioEmisor, afipConfigEmisor]);
 
   const comprobanteHtml = useMemo(
-    () => venta ? buildFacturaPrintHtml({ venta, comercio, afipConfig, qrDataUrl }) : "",
-    [venta, comercio, afipConfig, qrDataUrl],
+    () => venta
+      ? buildFacturaPrintHtml({
+          venta,
+          comercio: comercioEmisor,
+          afipConfig: afipConfigEmisor,
+          qrDataUrl,
+          formato: formatoEmisor,
+        })
+      : "",
+    [venta, comercioEmisor, afipConfigEmisor, qrDataUrl, formatoEmisor],
   );
 
-  if (ventaQuery.isLoading) {
+  if (tieneReferenciaOriginal && ventaQuery.isLoading) {
     return <div className="py-10 text-center text-sm text-muted-foreground">Cargando comprobante de venta...</div>;
   }
 
@@ -103,7 +120,12 @@ function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
           className="h-[70vh] w-full rounded-md border bg-white"
         />
         <div className="flex flex-wrap gap-2">
-          <FacturaImpresion venta={venta} />
+          <FacturaImpresion
+            venta={venta}
+            comercioOverride={comercioEmisor}
+            afipConfigOverride={afipConfigEmisor}
+            formatoOverride={formatoEmisor}
+          />
         </div>
       </div>
     );
@@ -151,7 +173,9 @@ function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        No se encontro una venta de este comercio con ese numero de comprobante.
+        {tieneReferenciaOriginal
+          ? "No se pudo recuperar el comprobante original compartido por la administracion."
+          : "Esta notificacion no tiene asociado un comprobante de venta imprimible."}
       </p>
     </div>
   );
@@ -166,7 +190,58 @@ function NotificacionItem({
   expanded: boolean;
   onToggle: (notificacion: Notificacion) => void;
 }) {
+  const { comercio } = useComercio();
+  const { toast } = useToast();
   const hasComprobante = Boolean(notificacion.comprobante_numero || notificacion.comprobante_monto);
+  const metadata = getMetadata(notificacion);
+  const admiteMercadoPago = metadata.tipo === "membresia_pago"
+    && metadata.mercadopago_habilitado === true
+    && Boolean(notificacion.comprobante_monto && notificacion.comprobante_monto > 0);
+  const pagoQuery = useQuery({
+    queryKey: ["pago-membresia-mercadopago", notificacion.id, comercio?.id],
+    enabled: admiteMercadoPago && Boolean(comercio?.id),
+    refetchInterval: (query) => {
+      const estado = query.state.data?.estado;
+      return estado === "pendiente" || estado === "procesando" ? 5_000 : false;
+    },
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("membresia_pagos_mercadopago")
+        .select("id,estado,checkout_url,approved_at")
+        .eq("notificacion_id", notificacion.id)
+        .eq("comercio_id", comercio!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const iniciarPago = useMutation({
+    mutationFn: async () => {
+      if (!comercio?.id) throw new Error("No se pudo resolver el comercio actual");
+      const { data, error } = await supabase.functions.invoke("membresia-checkout", {
+        body: {
+          notificacionId: notificacion.id,
+          comercioId: comercio.id,
+          returnOrigin: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      if (data?.estado === "aprobado") return data;
+      if (!data?.checkoutUrl) throw new Error(data?.error || "Mercado Pago no devolvio el enlace de pago");
+      window.location.assign(data.checkoutUrl);
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.estado === "aprobado") {
+        void pagoQuery.refetch();
+        toast({ title: "Pago confirmado", description: "Este comprobante ya fue pagado." });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "No se pudo iniciar el pago", description: error.message, variant: "destructive" });
+    },
+  });
+  const pagoAprobado = pagoQuery.data?.estado === "aprobado";
 
   return (
     <Card className={notificacion.leida ? "" : "border-primary/50 bg-primary/5"}>
@@ -218,6 +293,35 @@ function NotificacionItem({
                 <ComprobanteView notificacion={notificacion} />
               </DialogContent>
             </Dialog>
+          )}
+
+          {admiteMercadoPago && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-background p-3">
+              {pagoAprobado ? (
+                <Badge className="gap-2 bg-green-600 hover:bg-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Pagado con Mercado Pago
+                </Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="success"
+                  size="sm"
+                  disabled={iniciarPago.isPending || pagoQuery.isLoading}
+                  onClick={() => iniciarPago.mutate()}
+                >
+                  {iniciarPago.isPending || pagoQuery.isLoading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <CreditCard className="h-4 w-4" />}
+                  {pagoQuery.data?.estado === "pendiente" ? "Continuar pago con Mercado Pago" : "Pagar con Mercado Pago"}
+                </Button>
+              )}
+              {!pagoAprobado && (
+                <p className="text-xs text-muted-foreground">
+                  Sera redirigido al sitio seguro de Mercado Pago.
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       )}

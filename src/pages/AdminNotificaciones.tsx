@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Archive, ArchiveRestore, BellPlus, Building2, CheckCircle2, Circle, Eye, Pencil, ReceiptText, Save, Send, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BellPlus, Building2, CheckCircle2, Circle, CreditCard, Eye, Pencil, ReceiptText, Save, Send, Trash2, X } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
 import {
   categoriaLabels,
@@ -99,6 +99,25 @@ function EstadoLectura({
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function EstadoCobroMembresia({ notificacion }: { notificacion: Notificacion }) {
+  const metadata = notificacion.metadata;
+  const habilitado = typeof metadata === "object" && metadata !== null && !Array.isArray(metadata)
+    && metadata.tipo === "membresia_pago" && metadata.mercadopago_habilitado === true;
+  if (!habilitado) return <span className="text-muted-foreground">-</span>;
+
+  const pagos = notificacion.pagosMembresia || [];
+  const aprobados = pagos.filter(({ estado }) => estado === "aprobado").length;
+  const pendientes = pagos.filter(({ estado }) => estado === "pendiente" || estado === "procesando").length;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <CreditCard className="h-4 w-4" />
+      {aprobados > 0 && <Badge className="bg-green-600 hover:bg-green-600">{aprobados} pagado{aprobados === 1 ? "" : "s"}</Badge>}
+      {pendientes > 0 && <Badge variant="secondary">{pendientes} pendiente{pendientes === 1 ? "" : "s"}</Badge>}
+      {pagos.length === 0 && <Badge variant="outline">Sin iniciar</Badge>}
+    </div>
   );
 }
 
@@ -383,6 +402,7 @@ export default function AdminNotificaciones() {
                 <TableHead>Categoria</TableHead>
                 <TableHead>Destinatarios</TableHead>
                 <TableHead>Lectura</TableHead>
+                <TableHead>Cobro MP</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -390,13 +410,13 @@ export default function AdminNotificaciones() {
             <TableBody>
               {notificacionesQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Cargando notificaciones...
                   </TableCell>
                 </TableRow>
               ) : (notificacionesQuery.data || []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay notificaciones enviadas.
                   </TableCell>
                 </TableRow>
@@ -419,6 +439,7 @@ export default function AdminNotificaciones() {
                     <TableCell>
                       <EstadoLectura notificacion={notificacion} comercios={comercios} />
                     </TableCell>
+                    <TableCell><EstadoCobroMembresia notificacion={notificacion} /></TableCell>
                     <TableCell>
                       <Badge variant={notificacion.activo ? "default" : "secondary"}>
                         {notificacion.activo ? "Activa" : "Archivada"}

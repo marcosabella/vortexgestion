@@ -25,6 +25,18 @@ export interface Notificacion {
   leida?: boolean;
   destinatarios?: string[];
   lecturas?: NotificacionLectura[];
+  pagosMembresia?: PagoMembresiaMercadoPago[];
+}
+
+export interface PagoMembresiaMercadoPago {
+  id: string;
+  comercio_id: string;
+  estado: string;
+  importe: number;
+  payment_id: string | null;
+  medio_pago: string | null;
+  approved_at: string | null;
+  created_at: string;
 }
 
 export interface NotificacionLectura {
@@ -190,9 +202,10 @@ export function useAdminNotificaciones(enabled = true) {
       const ids = (notificaciones || []).map((notificacion) => notificacion.id);
       const destinatariosPorNotificacion = new Map<string, string[]>();
       const lecturasPorNotificacion = new Map<string, NotificacionLectura[]>();
+      const pagosPorNotificacion = new Map<string, PagoMembresiaMercadoPago[]>();
 
       if (ids.length > 0) {
-        const [destinatariosResult, lecturasResult] = await Promise.all([
+        const [destinatariosResult, lecturasResult, pagosResult] = await Promise.all([
           supabase
             .from("notificacion_destinatarios")
             .select("notificacion_id,comercio_id")
@@ -202,12 +215,18 @@ export function useAdminNotificaciones(enabled = true) {
             .select("notificacion_id,comercio_id,read_at")
             .in("notificacion_id", ids)
             .order("read_at", { ascending: true }),
+          supabase
+            .from("membresia_pagos_mercadopago")
+            .select("id,notificacion_id,comercio_id,estado,importe,payment_id,medio_pago,approved_at,created_at")
+            .in("notificacion_id", ids)
+            .order("created_at", { ascending: false }),
         ]);
 
         const { data: destinatarios, error: destinatariosError } = destinatariosResult;
 
         if (destinatariosError) throw destinatariosError;
         if (lecturasResult.error) throw lecturasResult.error;
+        if (pagosResult.error) throw pagosResult.error;
 
         for (const destinatario of destinatarios || []) {
           const current = destinatariosPorNotificacion.get(destinatario.notificacion_id) || [];
@@ -224,6 +243,13 @@ export function useAdminNotificaciones(enabled = true) {
             lecturasPorNotificacion.set(lectura.notificacion_id, current);
           }
         }
+
+        for (const pago of pagosResult.data || []) {
+          if (!pago.notificacion_id) continue;
+          const current = pagosPorNotificacion.get(pago.notificacion_id) || [];
+          current.push(pago as PagoMembresiaMercadoPago);
+          pagosPorNotificacion.set(pago.notificacion_id, current);
+        }
       }
 
       return (notificaciones || []).map((notificacion) => ({
@@ -232,6 +258,7 @@ export function useAdminNotificaciones(enabled = true) {
         prioridad: notificacion.prioridad as NotificacionPrioridad,
         destinatarios: destinatariosPorNotificacion.get(notificacion.id) || [],
         lecturas: lecturasPorNotificacion.get(notificacion.id) || [],
+        pagosMembresia: pagosPorNotificacion.get(notificacion.id) || [],
       })) as Notificacion[];
     },
   });

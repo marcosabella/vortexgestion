@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus } from "lucide-react";
+import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus, CreditCard } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
 import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
@@ -28,6 +28,13 @@ import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
 const automaticWhatsAppEnabled = import.meta.env.VITE_WHATSAPP_API_ENABLED === "true";
+
+interface OperacionMercadoPagoVenta {
+  id: string;
+  venta_id: string | null;
+  estado: string;
+  qr_data: string | null;
+}
 
 export const VentasList = () => {
   const { ventas, isLoading, deleteVenta } = useVentas();
@@ -47,6 +54,8 @@ export const VentasList = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
+  const [habilitarPagoMembresia, setHabilitarPagoMembresia] = useState(false);
+  const [cuentaCobroId, setCuentaCobroId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [qrPreview, setQrPreview] = useState("");
   const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
@@ -58,13 +67,27 @@ export const VentasList = () => {
     enabled: Boolean(selectedVenta?.id),
     refetchInterval: showDetails ? 5_000 : false,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("whatsapp_envios").select("*").eq("venta_id", selectedVenta!.id).order("enviado_at", { ascending: false });
+      const { data, error } = await supabase.from("whatsapp_envios").select("*").eq("venta_id", selectedVenta!.id).order("enviado_at", { ascending: false });
       if (error) throw error;
       return data as Array<{ id: string; estado: "enviado" | "entregado" | "leido" | "fallido"; enviado_at: string; error_detalle?: string | null }>;
     },
   });
+  const { data: cuentasMercadoPago = [] } = useQuery({
+    queryKey: ["admin-cuentas-mercadopago"],
+    enabled: isAppAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("mercadopago_configuraciones")
+        .select("comercio_id,cuenta_email,ambiente")
+        .eq("connected", true)
+        .order("cuenta_email");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+  const operacionesMercadoPago = (mercadoPagoStatus.data?.operaciones || []) as OperacionMercadoPagoVenta[];
   const operacionMercadoPago = selectedVenta?.id
-    ? (mercadoPagoStatus.data?.operaciones || []).find((operacion: any) => operacion.venta_id === selectedVenta.id)
+    ? operacionesMercadoPago.find((operacion) => operacion.venta_id === selectedVenta.id)
     : null;
   const cobroMercadoPagoPendiente = operacionMercadoPago && ["pendiente", "procesando"].includes(operacionMercadoPago.estado);
 
@@ -132,6 +155,18 @@ export const VentasList = () => {
   const handleSendNotification = () => {
     if (!selectedVenta || notificationComercioIds.length === 0) return;
 
+    const receptorComercioId = cuentaCobroId
+      || cuentasMercadoPago.find(({ comercio_id }) => comercio_id === selectedVenta.comercio_id)?.comercio_id
+      || (cuentasMercadoPago.length === 1 ? cuentasMercadoPago[0].comercio_id : "");
+    if (habilitarPagoMembresia && !receptorComercioId) {
+      toast({
+        title: "Seleccione la cuenta de cobro",
+        description: "Debe elegir la cuenta Mercado Pago que recibira el pago de la membresia.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const tipoComprobante =
       TIPOS_COMPROBANTE.find((tipo) => tipo.value === selectedVenta.tipo_comprobante)?.label ||
       "Comprobante";
@@ -151,12 +186,19 @@ export const VentasList = () => {
           comercio_emisor_id: selectedVenta.comercio_id || comercio?.id || null,
           tipo_comprobante: selectedVenta.tipo_comprobante,
           cliente_nombre: selectedVenta.cliente_nombre,
+          ...(habilitarPagoMembresia ? {
+            tipo: "membresia_pago",
+            mercadopago_habilitado: true,
+            receptor_comercio_id: receptorComercioId,
+          } : {}),
         },
       },
       {
         onSuccess: () => {
           setShowNotificationDialog(false);
           setNotificationComercioIds([]);
+          setHabilitarPagoMembresia(false);
+          setCuentaCobroId("");
         },
       },
     );
@@ -764,6 +806,50 @@ export const VentasList = () => {
                 ))
               )}
             </div>
+
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="habilitar-pago-membresia"
+                  checked={habilitarPagoMembresia}
+                  disabled={cuentasMercadoPago.length === 0}
+                  onCheckedChange={(checked) => setHabilitarPagoMembresia(checked === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="habilitar-pago-membresia" className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Permitir pagar este comprobante con Mercado Pago
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    El importe se cobrara en la cuenta Mercado Pago del administrador.
+                  </p>
+                </div>
+              </div>
+
+              {cuentasMercadoPago.length === 0 && (
+                <p className="text-xs text-destructive">No hay una cuenta Mercado Pago conectada disponible.</p>
+              )}
+
+              {habilitarPagoMembresia && cuentasMercadoPago.length > 1 && (
+                <div className="space-y-2">
+                  <Label htmlFor="cuenta-cobro-membresia">Cuenta que recibira el pago</Label>
+                  <select
+                    id="cuenta-cobro-membresia"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={cuentaCobroId}
+                    onChange={(event) => setCuentaCobroId(event.target.value)}
+                    required
+                  >
+                    <option value="">Seleccionar cuenta</option>
+                    {cuentasMercadoPago.map((cuenta) => (
+                      <option key={cuenta.comercio_id} value={cuenta.comercio_id}>
+                        {cuenta.cuenta_email || cuenta.comercio_id} ({cuenta.ambiente === "production" ? "Produccion" : "Prueba"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -773,7 +859,11 @@ export const VentasList = () => {
             <Button
               type="button"
               variant="success"
-              disabled={notificationComercioIds.length === 0 || crearNotificacion.isPending}
+              disabled={
+                notificationComercioIds.length === 0
+                || crearNotificacion.isPending
+                || (habilitarPagoMembresia && cuentasMercadoPago.length > 1 && !cuentaCobroId)
+              }
               onClick={handleSendNotification}
             >
               <BellPlus className="mr-2 h-4 w-4" />

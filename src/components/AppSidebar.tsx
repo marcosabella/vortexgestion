@@ -161,6 +161,12 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   administracion: false,
 });
 
+const appBuildDate = new Intl.DateTimeFormat("es-AR", {
+  dateStyle: "short",
+  timeStyle: "medium",
+  timeZone: "America/Buenos_Aires",
+}).format(new Date(__APP_BUILD_DATE__));
+
 const pathMatches = (currentPath: string, path: string) =>
   currentPath === path || currentPath.startsWith(`${path}/`);
 
@@ -371,11 +377,16 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="shrink-0 border-t border-sidebar-border bg-sidebar p-0">
         {!collapsed && (
-          <img
-            src="/logo.png"
-            alt="VORTEX"
-            className="block h-auto w-full object-cover"
-          />
+          <div className="relative">
+            <img
+              src="/logo.png"
+              alt="VORTEX"
+              className="block h-auto w-full object-contain"
+            />
+            <p className="absolute inset-x-0 bottom-0 bg-white px-1 py-1 text-center text-[10px] leading-tight text-black">
+              Build: {appBuildDate} (AR)
+            </p>
+          </div>
         )}
       </SidebarFooter>
     </Sidebar>

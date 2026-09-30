@@ -2427,6 +2427,94 @@ export type Database = {
           },
         ]
       }
+      membresia_pagos_mercadopago: {
+        Row: {
+          approved_at: string | null
+          checkout_url: string | null
+          comercio_id: string
+          created_at: string
+          cuotas: number | null
+          estado: string
+          estado_detalle: string | null
+          external_reference: string
+          id: string
+          idempotency_key: string
+          importe: number
+          medio_pago: string | null
+          moneda: string
+          notificacion_id: string | null
+          payment_id: string | null
+          preference_id: string | null
+          raw_response: Json
+          receptor_comercio_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          checkout_url?: string | null
+          comercio_id: string
+          created_at?: string
+          cuotas?: number | null
+          estado?: string
+          estado_detalle?: string | null
+          external_reference: string
+          id?: string
+          idempotency_key?: string
+          importe: number
+          medio_pago?: string | null
+          moneda?: string
+          notificacion_id?: string | null
+          payment_id?: string | null
+          preference_id?: string | null
+          raw_response?: Json
+          receptor_comercio_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          checkout_url?: string | null
+          comercio_id?: string
+          created_at?: string
+          cuotas?: number | null
+          estado?: string
+          estado_detalle?: string | null
+          external_reference?: string
+          id?: string
+          idempotency_key?: string
+          importe?: number
+          medio_pago?: string | null
+          moneda?: string
+          notificacion_id?: string | null
+          payment_id?: string | null
+          preference_id?: string | null
+          raw_response?: Json
+          receptor_comercio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membresia_pagos_mercadopago_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membresia_pagos_mercadopago_notificacion_id_fkey"
+            columns: ["notificacion_id"]
+            isOneToOne: false
+            referencedRelation: "notificaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membresia_pagos_mercadopago_receptor_comercio_id_fkey"
+            columns: ["receptor_comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mercadopago_cajas: {
         Row: {
           activa: boolean
@@ -4470,6 +4558,69 @@ export type Database = {
           },
         ]
       }
+      whatsapp_envios: {
+        Row: {
+          comercio_id: string
+          created_at: string
+          destinatario: string
+          entregado_at: string | null
+          enviado_at: string
+          error_detalle: string | null
+          estado: string
+          id: string
+          leido_at: string | null
+          mensaje_id: string | null
+          tipo: string
+          updated_at: string
+          venta_id: string | null
+        }
+        Insert: {
+          comercio_id: string
+          created_at?: string
+          destinatario: string
+          entregado_at?: string | null
+          enviado_at?: string
+          error_detalle?: string | null
+          estado?: string
+          id?: string
+          leido_at?: string | null
+          mensaje_id?: string | null
+          tipo?: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Update: {
+          comercio_id?: string
+          created_at?: string
+          destinatario?: string
+          entregado_at?: string | null
+          enviado_at?: string
+          error_detalle?: string | null
+          estado?: string
+          id?: string
+          leido_at?: string | null
+          mensaje_id?: string | null
+          tipo?: string
+          updated_at?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_envios_comercio_id_fkey"
+            columns: ["comercio_id"]
+            isOneToOne: false
+            referencedRelation: "comercio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_envios_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       tienda_productos: {
@@ -4503,6 +4654,10 @@ export type Database = {
       }
     }
     Functions: {
+      get_comprobante_notificacion: {
+        Args: { p_comercio_id: string; p_notificacion_id: string }
+        Returns: Json
+      }
       actualizar_estado_pedido_online: {
         Args: { p_estado: string; p_pedido_id: string }
         Returns: {

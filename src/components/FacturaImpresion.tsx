@@ -8,10 +8,16 @@ import { getVentaTotalFinal, Venta } from "@/types/venta";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaPrintHtml } from "@/utils/facturaPrint";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import type { Comercio } from "@/types/comercio";
+import type { AfipConfig } from "@/types/afip";
+import type { FormatoComprobante } from "@/config/parametrizacion";
 
 interface FacturaImpresionProps {
   venta: Venta;
   documentType?: "venta" | "presupuesto";
+  comercioOverride?: Comercio | null;
+  afipConfigOverride?: AfipConfig | null;
+  formatoOverride?: FormatoComprobante;
 }
 
 const printHtml = async (html: string) => {
@@ -57,24 +63,33 @@ const printHtml = async (html: string) => {
   }, 60_000);
 };
 
-export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpresionProps) => {
+export const FacturaImpresion = ({
+  venta,
+  documentType = "venta",
+  comercioOverride,
+  afipConfigOverride,
+  formatoOverride,
+}: FacturaImpresionProps) => {
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
   const { data: parametrizacion } = useComercioParametrizacion();
   const { toast } = useToast();
   const [openingAction, setOpeningAction] = useState<"print" | "pdf" | null>(null);
+  const comercioDocumento = comercioOverride !== undefined ? comercioOverride : comercio;
+  const afipConfigDocumento = afipConfigOverride !== undefined ? afipConfigOverride : afipConfig;
+  const formatoDocumento = formatoOverride ?? parametrizacion.impresion.formato_comprobante;
 
   const openFactura = async (action: "print" | "pdf") => {
     setOpeningAction(action);
 
     let qrDataUrl = "";
 
-    if (venta.cae?.trim() && comercio && afipConfig) {
+    if (venta.cae?.trim() && comercioDocumento && afipConfigDocumento) {
       try {
         qrDataUrl = await generarQRAfip({
           fecha: venta.fecha_venta,
-          cuit: comercio.cuit,
-          puntoVenta: afipConfig.punto_venta,
+          cuit: comercioDocumento.cuit,
+          puntoVenta: afipConfigDocumento.punto_venta,
           tipoComprobante: venta.tipo_comprobante,
           numeroComprobante: venta.numero_comprobante,
           importe: getVentaTotalFinal(venta),
@@ -86,7 +101,14 @@ export const FacturaImpresion = ({ venta, documentType = "venta" }: FacturaImpre
     }
 
     const comprobanteHtml = buildFacturaPrintHtml(
-      { venta, comercio, afipConfig, qrDataUrl, documentType, formato: parametrizacion.impresion.formato_comprobante },
+      {
+        venta,
+        comercio: comercioDocumento,
+        afipConfig: afipConfigDocumento,
+        qrDataUrl,
+        documentType,
+        formato: formatoDocumento,
+      },
     );
     try {
       await printHtml(comprobanteHtml);

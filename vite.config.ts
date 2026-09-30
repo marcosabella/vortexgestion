@@ -3,8 +3,15 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const buildDate = new Date();
+const buildVersion = buildDate.toISOString().replace(/[-:TZ.]/g, "");
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    __APP_BUILD_VERSION__: JSON.stringify(buildVersion),
+    __APP_BUILD_DATE__: JSON.stringify(buildDate.toISOString()),
+  },
   // Las rutas de React Router necesitan assets absolutos al recargar una URL interna.
   base: '/',
 
