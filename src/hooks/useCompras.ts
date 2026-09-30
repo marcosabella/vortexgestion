@@ -60,6 +60,9 @@ function compraErrorMessage(error: Error) {
   if (error.message.includes("cheque_cartera_no_disponible")) return "El cheque ya no está disponible en cartera.";
   if (error.message.includes("datos_cheque_propio_incompletos")) return "Completá todos los datos obligatorios del cheque propio.";
   if (error.message.includes("pagos_proveedor_superan_saldo")) return "La suma de los medios de pago supera el saldo pendiente.";
+  if (error.message.includes("pago_proveedor_documento_duplicado")) return "Un comprobante fue seleccionado más de una vez.";
+  if (error.message.includes("pago_proveedor_documento_sin_saldo")) return "Uno de los comprobantes seleccionados ya no tiene saldo pendiente.";
+  if (error.message.includes("pago_proveedor_multi_documento_invalido") || error.message.includes("pago_proveedor_documento_invalido")) return "Revisá los comprobantes seleccionados para el pago.";
   if (error.message.includes("pagos_proveedor_mixtos_invalidos") || error.message.includes("pago_proveedor_mixto_item_invalido")) return "Revisá los medios de pago y sus importes.";
   if (error.message.includes("compra_pagos_invalidos") || error.message.includes("compra_pago_cheque_invalido")) return "Agregá al menos un medio de pago válido para la compra.";
   return error.message;
@@ -124,6 +127,9 @@ export type PagoProveedorBorrador = {
   cheque_id?: string;
   cheque_propio?: ChequePropioPago;
 };
+export type DocumentoPagoProveedor =
+  | { factura_id: string }
+  | { gasto_id: string };
 export type FacturaProveedor = {
   id: string;
   compra_id: string;
@@ -539,6 +545,38 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
     onSuccess: () => { refresh(); toast({ title: "Pago registrado", description: "Se actualizaron la cuenta corriente y todos los medios asociados." }); },
     onError: (error: Error) => toast({ title: "No se pudo registrar el pago", description: compraErrorMessage(error), variant: "destructive" }),
   });
+  const registrarPagosMultiDocumento = useMutation({
+    mutationFn: async (
+      { proveedorId, fecha, observaciones, documentos, pagos }: {
+        proveedorId: string;
+        fecha: string;
+        observaciones?: string;
+        documentos: DocumentoPagoProveedor[];
+        pagos: PagoProveedorBorrador[];
+      },
+    ) => {
+      const { error } = await db.rpc("registrar_pagos_proveedor_multi_documento", {
+        p_proveedor_id: proveedorId,
+        p_fecha: fecha,
+        p_observaciones: observaciones || null,
+        p_documentos: documentos,
+        p_pagos: pagos,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refresh();
+      toast({
+        title: "Pago registrado",
+        description: "Los medios de pago se imputaron a los comprobantes seleccionados.",
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "No se pudo registrar el pago",
+      description: compraErrorMessage(error),
+      variant: "destructive",
+    }),
+  });
   return {
     compras: comprasQuery.data || [],
     facturas: facturasQuery.data || [],
@@ -558,5 +596,6 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
     registrarPagoCheque,
     eliminarPagoCheque,
     registrarPagosMixtos,
+    registrarPagosMultiDocumento,
   };
 }
