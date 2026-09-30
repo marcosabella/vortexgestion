@@ -67,6 +67,8 @@ export interface Venta {
     apellido: string;
     cuit?: string;
     calle?: string;
+    piso?: string;
+    departamento?: string;
     numero?: string;
     codigo_postal?: string;
     localidad?: string;

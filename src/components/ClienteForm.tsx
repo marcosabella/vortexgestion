@@ -25,6 +25,8 @@ const clienteSchema = z.object({
   }, 'Ingrese un DNI (7-8 dígitos) o CUIT válido (11 dígitos)'),
   calle: z.string().optional(),
   numero: z.string().optional(),
+  piso: z.string().optional(),
+  departamento: z.string().optional(),
   codigo_postal: z.string().optional(),
   localidad: z.string().optional(),
   provincia: z.string().optional(),
@@ -71,6 +73,8 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
       cuit: cliente.cuit,
       calle: cliente.calle,
       numero: cliente.numero,
+      piso: cliente.piso || '',
+      departamento: cliente.departamento || '',
       codigo_postal: cliente.codigo_postal,
       localidad: cliente.localidad,
       provincia: cliente.provincia,
@@ -86,6 +90,8 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
       cuit: '',
       calle: '',
       numero: '',
+      piso: '',
+      departamento: '',
       codigo_postal: '',
       localidad: '',
       provincia: '',
@@ -126,7 +132,9 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
       
       if (datos.domicilioFiscal) {
         if (datos.domicilioFiscal.calle) setValue('calle', datos.domicilioFiscal.calle);
-        if (datos.domicilioFiscal.numero) setValue('numero', datos.domicilioFiscal.numero);
+        if (datos.domicilioFiscal.numero !== undefined) setValue('numero', datos.domicilioFiscal.numero);
+        if (datos.domicilioFiscal.piso !== undefined) setValue('piso', datos.domicilioFiscal.piso);
+        if (datos.domicilioFiscal.departamento !== undefined) setValue('departamento', datos.domicilioFiscal.departamento);
         if (datos.domicilioFiscal.localidad) setValue('localidad', datos.domicilioFiscal.localidad);
         if (datos.domicilioFiscal.provincia) setValue('provincia', datos.domicilioFiscal.provincia);
         if (datos.domicilioFiscal.codigoPostal) setValue('codigo_postal', datos.domicilioFiscal.codigoPostal);
@@ -142,6 +150,8 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
         cuit: data.cuit,
         calle: data.calle || '',
         numero: data.numero || '',
+        piso: data.piso || '',
+        departamento: data.departamento || '',
         codigo_postal: data.codigo_postal || '',
         localidad: data.localidad || '',
         provincia: data.provincia || '',
@@ -311,6 +321,17 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
                 {errors.numero && (
                   <p className="text-sm text-destructive">{String(errors.numero.message)}</p>
                 )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="piso">Piso</Label>
+                <Input id="piso" {...register('piso')} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="departamento">Departamento</Label>
+                <Input id="departamento" {...register('departamento')} />
               </div>
             </div>
 

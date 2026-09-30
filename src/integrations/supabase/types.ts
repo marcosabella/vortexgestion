@@ -2083,6 +2083,8 @@ export type Database = {
           localidad: string
           nombre: string
           numero: string
+          piso: string
+          departamento: string
           provincia: string
           situacion_afip: string
           telefono: string | null
@@ -2102,6 +2104,8 @@ export type Database = {
           localidad: string
           nombre: string
           numero: string
+          piso?: string
+          departamento?: string
           provincia: string
           situacion_afip: string
           telefono?: string | null
@@ -2121,6 +2125,8 @@ export type Database = {
           localidad?: string
           nombre?: string
           numero?: string
+          piso?: string
+          departamento?: string
           provincia?: string
           situacion_afip?: string
           telefono?: string | null
@@ -4041,6 +4047,8 @@ export type Database = {
           localidad: string
           nombre: string
           numero: string
+          piso: string
+          departamento: string
           provincia: string
           razon_social: string | null
           situacion_afip: string
@@ -4061,6 +4069,8 @@ export type Database = {
           localidad: string
           nombre: string
           numero: string
+          piso?: string
+          departamento?: string
           provincia: string
           razon_social?: string | null
           situacion_afip: string
@@ -4081,6 +4091,8 @@ export type Database = {
           localidad?: string
           nombre?: string
           numero?: string
+          piso?: string
+          departamento?: string
           provincia?: string
           razon_social?: string | null
           situacion_afip?: string

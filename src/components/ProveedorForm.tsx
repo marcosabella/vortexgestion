@@ -26,6 +26,8 @@ const proveedorSchema = z.object({
   }, 'Ingrese un DNI (7-8 dígitos) o CUIT válido (11 dígitos)'),
   calle: z.string().optional(),
   numero: z.string().optional(),
+  piso: z.string().optional(),
+  departamento: z.string().optional(),
   codigo_postal: z.string().optional(),
   localidad: z.string().optional(),
   provincia: z.string().optional(),
@@ -57,6 +59,8 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
       cuit: proveedor?.cuit || '',
       calle: proveedor?.calle || '',
       numero: proveedor?.numero || '',
+      piso: proveedor?.piso || '',
+      departamento: proveedor?.departamento || '',
       codigo_postal: proveedor?.codigo_postal || '',
       localidad: proveedor?.localidad || '',
       provincia: proveedor?.provincia || '',
@@ -101,7 +105,9 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
       
       if (datos.domicilioFiscal) {
         if (datos.domicilioFiscal.calle) form.setValue('calle', datos.domicilioFiscal.calle);
-        if (datos.domicilioFiscal.numero) form.setValue('numero', datos.domicilioFiscal.numero);
+        if (datos.domicilioFiscal.numero !== undefined) form.setValue('numero', datos.domicilioFiscal.numero);
+        if (datos.domicilioFiscal.piso !== undefined) form.setValue('piso', datos.domicilioFiscal.piso);
+        if (datos.domicilioFiscal.departamento !== undefined) form.setValue('departamento', datos.domicilioFiscal.departamento);
         if (datos.domicilioFiscal.localidad) form.setValue('localidad', datos.domicilioFiscal.localidad);
         if (datos.domicilioFiscal.provincia) form.setValue('provincia', datos.domicilioFiscal.provincia);
         if (datos.domicilioFiscal.codigoPostal) form.setValue('codigo_postal', datos.domicilioFiscal.codigoPostal);
@@ -121,6 +127,8 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
       cuit: data.cuit,
       calle: data.calle || '',
       numero: data.numero || '',
+      piso: data.piso || '',
+      departamento: data.departamento || '',
       codigo_postal: data.codigo_postal || '',
       localidad: data.localidad || '',
       provincia: data.provincia || '',
@@ -317,6 +325,31 @@ export function ProveedorForm({ proveedor, onSuccess }: ProveedorFormProps) {
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="piso"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Piso</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="departamento"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Departamento</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}

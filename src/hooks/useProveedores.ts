@@ -11,6 +11,8 @@ export interface Proveedor {
   cuit: string;
   calle: string;
   numero: string;
+  piso?: string;
+  departamento?: string;
   codigo_postal: string;
   localidad: string;
   provincia: string;

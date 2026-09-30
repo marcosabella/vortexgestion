@@ -1,6 +1,7 @@
-// VERSION: 2026-01-06-v6 - Add detailed logging for official WS
+// VERSION: 2026-09-30-v7 - Constancia de inscripcion ARCA
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
+import { parseConstanciaInscripcion, soapFaultMessage } from './padron.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ function formatearFechaAFIP(fecha: Date): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-03:00`;
 }
 
-// Crear TRA (Ticket de Requerimiento de Acceso) para el servicio ws_sr_padron_a5
+// Crear TRA para el servicio ws_sr_constancia_inscripcion
 function crearTRA(service: string): string {
   const ahora = new Date();
   const generationTime = new Date(ahora.getTime() - 10 * 60000);
@@ -138,7 +139,7 @@ async function obtenerTokenYSign(
   
   if (!response.ok) {
     console.error('Error WSAA:', responseText.substring(0, 500));
-    throw new Error(`Error en WSAA: ${response.status} - IP no autorizada`);
+    throw new Error(soapFaultMessage(responseText) || `Error en WSAA: HTTP ${response.status}`);
   }
 
   let xmlContent = responseText;
@@ -161,7 +162,7 @@ async function obtenerTokenYSign(
   const signMatch = xmlContent.match(/<sign>([\s\S]*?)<\/sign>/);
 
   if (!tokenMatch || !signMatch) {
-    throw new Error('No se pudo extraer token y sign de WSAA');
+    throw new Error(soapFaultMessage(responseText) || 'No se pudo extraer token y sign de WSAA');
   }
 
   console.log('Token y sign obtenidos correctamente');
@@ -419,10 +420,10 @@ async function consultarPadron(
   cuitEmisor: string,
   cuitConsultar: string,
   ambiente: 'homologacion' | 'produccion'
-): Promise<any> {
+): Promise<ReturnType<typeof parseConstanciaInscripcion>> {
   const wsPadronUrl = ambiente === 'produccion'
-    ? 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5'
-    : 'https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5';
+    ? 'https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5'
+    : 'https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5';
 
   const cuitEmisorLimpio = cuitEmisor.replace(/-/g, '');
 
@@ -430,12 +431,12 @@ async function consultarPadron(
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:per="http://a5.soap.ws.server.puc.sr/">
 <soap:Header/>
 <soap:Body>
-<per:getPersona>
+<per:getPersona_v2>
 <token>${token}</token>
 <sign>${sign}</sign>
 <cuitRepresentada>${cuitEmisorLimpio}</cuitRepresentada>
 <idPersona>${cuitConsultar}</idPersona>
-</per:getPersona>
+</per:getPersona_v2>
 </soap:Body>
 </soap:Envelope>`;
 
@@ -454,93 +455,14 @@ async function consultarPadron(
   console.log('Respuesta padrón status:', response.status);
 
   if (!response.ok) {
-    throw new Error(`Error en padrón AFIP: ${response.status}`);
+    throw new Error(soapFaultMessage(responseText) || `Error en padron ARCA: HTTP ${response.status}`);
   }
 
-  return parseRespuestaPadron(responseText);
+  const datos = parseConstanciaInscripcion(responseText);
+  datos.domicilioFiscal.provincia = mapearProvincia(datos.domicilioFiscal.provincia);
+  return datos;
 }
 
-function parseRespuestaPadron(xml: string): any {
-  const tipoPersonaMatch = xml.match(/<tipoPersona>(.*?)<\/tipoPersona>/);
-  const nombreMatch = xml.match(/<nombre>(.*?)<\/nombre>/);
-  const apellidoMatch = xml.match(/<apellido>(.*?)<\/apellido>/);
-  const razonSocialMatch = xml.match(/<razonSocial>(.*?)<\/razonSocial>/);
-  
-  const domicilioSection = xml.match(/<domicilioFiscal>(.*?)<\/domicilioFiscal>/s);
-  let domicilio: any = {};
-  
-  if (domicilioSection) {
-    const domXml = domicilioSection[1];
-    const calleMatch = domXml.match(/<direccion>(.*?)<\/direccion>/);
-    const localidadMatch = domXml.match(/<localidad>(.*?)<\/localidad>/);
-    const provinciaMatch = domXml.match(/<descripcionProvincia>(.*?)<\/descripcionProvincia>/);
-    const cpMatch = domXml.match(/<codPostal>(.*?)<\/codPostal>/);
-    
-    domicilio = {
-      calle: calleMatch ? calleMatch[1] : '',
-      numero: '',
-      localidad: localidadMatch ? localidadMatch[1] : '',
-      provincia: provinciaMatch ? mapearProvincia(provinciaMatch[1]) : '',
-      codigoPostal: cpMatch ? cpMatch[1] : '',
-    };
-    
-    if (calleMatch) {
-      const direccion = calleMatch[1];
-      const match = direccion.match(/^(.+?)\s+(\d+)$/);
-      if (match) {
-        domicilio.calle = match[1].trim();
-        domicilio.numero = match[2];
-      } else {
-        domicilio.calle = direccion;
-        domicilio.numero = 'S/N';
-      }
-    }
-  }
-
-  const impuestosSection = xml.match(/<impuesto>(.*?)<\/impuesto>/gs);
-  let situacionAfip = 'Consumidor Final';
-  
-  if (impuestosSection) {
-    for (const imp of impuestosSection) {
-      const idImpMatch = imp.match(/<idImpuesto>(\d+)<\/idImpuesto>/);
-      const estadoMatch = imp.match(/<estado>(\w+)<\/estado>/);
-      
-      if (idImpMatch && estadoMatch && estadoMatch[1] === 'ACTIVO') {
-        const idImpuesto = parseInt(idImpMatch[1]);
-        if (idImpuesto === 32 || idImpuesto === 30) {
-          situacionAfip = 'Responsable Inscripto';
-          break;
-        }
-        if (idImpuesto === 20) {
-          situacionAfip = 'Monotributista';
-        }
-        if (idImpuesto === 34) {
-          situacionAfip = 'Exento';
-        }
-      }
-    }
-  }
-
-  const categoriaMonoMatch = xml.match(/<categoriaMonotributo>(.*?)<\/categoriaMonotributo>/);
-  if (categoriaMonoMatch && situacionAfip === 'Monotributista') {
-    situacionAfip = `Monotributista Cat. ${categoriaMonoMatch[1]}`;
-  }
-
-  const tipoPersona = tipoPersonaMatch?.[1] || '';
-  const esPersonaFisica = tipoPersona === 'FISICA';
-
-  return {
-    nombre: esPersonaFisica 
-      ? (nombreMatch?.[1] || '') 
-      : (razonSocialMatch?.[1] || nombreMatch?.[1] || ''),
-    apellido: esPersonaFisica ? (apellidoMatch?.[1] || '') : '',
-    razonSocial: razonSocialMatch?.[1] || '',
-    tipoPersona: esPersonaFisica ? 'fisica' : 'juridica',
-    situacionAfip,
-    domicilioFiscal: domicilio,
-    fuente: 'afip_oficial',
-  };
-}
 
 function mapearProvincia(provinciaAfip: string): string {
   const mapeo: Record<string, string> = {
@@ -654,7 +576,6 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    let usarAPIOficial = false;
     let errorOficial = '';
 
     // Intentar webservice oficial si hay configuración
@@ -666,11 +587,11 @@ Deno.serve(async (req) => {
       console.log('Certificado KEY presente:', !!afipConfig.certificado_key);
       
       try {
-        console.log('Obteniendo token y sign para ws_sr_padron_a5...');
+        console.log('Obteniendo token y sign para ws_sr_constancia_inscripcion...');
         const { token, sign } = await obtenerTokenYSign(
           afipConfig.certificado_crt,
           afipConfig.certificado_key,
-          'ws_sr_padron_a5',
+          'ws_sr_constancia_inscripcion',
           afipConfig.ambiente
         );
         console.log('Token obtenido OK, longitud:', token.length);
@@ -734,7 +655,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'No se pudieron obtener datos del contribuyente. Complete los datos manualmente.',
+        error: errorOficial || 'No se pudieron obtener datos del contribuyente. Complete los datos manualmente.',
         tipoPersona,
         data: {
           nombre: '',

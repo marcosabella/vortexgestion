@@ -504,6 +504,8 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   const clienteDireccion = [
     venta.cliente?.calle,
     venta.cliente?.numero,
+    venta.cliente?.piso ? `Piso: ${venta.cliente.piso}` : '',
+    venta.cliente?.departamento ? `Dpto: ${venta.cliente.departamento}` : '',
     venta.cliente?.codigo_postal,
     venta.cliente?.localidad,
     venta.cliente?.provincia,
