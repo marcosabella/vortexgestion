@@ -5,6 +5,7 @@ export interface CuentaCorriente {
   monto: number;
   concepto: string;
   venta_id?: string;
+  cheque_id?: string | null;
   tarjeta_id?: string;
   cuotas?: number;
   fecha_movimiento: string;

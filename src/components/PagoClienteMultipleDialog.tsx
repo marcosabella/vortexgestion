@@ -4,6 +4,7 @@ import { type ChequeClientePago, type PagoClienteBorrador, useCuentaCorriente } 
 import type { CuentaCorriente } from "@/types/cuenta-corriente";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ type Props = {
 };
 
 const money = (value: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
 const methodLabels: Record<PaymentRow["tipo"], string> = {
   contado: "Efectivo",
@@ -50,7 +52,8 @@ export function PagoClienteMultipleDialog({
 }: Props) {
   const { registrarPagosMixtos } = useCuentaCorriente();
   const { toast } = useToast();
-  const [documentId, setDocumentId] = useState("");
+  const [documentIds, setDocumentIds] = useState<string[]>([]);
+  const [draftDocumentIds, setDraftDocumentIds] = useState<string[]>([]);
   const [documentOpen, setDocumentOpen] = useState(false);
   const [documentSearch, setDocumentSearch] = useState("");
   const [rows, setRows] = useState<PaymentRow[]>([]);
@@ -62,10 +65,10 @@ export function PagoClienteMultipleDialog({
   const [chequeAmount, setChequeAmount] = useState(0);
   const [cheque, setCheque] = useState<ChequeClientePago>(() => emptyCheque(clienteNombre, clienteCuit));
 
-  const saldoCliente = movimientos.reduce(
+  const saldoCliente = roundMoney(movimientos.reduce(
     (sum, movement) => sum + (movement.tipo_movimiento === "debito" ? Number(movement.monto) : -Number(movement.monto)),
     0,
-  );
+  ));
   const pendingDocuments = useMemo(() => {
     const documents = new Map<string, PendingDocument>();
     for (const movement of movimientos) {
@@ -80,24 +83,28 @@ export function PagoClienteMultipleDialog({
       documents.set(movement.venta_id, current);
     }
     return Array.from(documents.values())
+      .map((document) => ({ ...document, saldo: roundMoney(document.saldo) }))
       .filter((document) => document.saldo > 0)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [movimientos]);
 
   const normalizedSearch = documentSearch.trim().toLocaleLowerCase("es");
   const visibleDocuments = pendingDocuments.filter((document) => !normalizedSearch || document.numero.toLocaleLowerCase("es").includes(normalizedSearch));
-  const selectedDocument = pendingDocuments.find((document) => document.id === documentId) || null;
-  const debt = selectedDocument ? Math.max(Math.min(selectedDocument.saldo, saldoCliente), 0) : 0;
-  const assigned = rows.reduce((sum, row) => sum + Number(row.monto), 0);
-  const remaining = Math.max(debt - assigned, 0);
+  const selectedDocuments = documentIds.map((id) => pendingDocuments.find((document) => document.id === id))
+    .filter((document): document is PendingDocument => Boolean(document));
+  const debt = roundMoney(Math.max(Math.min(selectedDocuments.reduce((sum, document) => sum + document.saldo, 0), saldoCliente), 0));
+  const assigned = roundMoney(rows.reduce((sum, row) => sum + Number(row.monto), 0));
+  const remaining = roundMoney(Math.max(debt - assigned, 0));
+  const selectionValid = selectedDocuments.length > 0 && selectedDocuments.length === documentIds.length;
   const chequeComplete = Boolean(
-    chequeAmount > 0 && cheque.numero_cheque.trim() && cheque.banco_emisor.trim()
+    Number.isFinite(chequeAmount) && roundMoney(chequeAmount) > 0 && cheque.numero_cheque.trim() && cheque.banco_emisor.trim()
       && cheque.emisor_nombre.trim() && cheque.fecha_emision && cheque.fecha_vencimiento,
   );
 
   useEffect(() => {
     if (!open) return;
-    setDocumentId("");
+    setDocumentIds([]);
+    setDraftDocumentIds([]);
     setDocumentOpen(false);
     setDocumentSearch("");
     setRows([]);
@@ -108,25 +115,36 @@ export function PagoClienteMultipleDialog({
     setChequeOpen(false);
     setChequeAmount(0);
     setCheque(emptyCheque(clienteNombre, clienteCuit));
-  }, [clienteCuit, clienteNombre, open]);
+  }, [clienteId, clienteCuit, clienteNombre, open]);
 
-  const selectDocument = (id: string) => {
-    setDocumentId(id);
-    setRows([]);
-    setAmount(0);
+  const openDocumentSelector = () => {
+    setDraftDocumentIds(documentIds);
+    setDocumentSearch("");
+    setDocumentOpen(true);
+  };
+  const toggleDocument = (id: string, checked: boolean) => setDraftDocumentIds((current) =>
+    checked ? [...new Set([...current, id])] : current.filter((value) => value !== id));
+  const applyDocuments = () => {
+    const selectedDebt = roundMoney(Math.max(Math.min(draftDocumentIds.reduce((sum, id) =>
+      sum + (pendingDocuments.find((document) => document.id === id)?.saldo || 0), 0), saldoCliente), 0));
+    if (selectedDebt < assigned) {
+      toast({ title: "Selección insuficiente", description: "Los comprobantes elegidos no cubren los medios de pago ya agregados.", variant: "destructive" });
+      return;
+    }
+    setDocumentIds(draftDocumentIds);
     setDocumentOpen(false);
   };
   const addRegularPayment = () => {
-    if (!documentId || amount <= 0 || amount > remaining) {
+    if (!selectionValid || !Number.isFinite(amount) || roundMoney(amount) <= 0 || roundMoney(amount) > remaining) {
       toast({ title: "Importe inválido", description: "El importe debe ser mayor que cero y no superar el saldo restante.", variant: "destructive" });
       return;
     }
-    setRows((current) => [...current, { localId: crypto.randomUUID(), tipo: method, monto: amount, detail: methodLabels[method] }]);
+    setRows((current) => [...current, { localId: crypto.randomUUID(), tipo: method, monto: roundMoney(amount), detail: methodLabels[method] }]);
     setAmount(0);
   };
   const openChequeForm = () => {
-    if (!documentId || remaining <= 0) {
-      toast({ title: "Seleccioná primero un comprobante pendiente", variant: "destructive" });
+    if (!selectionValid || remaining <= 0) {
+      toast({ title: "Seleccioná primero uno o más comprobantes pendientes", variant: "destructive" });
       return;
     }
     setChequeAmount(remaining);
@@ -134,14 +152,14 @@ export function PagoClienteMultipleDialog({
     setChequeOpen(true);
   };
   const addCheque = () => {
-    if (!chequeComplete || chequeAmount > remaining) {
+    if (!chequeComplete || roundMoney(chequeAmount) > remaining) {
       toast({ title: "Cheque inválido", description: "Completá sus datos y verificá que el importe no supere el saldo restante.", variant: "destructive" });
       return;
     }
     setRows((current) => [...current, {
       localId: crypto.randomUUID(),
       tipo: "cheque",
-      monto: chequeAmount,
+      monto: roundMoney(chequeAmount),
       cheque: { ...cheque },
       detail: `N° ${cheque.numero_cheque} · ${cheque.banco_emisor}`,
     }]);
@@ -149,10 +167,10 @@ export function PagoClienteMultipleDialog({
     setChequeAmount(0);
   };
   const submit = () => {
-    if (!selectedDocument) return;
+    if (!selectionValid || rows.length === 0 || assigned > debt || !date || registrarPagosMixtos.isPending) return;
     registrarPagosMixtos.mutate({
       clienteId,
-      ventaId: selectedDocument.id,
+      ventaIds: documentIds,
       fecha: date,
       observaciones: notes,
       pagos: rows.map(({ localId: _localId, detail: _detail, ...row }) => row),
@@ -164,15 +182,19 @@ export function PagoClienteMultipleDialog({
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader><DialogTitle>Registrar pago del cliente</DialogTitle></DialogHeader>
         <div className="space-y-2">
-          <Label>Comprobante pendiente</Label>
-          <div className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>{selectedDocument
-              ? <><p className="font-medium">Comprobante {selectedDocument.numero}</p><p className="text-sm text-muted-foreground">Saldo imputable: {money(debt)}</p></>
-              : <p className="text-sm text-muted-foreground">Todavía no seleccionaste un comprobante.</p>}
+          <Label>Comprobantes pendientes</Label>
+          <div className="rounded-md border p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">{selectedDocuments.length
+                ? `${selectedDocuments.length} comprobante${selectedDocuments.length === 1 ? "" : "s"} seleccionado${selectedDocuments.length === 1 ? "" : "s"}. La imputación seguirá el orden de selección.`
+                : "Todavía no seleccionaste comprobantes."}</p>
+              <Button type="button" variant="outline" className="shrink-0" onClick={openDocumentSelector} disabled={registrarPagosMixtos.isPending}>
+                <Search className="mr-2 h-4 w-4" />Seleccionar comprobantes
+              </Button>
             </div>
-            <Button type="button" variant="outline" className="shrink-0" onClick={() => { setDocumentSearch(""); setDocumentOpen(true); }}>
-              <Search className="mr-2 h-4 w-4" />Buscar comprobante
-            </Button>
+            {selectedDocuments.length > 0 && <div className="mt-3 space-y-1 border-t pt-3">{selectedDocuments.map((document, index) =>
+              <div key={document.id} className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate">{index + 1}. Comprobante <strong>{document.numero}</strong></span><span className="shrink-0 font-medium">{money(document.saldo)}</span></div>)}</div>}
+            {selectedDocuments.length > 0 && selectedDocuments.reduce((sum, document) => sum + document.saldo, 0) > saldoCliente && <p className="mt-2 text-sm text-muted-foreground">El importe imputable está limitado al saldo total del cliente: {money(Math.max(saldoCliente, 0))}.</p>}
           </div>
         </div>
         <div className="grid gap-3 rounded-lg bg-muted p-4 sm:grid-cols-3">
@@ -185,25 +207,25 @@ export function PagoClienteMultipleDialog({
           {method !== "cheque"
             ? <div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={amount || ""} onChange={(event) => setAmount(Number(event.target.value))} /></div>
             : <div className="flex items-end"><p className="pb-2 text-sm text-muted-foreground">El cheque recibido ingresará en cartera.</p></div>}
-          <div className="flex items-end"><Button type="button" disabled={!documentId || remaining <= 0} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
+          <div className="flex items-end"><Button type="button" disabled={!selectionValid || remaining <= 0 || registrarPagosMixtos.isPending} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
         </div>
         <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Medio</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Importe</TableHead><TableHead className="w-16" /></TableRow></TableHeader><TableBody>{rows.length === 0
           ? <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Todavía no agregaste medios de pago.</TableCell></TableRow>
-          : rows.map((row) => <TableRow key={row.localId}><TableCell>{methodLabels[row.tipo]}</TableCell><TableCell>{row.detail}</TableCell><TableCell className="text-right font-medium">{money(row.monto)}</TableCell><TableCell><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => setRows((current) => current.filter((item) => item.localId !== row.localId))}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div>
+          : rows.map((row) => <TableRow key={row.localId}><TableCell>{methodLabels[row.tipo]}</TableCell><TableCell>{row.detail}</TableCell><TableCell className="text-right font-medium">{money(row.monto)}</TableCell><TableCell><Button type="button" size="icon" variant="ghost" className="text-destructive" disabled={registrarPagosMixtos.isPending} onClick={() => setRows((current) => current.filter((item) => item.localId !== row.localId))}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div>
         <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Fecha</Label><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div><div className="space-y-2"><Label>Observaciones generales</Label><Input value={notes} onChange={(event) => setNotes(event.target.value)} /></div></div>
-        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={registrarPagosMixtos.isPending}>Cancelar</Button><Button onClick={submit} disabled={!documentId || rows.length === 0 || assigned > debt || registrarPagosMixtos.isPending}>Confirmar pago</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={registrarPagosMixtos.isPending}>Cancelar</Button><Button onClick={submit} disabled={!selectionValid || rows.length === 0 || assigned > debt || !date || registrarPagosMixtos.isPending}>Confirmar pago</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
-    <Dialog open={documentOpen} onOpenChange={setDocumentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Seleccionar comprobante pendiente</DialogTitle></DialogHeader>
+    <Dialog open={documentOpen} onOpenChange={setDocumentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Seleccionar comprobantes pendientes</DialogTitle></DialogHeader>
       <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input autoFocus className="pl-9" value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Buscar por número de comprobante" /></div>
-      <div className="max-h-[55vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Comprobante</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Saldo pendiente</TableHead><TableHead className="w-28" /></TableRow></TableHeader><TableBody>{visibleDocuments.map((document) => <TableRow key={document.id}><TableCell className="font-medium">{document.numero}</TableCell><TableCell>{new Date(document.fecha).toLocaleDateString("es-AR")}</TableCell><TableCell className="text-right font-medium">{money(Math.min(document.saldo, Math.max(saldoCliente, 0)))}</TableCell><TableCell className="text-right"><Button size="sm" onClick={() => selectDocument(document.id)}>Seleccionar</Button></TableCell></TableRow>)}{visibleDocuments.length === 0 && <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No se encontraron comprobantes pendientes.</TableCell></TableRow>}</TableBody></Table></div>
-      <DialogFooter><Button variant="outline" onClick={() => setDocumentOpen(false)}>Cerrar</Button></DialogFooter>
+      <div className="max-h-[55vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead className="w-12" /><TableHead>Comprobante</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Saldo pendiente</TableHead></TableRow></TableHeader><TableBody>{visibleDocuments.map((document) => <TableRow key={document.id} className={draftDocumentIds.includes(document.id) ? "bg-muted/50" : ""}><TableCell><Checkbox aria-label={`Seleccionar comprobante ${document.numero}`} checked={draftDocumentIds.includes(document.id)} onCheckedChange={(checked) => toggleDocument(document.id, checked === true)} /></TableCell><TableCell className="font-medium">{document.numero}</TableCell><TableCell>{new Date(document.fecha).toLocaleDateString("es-AR")}</TableCell><TableCell className="text-right font-medium">{money(document.saldo)}</TableCell></TableRow>)}{visibleDocuments.length === 0 && <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No se encontraron comprobantes pendientes.</TableCell></TableRow>}</TableBody></Table></div>
+      <DialogFooter><Button variant="outline" onClick={() => setDocumentOpen(false)}>Cancelar</Button><Button onClick={applyDocuments}>Aplicar selección ({draftDocumentIds.length})</Button></DialogFooter>
     </DialogContent></Dialog>
 
     <Dialog open={chequeOpen} onOpenChange={setChequeOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Registrar cheque recibido</DialogTitle></DialogHeader>
       <div className="grid gap-4 sm:grid-cols-2"><Field label="Número de cheque" value={cheque.numero_cheque} onChange={(value) => setCheque((current) => ({ ...current, numero_cheque: value }))} /><Field label="Banco emisor" value={cheque.banco_emisor} onChange={(value) => setCheque((current) => ({ ...current, banco_emisor: value }))} /><div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={chequeAmount || ""} onChange={(event) => setChequeAmount(Number(event.target.value))} /></div><Field label="Nombre del emisor" value={cheque.emisor_nombre} onChange={(value) => setCheque((current) => ({ ...current, emisor_nombre: value }))} /><Field label="CUIT del emisor" value={cheque.emisor_cuit || ""} onChange={(value) => setCheque((current) => ({ ...current, emisor_cuit: value }))} /><div className="space-y-2"><Label>Fecha de emisión</Label><Input type="date" value={cheque.fecha_emision} onChange={(event) => setCheque((current) => ({ ...current, fecha_emision: event.target.value }))} /></div><div className="space-y-2"><Label>Fecha de vencimiento</Label><Input type="date" value={cheque.fecha_vencimiento} onChange={(event) => setCheque((current) => ({ ...current, fecha_vencimiento: event.target.value }))} /></div><div className="space-y-2 sm:col-span-2"><Label>Observaciones</Label><Textarea rows={2} value={cheque.observaciones || ""} onChange={(event) => setCheque((current) => ({ ...current, observaciones: event.target.value }))} /></div></div>
-      <DialogFooter><Button variant="outline" onClick={() => setChequeOpen(false)}>Cancelar</Button><Button disabled={!chequeComplete || chequeAmount > remaining} onClick={addCheque}>Agregar cheque</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" onClick={() => setChequeOpen(false)}>Cancelar</Button><Button disabled={!chequeComplete || roundMoney(chequeAmount) > remaining} onClick={addCheque}>Agregar cheque</Button></DialogFooter>
     </DialogContent></Dialog>
   </>;
 }

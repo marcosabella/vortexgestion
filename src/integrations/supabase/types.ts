@@ -2272,6 +2272,7 @@ export type Database = {
       }
       cuenta_corriente: {
         Row: {
+          cheque_id: string | null
           cliente_id: string
           comercio_id: string | null
           concepto: string
@@ -2288,6 +2289,7 @@ export type Database = {
           venta_id: string | null
         }
         Insert: {
+          cheque_id?: string | null
           cliente_id: string
           comercio_id?: string | null
           concepto: string
@@ -2304,6 +2306,7 @@ export type Database = {
           venta_id?: string | null
         }
         Update: {
+          cheque_id?: string | null
           cliente_id?: string
           comercio_id?: string | null
           concepto?: string
@@ -2320,6 +2323,13 @@ export type Database = {
           venta_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cuenta_corriente_cheque_id_fkey"
+            columns: ["cheque_id"]
+            isOneToOne: false
+            referencedRelation: "cheques"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cuenta_corriente_comercio_id_fkey"
             columns: ["comercio_id"]
@@ -5585,6 +5595,16 @@ export type Database = {
           p_observaciones: string
           p_pagos: Json
           p_venta_id: string
+        }
+        Returns: undefined
+      }
+      registrar_pagos_cliente_multi_documento: {
+        Args: {
+          p_cliente_id: string
+          p_fecha: string
+          p_observaciones: string
+          p_pagos: Json
+          p_venta_ids: string[]
         }
         Returns: undefined
       }

@@ -268,21 +268,21 @@ export const useCuentaCorriente = () => {
   const registrarPagosMixtosMutation = useMutation({
     mutationFn: async ({
       clienteId,
-      ventaId,
+      ventaIds,
       fecha,
       observaciones,
       pagos,
     }: {
       clienteId: string;
-      ventaId: string;
+      ventaIds: string[];
       fecha: string;
       observaciones?: string;
       pagos: PagoClienteBorrador[];
     }) => {
       if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el pago.");
-      const { error } = await supabase.rpc("registrar_pagos_cliente_mixtos", {
+      const { error } = await supabase.rpc("registrar_pagos_cliente_multi_documento", {
         p_cliente_id: clienteId,
-        p_venta_id: ventaId,
+        p_venta_ids: ventaIds,
         p_fecha: fecha,
         p_observaciones: observaciones || null,
         p_pagos: pagos as unknown as Json,
@@ -301,8 +301,12 @@ export const useCuentaCorriente = () => {
       const description = error.message.includes("pagos_cliente_superan_saldo")
         ? "Los pagos ingresados superan el saldo pendiente."
         : error.message.includes("comprobante_cliente_sin_saldo")
-          ? "El comprobante seleccionado ya no tiene saldo pendiente."
-          : error.message;
+          ? "Uno de los comprobantes seleccionados ya no tiene saldo pendiente."
+          : error.message.includes("comprobantes_cliente_moneda_distinta")
+            ? "Seleccioná comprobantes de la misma moneda."
+            : error.message.includes("comprobantes_cliente_invalidos") || error.message.includes("venta_cliente_no_disponible")
+              ? "Revisá los comprobantes seleccionados: deben pertenecer a este cliente y comercio."
+              : error.message;
       toast({ title: "No se pudo registrar el pago", description, variant: "destructive" });
     },
   });
