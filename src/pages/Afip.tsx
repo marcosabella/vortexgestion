@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAfipConfig, useCreateAfipConfig, useUpdateAfipConfig } from '@/hooks/useAfipConfig';
-import { useConsultarUltimoComprobante } from '@/hooks/useConsultarUltimoComprobante';
+import { useConsultarUltimoComprobante, useNombreReceptorArca } from '@/hooks/useConsultarUltimoComprobante';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -64,6 +65,13 @@ const Afip = () => {
     cae?: string;
     caeVencimiento?: string;
   } | null>(null);
+
+  const nombreReceptor = useNombreReceptorArca(
+    comercio?.id,
+    resultadoConsulta?.cuitReceptor,
+    resultadoConsulta?.tipoDocReceptor,
+    showResultDialog && resultadoConsulta?.comercioId === comercio?.id,
+  );
 
   const inputCrtRef = useRef<HTMLInputElement>(null);
   const inputKeyRef = useRef<HTMLInputElement>(null);
@@ -312,6 +320,13 @@ const Afip = () => {
           </p>
         </div>
 
+        <Tabs defaultValue="configuracion" className="space-y-4">
+          <TabsList aria-label="Secciones de ARCA" className="grid h-auto w-full grid-cols-3">
+            <TabsTrigger value="configuracion" className="px-1 text-xs sm:px-3 sm:text-sm">Configuración</TabsTrigger>
+            <TabsTrigger value="certificados" className="px-1 text-xs sm:px-3 sm:text-sm">Certificados</TabsTrigger>
+            <TabsTrigger value="ultimo-comprobante" className="px-1 text-xs sm:px-3 sm:text-sm">Último comprobante</TabsTrigger>
+          </TabsList>
+          <TabsContent value="configuracion">
         <Card>
           <CardHeader>
             <CardTitle>Datos de Configuración</CardTitle>
@@ -383,8 +398,38 @@ const Afip = () => {
                 </div>
               </div>
 
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Certificados Digitales</h3>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  variant="success"
+                  disabled={createConfig.isPending || updateConfig.isPending}
+                >
+                  {createConfig.isPending || updateConfig.isPending ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      {config?.id ? 'Actualizar' : 'Guardar'} Configuración
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+          </TabsContent>
+          <TabsContent value="certificados">
+            <Card>
+              <CardHeader>
+                <CardTitle>Certificados Digitales</CardTitle>
+                <CardDescription>Cargue el certificado y la clave privada para operar con ARCA.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-6">
 
                 <Alert className="mb-4">
                   <FileKey className="h-4 w-4" />
@@ -519,7 +564,7 @@ const Afip = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="submit"
                   variant="success"
@@ -572,9 +617,10 @@ const Afip = () => {
             </form>
           </CardContent>
         </Card>
-
+          </TabsContent>
+          <TabsContent value="ultimo-comprobante">
         {config?.id && certificadoCrt && certificadoKey && (
-          <Card className="mt-6">
+          <Card>
             <CardHeader>
               <CardTitle>Consultar Último Comprobante</CardTitle>
               <CardDescription>
@@ -631,6 +677,15 @@ const Afip = () => {
             </CardContent>
           </Card>
         )}
+
+            {(!config?.id || !certificadoCrt || !certificadoKey) && (
+              <Alert>
+                <FileKey className="h-4 w-4" />
+                <AlertDescription>Guarde la configuración y cargue el certificado y la clave privada para consultar el último comprobante.</AlertDescription>
+              </Alert>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
           <DialogContent className="sm:max-w-lg">
@@ -700,11 +755,26 @@ const Afip = () => {
                       )}
                     </div>
 
+                    {resultadoConsulta.tipoDocReceptor === 80 && resultadoConsulta.cuitReceptor?.replace(/\D/g, '').length === 11 && (
+                      <div className="text-center pt-2">
+                        <p className="text-sm text-muted-foreground">Nombre / Razón social del receptor</p>
+                        <p className="text-base font-medium">
+                          {nombreReceptor.isFetching ? 'Consultando padrón de ARCA...' : nombreReceptor.data?.nombre || 'No disponible en el padrón'}
+                        </p>
+                        {nombreReceptor.data?.advertencia && (
+                          <p className="text-xs text-muted-foreground">{nombreReceptor.data.advertencia}</p>
+                        )}
+                        {nombreReceptor.isError && (
+                          <Button variant="outline" size="sm" className="mt-2" onClick={() => nombreReceptor.refetch()}>Reintentar consulta del padrón</Button>
+                        )}
+                      </div>
+                    )}
+
                     {resultadoConsulta.fechaEmision && (
                       <div className="grid grid-cols-2 gap-4 pt-2">
                         <div className="text-center">
                           <p className="text-sm text-muted-foreground">Fecha Emisión</p>
-                          <p className="text-base font-medium">{resultadoConsulta.fechaEmision}</p>
+                          <p className="text-base font-medium">{resultadoConsulta.fechaEmision.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1')}</p>
                         </div>
                         {resultadoConsulta.cae && (
                           <div className="text-center">

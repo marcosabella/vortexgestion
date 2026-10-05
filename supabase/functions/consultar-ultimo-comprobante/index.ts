@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
+import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,7 +116,7 @@ async function obtenerTokenYSign(
   keyPem: string,
   service: string,
   ambiente: 'homologacion' | 'produccion'
-): Promise<{ token: string; sign: string }> {
+): Promise<{ token: string; sign: string; expirationTime: string }> {
   try {
     const tra = crearTRA(service);
     console.log('TRA creado');
@@ -146,14 +147,13 @@ async function obtenerTokenYSign(
         'SOAPAction': '',
       },
       body: soapRequest,
+      signal: AbortSignal.timeout(30_000),
     });
 
     const responseText = await response.text();
     console.log('Respuesta WSAA status:', response.status);
-    console.log('Respuesta WSAA (primeros 500 chars):', responseText.substring(0, 500));
     
     if (!response.ok) {
-      console.error('Error WSAA response completa:', responseText);
       throw new Error(`Error en WSAA: ${response.status} - ${responseText}`);
     }
 
@@ -180,9 +180,9 @@ async function obtenerTokenYSign(
 
     const tokenMatch = xmlContent.match(/<token>([\s\S]*?)<\/token>/);
     const signMatch = xmlContent.match(/<sign>([\s\S]*?)<\/sign>/);
+    const expirationMatch = xmlContent.match(/<expirationTime>([\s\S]*?)<\/expirationTime>/);
 
-    if (!tokenMatch || !signMatch) {
-      console.error('No se encontró token/sign en:', xmlContent);
+    if (!tokenMatch || !signMatch || !expirationMatch) {
       throw new Error('No se pudo extraer token y sign de WSAA');
     }
 
@@ -191,6 +191,7 @@ async function obtenerTokenYSign(
     return {
       token: tokenMatch[1].trim(),
       sign: signMatch[1].trim(),
+      expirationTime: expirationMatch[1].trim(),
     };
   } catch (error) {
     console.error('Error en obtenerTokenYSign:', error);
@@ -512,12 +513,9 @@ Deno.serve(async (req) => {
 
     // Obtener token y sign
     console.log('Obteniendo token y sign de WSAA...');
-    const { token, sign } = await obtenerTokenYSign(
-      afipConfig.certificado_crt,
-      afipConfig.certificado_key,
-      'wsfe',
-      afipConfig.ambiente as 'homologacion' | 'produccion'
-    );
+    const { token, sign } = await obtenerTicketWsaaCacheado(supabase, authorizedComercioId,
+      afipConfig.certificado_crt, 'wsfe', afipConfig.ambiente, () => obtenerTokenYSign(
+        afipConfig.certificado_crt, afipConfig.certificado_key, 'wsfe', afipConfig.ambiente as 'homologacion' | 'produccion'));
 
     // Consultar último comprobante
     console.log('Consultando último comprobante en WSFE...');

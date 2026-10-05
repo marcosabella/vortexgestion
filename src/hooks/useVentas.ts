@@ -45,6 +45,15 @@ const getRpcErrorMessage = (error: unknown) => {
   if (message.includes("Stock insuficiente")) {
     return "Stock insuficiente para el producto seleccionado.";
   }
+  if (message.includes("venta_items_stock_coherente") || message.includes("ventas_item_invalido")) {
+    return "Revise los ítems: los conceptos manuales no afectan stock y los productos requieren cantidades enteras.";
+  }
+  if (message.includes("ventas_detalle_requerido")) {
+    return "La venta debe tener al menos un ítem y un medio de pago.";
+  }
+  if (message.includes("actualizar_venta_transaccional") && message.includes("schema cache")) {
+    return "La actualización segura de ventas todavía no está disponible en el servidor. La venta conserva sus datos.";
+  }
   if (message.includes("ventas_pago_") || message.includes("ventas_pagos_no_coinciden")) {
     return "Los pagos informados no son válidos o no coinciden con el total calculado.";
   }
@@ -135,7 +144,7 @@ export const useVentas = () => {
         if (items.length > 0) {
           const { error: itemsError } = await supabase
             .from("venta_items")
-            .insert(items.map((item) => ({ ...item, venta_id: ventaData.id })));
+            .insert(items.map((item) => ({ ...item, afecta_stock: Boolean(item.producto_id), venta_id: ventaData.id })));
 
           if (itemsError) throw itemsError;
         }
@@ -274,96 +283,23 @@ export const useVentas = () => {
       ventaId: string; 
       venta: Omit<Venta, "id" | "created_at" | "updated_at">; 
       items: Omit<VentaItem, "id" | "venta_id" | "created_at" | "updated_at">[]; 
-      pagos?: any[]
+      pagos?: PagoVentaNuevo[]
     }) => {
       if (!comercioId) throw new Error("Seleccione un comercio antes de modificar la venta.");
-      await assertVentaSinCAE(ventaId, comercioId);
+      if (!items.length || !pagos.length) throw new Error("La venta debe tener al menos un ítem y un medio de pago.");
 
-      // First, delete any existing cuenta corriente movements for this sale
-      const { error: deleteCuentaError } = await supabase
-        .from("cuenta_corriente")
-        .delete()
-        .eq("venta_id", ventaId)
-        .eq("comercio_id", comercioId);
-
-      if (deleteCuentaError) throw deleteCuentaError;
-
-      // Update venta
-      const { data: ventaData, error: ventaError } = await supabase
-        .from("ventas")
-        .update(venta)
-        .eq("id", ventaId)
-        .eq("comercio_id", comercioId)
-        .select()
-        .single();
-
-      if (ventaError) throw ventaError;
-
-      // Delete existing items
-      const { error: deleteError } = await supabase
-        .from("venta_items")
-        .delete()
-        .eq("venta_id", ventaId);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new items
-      if (items.length > 0) {
-        const itemsWithVentaId = items.map(item => ({
-          ...item,
-          venta_id: ventaId
-        }));
-
-        const { error: itemsError } = await supabase
-          .from("venta_items")
-          .insert(itemsWithVentaId);
-
-        if (itemsError) throw itemsError;
-      }
-
-      // Delete existing pagos
-      const { error: deletePagosError } = await supabase
-        .from("pagos_venta")
-        .delete()
-        .eq("venta_id", ventaId);
-
-      if (deletePagosError) throw deletePagosError;
-
-      // Insert new pagos
-      if (pagos.length > 0) {
-        const pagosConVentaId = pagos.map(pago => ({
-          ...pago,
-          venta_id: ventaId
-        }));
-
-        const { error: pagosError } = await supabase
-          .from("pagos_venta")
-          .insert(pagosConVentaId);
-
-        if (pagosError) throw pagosError;
-
-        // Check if any payment is "cta_cte" and create debit movements
-        const pagosCuentaCorriente = pagos.filter(pago => pago.tipo_pago === 'cta_cte');
-
-        if (pagosCuentaCorriente.length > 0 && venta.cliente_id) {
-          const movimientos = pagosCuentaCorriente.map(pago => ({
-            cliente_id: venta.cliente_id,
-            tipo_movimiento: 'debito',
-            monto: pago.monto,
-            concepto: 'pago_cuenta_corriente',
-            venta_id: ventaId,
-            fecha_movimiento: venta.fecha_venta,
-          }));
-
-          const { error: cuentaError } = await supabase
-            .from("cuenta_corriente")
-            .insert(movimientos);
-
-          if (cuentaError) throw cuentaError;
-        }
-      }
-
-      return ventaData;
+      // Una única RPC: PostgreSQL revierte cabecera, detalle, stock y pagos
+      // juntos si falla cualquiera de los pasos. No usar escrituras separadas.
+      const { data, error } = await supabase.rpc("actualizar_venta_transaccional", {
+        p_comercio_id: comercioId,
+        p_venta_id: ventaId,
+        p_venta: venta as unknown as Json,
+        p_items: items.map(item => ({ ...item, afecta_stock: Boolean(item.producto_id) })) as Json,
+        p_pagos: pagos as unknown as Json,
+      });
+      if (error) throw new Error(getRpcErrorMessage(error));
+      if (!data) throw new Error("La actualización no devolvió una confirmación.");
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ventas"] });
@@ -380,7 +316,7 @@ export const useVentas = () => {
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al actualizar venta: ${error.message}`,
+        description: `Error al actualizar venta: ${getRpcErrorMessage(error)}`,
         variant: "destructive",
       });
     },
@@ -449,7 +385,7 @@ export const useVentas = () => {
     error,
     createVenta: createVentaMutation.mutate,
     createVentaAsync: createVentaMutation.mutateAsync,
-    updateVenta: updateVentaMutation.mutate,
+    updateVenta: updateVentaMutation.mutateAsync,
     deleteVenta: deleteVentaMutation.mutate,
     isCreating: createVentaMutation.isPending,
     isUpdating: updateVentaMutation.isPending,

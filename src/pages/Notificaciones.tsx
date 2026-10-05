@@ -83,6 +83,7 @@ function ComprobanteView({ notificacion }: { notificacion: Notificacion }) {
       numeroComprobante: venta.numero_comprobante,
       importe: getVentaTotalFinal(venta),
       cae: venta.cae,
+      cuitReceptor: venta.cliente?.cuit,
     }).then((qr) => {
       if (active) setQrDataUrl(qr);
     }).catch((error) => console.error("Error generando QR ARCA:", error));

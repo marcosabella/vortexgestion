@@ -4676,6 +4676,16 @@ export type Database = {
       }
     }
     Functions: {
+      actualizar_venta_transaccional: {
+        Args: {
+          p_comercio_id: string
+          p_venta_id: string
+          p_venta: Json
+          p_items: Json
+          p_pagos: Json
+        }
+        Returns: Database["public"]["Tables"]["ventas"]["Row"]
+      }
       get_comprobante_notificacion: {
         Args: { p_comercio_id: string; p_notificacion_id: string }
         Returns: Json

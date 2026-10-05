@@ -353,6 +353,7 @@ export const VentasList = () => {
           numeroComprobante: venta.numero_comprobante,
           importe: getVentaTotalFinal(venta),
           cae: venta.cae,
+          cuitReceptor: venta.cliente?.cuit,
         });
       } catch (error) {
         console.error("Error generando QR ARCA para WhatsApp:", error);

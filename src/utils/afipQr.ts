@@ -56,6 +56,7 @@ export async function generarQRAfip(params: {
   tipoComprobante: string;
   numeroComprobante: string; // Formato: 0001-00000123
   importe: number;
+  cuitReceptor?: string | null;
   cae?: string;
 }): Promise<string> {
   // Si no hay CAE, retornar string vacío
@@ -90,6 +91,13 @@ export async function generarQRAfip(params: {
     tipoCodAut: 'E', // CAE
     codAut: parseInt(params.cae, 10),
   };
+
+  // Usar el mismo criterio de identificación que la solicitud de CAE.
+  const cuitReceptor = params.cuitReceptor?.replace(/\D/g, '') || '';
+  if (cuitReceptor.length === 11) {
+    qrData.tipoDocRec = 80;
+    qrData.nroDocRec = Number(cuitReceptor);
+  }
 
   // Convertir a JSON y codificar en Base64
   const jsonString = JSON.stringify(qrData);

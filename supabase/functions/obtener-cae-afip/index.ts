@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
+import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
+import { CaeRechazado, camposAutorizacionCae, validarComprobanteRecuperado } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
   const date = new Date(value);
@@ -172,6 +174,7 @@ async function obtenerTokenYSign(
         'SOAPAction': '',
       },
       body: soapRequest,
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {
@@ -300,6 +303,26 @@ async function consultarUltimoComprobante(
   }
 
   return parseInt(cbteNroMatch[1], 10);
+}
+
+async function consultarCaeExistente(token: string, sign: string, cuit: string, puntoVenta: number,
+  tipoComprobante: number, numero: number, ambiente: string): Promise<string> {
+  const url = ambiente === 'produccion'
+    ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx' : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
+  const response = await fetch(url, {
+    method: 'POST', signal: AbortSignal.timeout(30_000),
+    headers: { 'Content-Type': 'application/soap+xml; charset=utf-8', 'SOAPAction': 'http://ar.gov.afip.dif.FEV1/FECompConsultar' },
+    body: `<?xml version="1.0" encoding="UTF-8"?>
+      <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
+      <soap:Body><ar:FECompConsultar><ar:Auth><ar:Token>${token}</ar:Token><ar:Sign>${sign}</ar:Sign><ar:Cuit>${cuit}</ar:Cuit></ar:Auth>
+      <ar:FeCompConsReq><ar:CbteTipo>${tipoComprobante}</ar:CbteTipo><ar:CbteNro>${numero}</ar:CbteNro><ar:PtoVta>${puntoVenta}</ar:PtoVta></ar:FeCompConsReq>
+      </ar:FECompConsultar></soap:Body></soap:Envelope>`,
+  });
+  const xml = await response.text();
+  if (!response.ok || !/<ResultGet>/.test(xml)) {
+    throw new Error('No se pudo confirmar en ARCA el CAE del intento anterior. No se solicitara una nueva factura.');
+  }
+  return xml;
 }
 
 function formatearNumeroComprobante(puntoVenta: number, numeroComprobante: number): string {
@@ -458,12 +481,12 @@ async function solicitarCAE(
     const mensajesArca = extraerMensajesArca(responseText);
 
     if (resultadoMatch && resultadoMatch[1] === 'R' && mensajesArca.length > 0) {
-      throw new Error(`ARCA rechazo la solicitud: ${mensajesArca.join(' | ')}`);
+      throw new CaeRechazado(`ARCA rechazo la solicitud: ${mensajesArca.join(' | ')}`);
     }
 
     if (resultadoMatch && resultadoMatch[1] === 'R') {
       const errorMsg = obsMatch ? obsMatch[1] : 'Error desconocido en WSFE';
-      throw new Error(`AFIP rechazó la solicitud: ${errorMsg}`);
+      throw new CaeRechazado(`AFIP rechazó la solicitud: ${errorMsg}`);
     }
 
     if (!caeMatch || !caeVencMatch) {
@@ -537,6 +560,7 @@ async function assertUserCanAccessComercio(supabase: any, userId: string, comerc
     .select('id')
     .eq('user_id', userId)
     .eq('comercio_id', comercioId)
+    .eq('rol', 'admin')
     .eq('activo', true)
     .maybeSingle();
 
@@ -756,17 +780,47 @@ Deno.serve(async (req) => {
 
     console.log('Solicitud AFIP preparada:', JSON.stringify(solicitudAfip, null, 2));
 
-    // Autenticación con WSAA para obtener token y sign
+    // Conserva el resultado y el numero intentado antes de emitir. Un reintento
+    // consulta ese mismo comprobante; nunca usa ultimo + 1 para la misma venta.
+    const { data: intentoGuardado, error: intentoError } = await supabase.from('afip_cae_intentos')
+      .select('*').eq('venta_id', ventaId).eq('comercio_id', ventaPre.comercio_id).maybeSingle();
+    if (intentoError) throw new Error(`No se pudo verificar el intento de CAE: ${intentoError.message}`);
+    let intentoPrevio = intentoGuardado;
+    // Solo un rechazo explicito de ARCA permite corregir datos y emitir de
+    // nuevo. Un timeout o una falla de guardado siempre exige consultar.
+    if (intentoPrevio?.rechazado) {
+      const { error: liberarError } = await supabase.from('afip_cae_intentos').delete()
+        .eq('venta_id', ventaId).eq('comercio_id', ventaPre.comercio_id).eq('rechazado', true).select('venta_id').single();
+      if (liberarError) throw new Error('Otra solicitud fiscal esta en curso. Vuelva a intentar.');
+      intentoPrevio = null;
+    }
+    const detalleActual = solicitudAfip.FeCAEReq.FeDetReq.FECAEDetRequest;
+    if (intentoPrevio) {
+      const detallePrevio = intentoPrevio.solicitud?.FeDetReq?.FECAEDetRequest;
+      if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
+          || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
+          || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA'].some(campo =>
+            String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {
+        throw new Error('La venta cambio desde la solicitud fiscal anterior. Revise el comprobante autorizado antes de continuar.');
+      }
+      if (intentoPrevio.cae && intentoPrevio.cae_vencimiento) {
+        const campos = camposAutorizacionCae(intentoPrevio.punto_venta, Number(intentoPrevio.numero_secuencial), intentoPrevio.cae, intentoPrevio.cae_vencimiento);
+        const { data: guardada, error: errorGuardado } = await supabase.from('ventas').update(campos)
+          .eq('id', ventaId).eq('comercio_id', ventaPre.comercio_id).select('id').single();
+        if (errorGuardado || !guardada) throw new Error('ARCA ya autorizo la factura, pero no se pudo guardar en la venta. No solicite otro CAE.');
+        return new Response(JSON.stringify({ success: true, ...campos, mensaje: 'CAE existente recuperado sin emitir otra factura' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Autenticación con WSAA: reutiliza el TA vigente, incluso entre invocaciones.
     console.log('Obteniendo token y sign de WSAA...');
-    const { token, sign } = await obtenerTokenYSign(
-      afipConfig.certificado_crt,
-      afipConfig.certificado_key,
-      'wsfe',
-      afipConfig.ambiente
-    );
+    const { token, sign } = await obtenerTicketWsaaCacheado(supabase, ventaPre.comercio_id,
+      afipConfig.certificado_crt, 'wsfe', afipConfig.ambiente, () => obtenerTokenYSign(
+        afipConfig.certificado_crt, afipConfig.certificado_key, 'wsfe', afipConfig.ambiente));
     console.log('Token y Sign obtenidos exitosamente');
 
-    const ultimoNumeroAutorizado = await consultarUltimoComprobante(
+    const ultimoNumeroAutorizado = intentoPrevio ? Number(intentoPrevio.numero_secuencial) - 1 : await consultarUltimoComprobante(
       token,
       sign,
       cuitEmisor,
@@ -774,9 +828,10 @@ Deno.serve(async (req) => {
       codigoComprobante,
       afipConfig.ambiente
     );
-    const numeroComprobante = ultimoNumeroAutorizado + 1;
+    const numeroComprobante = intentoPrevio ? Number(intentoPrevio.numero_secuencial) : ultimoNumeroAutorizado + 1;
+    const puntoVentaFiscal = intentoPrevio?.punto_venta ?? afipConfig.punto_venta;
     const numeroComprobanteFormateado = formatearNumeroComprobante(
-      afipConfig.punto_venta,
+      puntoVentaFiscal,
       numeroComprobante
     );
 
@@ -789,13 +844,30 @@ Deno.serve(async (req) => {
       numeroComprobanteFormateado,
     });
 
-    // Solicitar CAE a WSFE
+    // Reserva unica por venta y numero fiscal. Si otra invocacion ya reservo,
+    // esta termina sin enviar FECAESolicitar.
+    if (!intentoPrevio) {
+      const { error: reservaError } = await supabase.from('afip_cae_intentos').insert({
+        venta_id: ventaId, comercio_id: ventaPre.comercio_id, ambiente: afipConfig.ambiente,
+        cuit_emisor: cuitEmisor, punto_venta: puntoVentaFiscal, tipo_comprobante: codigoComprobante,
+        numero_secuencial: numeroComprobante, solicitud: solicitudAfip.FeCAEReq,
+      });
+      if (reservaError) throw new Error('Ya hay una solicitud fiscal en curso para esta venta o numero. Vuelva a intentar para consultar su resultado.');
+    }
+    // Solicitar CAE a WSFE solo en el primer intento; los siguientes consultan.
     console.log('Solicitando CAE a WSFE...');
-    const { cae, caeVencimiento } = await solicitarCAE(
+    const { cae, caeVencimiento } = intentoPrevio
+      ? validarComprobanteRecuperado(await consultarCaeExistente(token, sign, cuitEmisor, puntoVentaFiscal,
+          codigoComprobante, numeroComprobante, afipConfig.ambiente), {
+          puntoVenta: puntoVentaFiscal, tipoComprobante: codigoComprobante, numero: numeroComprobante,
+          docTipo: detalleActual.DocTipo, docNro: detalleActual.DocNro,
+          fecha: detalleActual.CbteFch, total: detalleActual.ImpTotal,
+        })
+      : await solicitarCAE(
       token,
       sign,
       cuitEmisor,
-      afipConfig.punto_venta,
+      puntoVentaFiscal,
       solicitudAfip.FeCAEReq,
       afipConfig.ambiente
     );
@@ -805,21 +877,21 @@ Deno.serve(async (req) => {
 
     console.log('CAE obtenido exitosamente:', cae, 'Vencimiento:', fechaVencimientoStr);
 
+    const { error: resultadoError } = await supabase.from('afip_cae_intentos')
+      .update({ cae, cae_vencimiento: fechaVencimientoStr }).eq('venta_id', ventaId).eq('comercio_id', ventaPre.comercio_id);
+    if (resultadoError) throw new Error('ARCA autorizo el comprobante. No se pudo conservar el resultado; el proximo intento consultara el mismo numero.');
+
     // Actualizar venta con CAE
-    const { error: updateError } = await supabase
+    const { data: ventaGuardada, error: updateError } = await supabase
       .from('ventas')
       .update({
-        cae: cae,
-        cae_vencimiento: fechaVencimientoStr,
-        numero_comprobante: numeroComprobanteFormateado,
-        cae_solicitado_at: new Date().toISOString(),
-        cae_error: null, // Limpiar error previo si existía
+        ...camposAutorizacionCae(puntoVentaFiscal, numeroComprobante, cae, fechaVencimientoStr),
       })
       .eq('id', ventaId)
-      .eq('comercio_id', ventaPre.comercio_id);
+      .eq('comercio_id', ventaPre.comercio_id).select('id').single();
 
-    if (updateError) {
-      throw new Error(`Error al actualizar venta: ${updateError.message}`);
+    if (updateError || !ventaGuardada) {
+      throw new Error(`ARCA ya autorizo la factura. Error al guardar la venta: ${updateError?.message || 'venta no encontrada'}. El reintento recuperara ese CAE sin emitir otro.`);
     }
 
     console.log('Venta actualizada con CAE exitosamente');
@@ -850,6 +922,11 @@ Deno.serve(async (req) => {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        if (error instanceof CaeRechazado) {
+          await supabase.from('afip_cae_intentos').update({ rechazado: true })
+            .eq('venta_id', ventaId).eq('comercio_id', comercioIdForError);
+        }
 
         await supabase
           .from('ventas')

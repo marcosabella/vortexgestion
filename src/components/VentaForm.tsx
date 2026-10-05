@@ -147,7 +147,7 @@ const calcularTotalesVenta = (
 
 const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = true, modo = "venta", ordenTrabajoInicial }) => {
   const { toast } = useToast()
-  const { createVentaAsync, updateVenta, isCreating } = useVentas()
+  const { createVentaAsync, updateVenta, isCreating, isUpdating } = useVentas()
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago()
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
   const { comercio } = useComercio()
@@ -184,6 +184,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           numeroComprobante: ventaWhatsApp.numero_comprobante,
           importe: ventaWhatsApp.total,
           cae: ventaWhatsApp.cae,
+          cuitReceptor: ventaWhatsApp.cliente?.cuit,
         })
       }
       const file = await buildFacturaWhatsAppPdfFile({ venta: ventaWhatsApp, comercio, afipConfig, qrDataUrl })
@@ -740,6 +741,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const onSubmit = async (data: VentaFormData) => {
+    if (isCreating || isUpdating) return
     if (usaNumeracionManual && !numeroComprobanteManualValido(data.numero_comprobante)) {
       form.setError("numero_comprobante", {
         message: "Ingrese un número válido con formato 0000 - 00000000.",
@@ -1555,7 +1557,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                   <Button type="button" variant="cancel" onClick={() => setFinalizarDialogOpen(false)}>
                     Volver
                   </Button>
-                  <Button type="button" variant="success" disabled={mercadoPagoWorking || isCreating} onClick={form.handleSubmit(onSubmit)}>
+                  <Button type="button" variant="success" disabled={mercadoPagoWorking || isCreating || isUpdating} onClick={form.handleSubmit(onSubmit)}>
                     {mercadoPagoWorking ? "Generando QR..." : venta ? "Confirmar actualizacion" : esPresupuesto ? "Guardar presupuesto" : "Confirmar venta"}
                   </Button>
                 </DialogFooter>
