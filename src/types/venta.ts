@@ -35,6 +35,7 @@ export interface PagoVenta {
 }
 
 export interface Venta {
+  taller_vehiculo?: { patente: string; marca: string; modelo: string; anio: number | null; kilometraje: number } | null;
   id?: string;
   comercio_id?: string;
   numero_comprobante: string;

@@ -142,6 +142,10 @@ export function PresupuestosList() {
               <div>
                 <p><strong>Cliente:</strong> {selected.cliente_nombre}</p>
                 <p><strong>Estado:</strong> {selected.estado}</p>
+                {selected.taller_vehiculo && <>
+                  <p><strong>Vehículo:</strong> {selected.taller_vehiculo.patente} · {selected.taller_vehiculo.marca} {selected.taller_vehiculo.modelo}{selected.taller_vehiculo.anio ? ` · ${selected.taller_vehiculo.anio}` : ''}</p>
+                  <p><strong>Kilometraje de ingreso:</strong> {selected.taller_vehiculo.kilometraje.toLocaleString('es-AR')} km</p>
+                </>}
                 {selected.venta_vinculada && (
                   <p>
                     <strong>Venta vinculada:</strong>{" "}

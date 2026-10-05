@@ -47,6 +47,7 @@ const defaultParametrizacion = {
     listados: true,
     pedidos_online: false,
     mercado_pago: true,
+    taller: false,
   },
   funciones: {
     venta_items_manuales: true,

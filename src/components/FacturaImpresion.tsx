@@ -6,7 +6,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import { getVentaTotalFinal, Venta } from "@/types/venta";
 import { generarQRAfip } from "@/utils/afipQr";
-import { buildFacturaPrintHtml } from "@/utils/facturaPrint";
+import { buildFacturaPrintHtml, type TipoDocumentoImpresion, type DatosOrdenImpresion } from "@/utils/facturaPrint";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import type { Comercio } from "@/types/comercio";
 import type { AfipConfig } from "@/types/afip";
@@ -14,7 +14,10 @@ import type { FormatoComprobante } from "@/config/parametrizacion";
 
 interface FacturaImpresionProps {
   venta: Venta;
-  documentType?: "venta" | "presupuesto";
+  documentType?: TipoDocumentoImpresion;
+  ordenTaller?: DatosOrdenImpresion;
+  showPrint?: boolean;
+  showPdf?: boolean;
   comercioOverride?: Comercio | null;
   afipConfigOverride?: AfipConfig | null;
   formatoOverride?: FormatoComprobante;
@@ -69,6 +72,9 @@ export const FacturaImpresion = ({
   comercioOverride,
   afipConfigOverride,
   formatoOverride,
+  ordenTaller,
+  showPrint = true,
+  showPdf = true,
 }: FacturaImpresionProps) => {
   const { comercio } = useComercio();
   const { data: afipConfig } = useAfipConfig();
@@ -108,6 +114,7 @@ export const FacturaImpresion = ({
         afipConfig: afipConfigDocumento,
         qrDataUrl,
         documentType,
+        ordenTaller,
         formato: formatoDocumento,
       },
     );
@@ -133,16 +140,16 @@ export const FacturaImpresion = ({
 
   return (
     <>
-      <Button
+      {showPrint && <Button
         onClick={() => openFactura("print")}
         size="sm"
         variant="print"
         disabled={openingAction !== null}
       >
         <Printer className="h-4 w-4 mr-2" />
-        {openingAction === "print" ? "Abriendo..." : documentType === "presupuesto" ? "Imprimir" : "Imprimir Factura"}
-      </Button>
-      <Button
+        {openingAction === "print" ? "Abriendo..." : documentType === "orden_taller" ? "Imprimir orden" : documentType === "presupuesto" ? "Imprimir" : "Imprimir Factura"}
+      </Button>}
+      {showPdf && <Button
         onClick={() => openFactura("pdf")}
         size="sm"
         className="bg-red-600 text-white hover:bg-red-700"
@@ -150,7 +157,7 @@ export const FacturaImpresion = ({
       >
         <FileDown className="h-4 w-4 mr-2" />
         {openingAction === "pdf" ? "Generando..." : "PDF"}
-      </Button>
+      </Button>}
     </>
   );
 };

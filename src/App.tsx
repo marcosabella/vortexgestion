@@ -12,7 +12,7 @@ import { Bell, Building2, CalendarClock, LogOut } from "lucide-react";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
 import { useComercio } from "@/hooks/useComercio";
-import type { Comercio } from "@/types/comercio";
+import type { Comercio as ComercioDatos } from "@/types/comercio";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ModuloSistema } from "@/config/parametrizacion";
@@ -50,6 +50,9 @@ import Seguridad from "./pages/Seguridad";
 import PedidosOnline from "./pages/PedidosOnline";
 import MercadoPago from "./pages/MercadoPago";
 import Extintores from "./pages/Extintores";
+import Taller from "./pages/Taller";
+import TallerOrdenDetalle from "./pages/TallerOrdenDetalle";
+import TallerFormulario from "./pages/TallerFormulario";
 import OrdenesTrabajoExtintores from "./pages/OrdenesTrabajoExtintores";
 import NotFound from "./pages/NotFound";
 import ListadoClientes from "./pages/listados/ListadoClientes";
@@ -86,7 +89,7 @@ import CuentaCorrienteClienteDetalle from "./pages/CuentaCorrienteClienteDetalle
 
 const queryClient = new QueryClient();
 
-function MembershipReminder({ comercio }: { comercio: Comercio | null }) {
+function MembershipReminder({ comercio }: { comercio: ComercioDatos | null }) {
   const [open, setOpen] = useState(false);
   const vencimiento = comercio?.membresia_vigente_hasta || null;
 
@@ -267,6 +270,20 @@ function AuthenticatedLayout() {
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
               <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
+              <Route path="/taller" element={<ParametrizedRoute modulo="taller"><Taller seccion="resumen" /></ParametrizedRoute>} />
+              <Route path="/taller/vehiculos/nuevo" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="vehiculo" /></ParametrizedRoute>} />
+              <Route path="/taller/vehiculos/:vehiculoId/editar" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="vehiculo" editar /></ParametrizedRoute>} />
+              <Route path="/taller/tecnicos/nuevo" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="tecnico" /></ParametrizedRoute>} />
+              <Route path="/taller/tecnicos/:tecnicoId/editar" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="tecnico" editar /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes/nueva" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="orden" /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes/:ordenId/editar" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="orden" editar /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes/:ordenId/conceptos/nuevo" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="concepto" /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes/:ordenId/conceptos/:itemId/editar" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="concepto" editar /></ParametrizedRoute>} />
+              <Route path="/taller/vehiculos" element={<ParametrizedRoute modulo="taller"><Taller seccion="vehiculos" /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes" element={<ParametrizedRoute modulo="taller"><Taller seccion="ordenes" /></ParametrizedRoute>} />
+              <Route path="/taller/ordenes/:ordenId" element={<ParametrizedRoute modulo="taller"><TallerOrdenDetalle /></ParametrizedRoute>} />
+              <Route path="/taller/agenda" element={<ParametrizedRoute modulo="taller"><Taller seccion="agenda" /></ParametrizedRoute>} />
+              <Route path="/taller/tecnicos" element={<ParametrizedRoute modulo="taller"><Taller seccion="tecnicos" /></ParametrizedRoute>} />
               <Route path="/campo/establecimientos" element={<ParametrizedRoute modulo="campo"><CampoEstablecimientos /></ParametrizedRoute>} />
               <Route path="/campo/establecimientos/:establecimientoId/lotes" element={<ParametrizedRoute modulo="campo"><CampoLotes /></ParametrizedRoute>} />
               <Route path="/campo/ordenes" element={<ParametrizedRoute modulo="campo"><CampoOrdenes /></ParametrizedRoute>} />

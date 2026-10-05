@@ -26,6 +26,9 @@ import {
   Store,
   Truck,
   Users,
+  Wrench,
+  Car,
+  CalendarDays,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -76,6 +79,7 @@ type GroupKey =
   | "inventario"
   | "tesoreria"
   | "campo"
+  | "taller"
   | "extintores"
   | "informes"
   | "configuracion"
@@ -144,6 +148,14 @@ const campoItems: Array<MenuItem & { adminOnly?: boolean }> = [
   { title: "Telemetría", url: "/campo/telemetria", icon: Activity, adminOnly: true },
 ];
 
+const tallerItems: MenuItem[] = [
+  { title: "Resumen del taller", url: "/taller", icon: Wrench },
+  { title: "Vehículos", url: "/taller/vehiculos", icon: Car },
+  { title: "Órdenes de trabajo", url: "/taller/ordenes", icon: ClipboardList },
+  { title: "Agenda y próximos servicios", url: "/taller/agenda", icon: CalendarDays },
+  { title: "Técnicos", url: "/taller/tecnicos", icon: Users },
+];
+
 const extintoresItems: MenuItem[] = [
   { title: "Extintores", url: "/extintores", icon: Flame },
   { title: "Órdenes de trabajo", url: "/extintores/ordenes-trabajo", icon: ClipboardList },
@@ -155,6 +167,7 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   inventario: false,
   tesoreria: false,
   campo: false,
+  taller: false,
   extintores: false,
   informes: false,
   configuracion: false,
@@ -172,6 +185,7 @@ const pathMatches = (currentPath: string, path: string) =>
 
 const getGroupForPath = (path: string): GroupKey | null => {
   if (path.startsWith("/campo")) return "campo";
+  if (path.startsWith("/taller")) return "taller";
   if (path.startsWith("/extintores")) return "extintores";
   if (path.startsWith("/listados")) return "informes";
   if (path.startsWith("/admin")) return "administracion";
@@ -367,6 +381,7 @@ export function AppSidebar() {
               {renderCollapsibleGroup("inventario", "Inventario", Package, enabledInventarioItems)}
               {renderCollapsibleGroup("tesoreria", "Tesorería", Banknote, enabledTesoreriaItems)}
               {parametrizacion.modulos.campo && renderCollapsibleGroup("campo", "Vortex Campo", Sprout, enabledCampoItems)}
+              {parametrizacion.modulos.taller && renderCollapsibleGroup("taller", "Vortex Taller", Wrench, tallerItems)}
               {parametrizacion.modulos.extintores && renderCollapsibleGroup("extintores", "Extintores", Flame, extintoresItems)}
               {parametrizacion.modulos.listados && renderCollapsibleGroup("informes", "Informes", FileText, listadosItems)}
               {renderCollapsibleGroup("configuracion", "Configuración", Settings, enabledConfiguracionItems)}

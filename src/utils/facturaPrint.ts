@@ -3,13 +3,19 @@ import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
 import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
 import { FormatoComprobante } from "@/config/parametrizacion";
+import type { TallerOrden } from "@/types/taller";
+import { ESTADOS_TALLER } from "@/types/taller";
+
+export type TipoDocumentoImpresion = "venta" | "presupuesto" | "orden_taller";
+export type DatosOrdenImpresion = { orden: TallerOrden; responsable: string };
 
 interface FacturaPrintOptions {
   venta: Venta;
   comercio?: Comercio | null;
   afipConfig?: AfipConfig | null;
   qrDataUrl?: string;
-  documentType?: "venta" | "presupuesto";
+  documentType?: TipoDocumentoImpresion;
+  ordenTaller?: DatosOrdenImpresion;
   formato?: FormatoComprobante;
 }
 
@@ -479,9 +485,10 @@ const getTipoPagoLabel = (venta: Venta) => {
   return pagoLabel;
 };
 
-export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "", documentType = "venta" }: FacturaPrintOptions) => {
+export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "", documentType = "venta", ordenTaller }: FacturaPrintOptions) => {
   const isPresupuesto = documentType === "presupuesto";
-  const hasCae = !isPresupuesto && Boolean(venta.cae?.trim());
+  const isOrden = documentType === "orden_taller";
+  const hasCae = !isPresupuesto && !isOrden && Boolean(venta.cae?.trim());
   const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const totalFinal = getVentaTotalFinal(venta);
   const recargoPagos = getTotalRecargoPagos(venta.pagos_venta || []);
@@ -538,7 +545,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
               <td class="ticket-hide">${escapeHtml(getVentaItemCodigo(item))}</td>
               <td>${escapeHtml(`${descripcion}${recargo}`)}</td>
               <td class="text-right">${escapeHtml(formatMoney(item.cantidad))}</td>
-              <td class="text-center ticket-hide">unidades</td>
+              <td class="text-center ticket-hide">${isOrden && item.codigo_manual === 'MO' ? 'horas' : 'unidades'}</td>
               <td class="text-right">${escapeHtml(formatMoney(discriminaIva ? precioUnitarioSinIva : item.precio_unitario))}</td>
               ${discriminaIva ? `<td class="text-right ticket-hide">${escapeHtml(formatMoney(porcentajeIva))}%</td>` : ""}
               <td class="text-right ticket-hide">${escapeHtml(formatMoney(item.porcentaje_descuento || 0))}</td>
@@ -551,7 +558,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
     : "";
 
   return `
-    <div class="factura-container ${hasCae ? "con-cae" : "sin-cae"}">
+    <div class="factura-container ${hasCae ? "con-cae" : "sin-cae"} ${isOrden ? "orden-taller" : ""}">
       <div class="copy-indicator">ORIGINAL</div>
 
       <div class="header">
@@ -568,15 +575,15 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
         </div>
 
         <div class="header-center">
-          <div class="tipo-letra">${isPresupuesto ? "P" : escapeHtml(getTipoComprobanteLetra(venta.tipo_comprobante))}</div>
-          <div class="tipo-codigo">${isPresupuesto ? "NO FISCAL" : `COD. ${escapeHtml(CODIGOS_COMPROBANTE[venta.tipo_comprobante] || "000")}`}</div>
+          <div class="tipo-letra">${isOrden ? "OT" : isPresupuesto ? "P" : escapeHtml(getTipoComprobanteLetra(venta.tipo_comprobante))}</div>
+          <div class="tipo-codigo">${isPresupuesto || isOrden ? "NO FISCAL" : `COD. ${escapeHtml(CODIGOS_COMPROBANTE[venta.tipo_comprobante] || "000")}`}</div>
         </div>
 
         <div class="header-right">
-          <div class="factura-titulo">${isPresupuesto ? "PRESUPUESTO" : escapeHtml(getTipoComprobanteNombre(venta.tipo_comprobante))}</div>
+          <div class="factura-titulo">${isOrden ? "ORDEN DE TRABAJO" : isPresupuesto ? "PRESUPUESTO" : escapeHtml(getTipoComprobanteNombre(venta.tipo_comprobante))}</div>
           <div class="factura-info">
-            <div class="numero-line"><strong><span class="${isPresupuesto ? "presupuesto-numero" : ""}">${escapeHtml(numComprobante.puntoVenta)} - ${escapeHtml(numComprobante.numero)}</span></strong></div>
-            <div><strong>Fecha de Emision:</strong> ${escapeHtml(fechaVenta)}</div>
+            <div class="numero-line"><strong><span class="${isPresupuesto || isOrden ? "presupuesto-numero" : ""}">${isOrden ? escapeHtml(venta.numero_comprobante) : `${escapeHtml(numComprobante.puntoVenta)} - ${escapeHtml(numComprobante.numero)}`}</span></strong></div>
+            <div><strong>${isOrden ? 'Fecha de ingreso:' : 'Fecha de Emision:'}</strong> ${escapeHtml(fechaVenta)}</div>
             <div><strong>CUIT:</strong> ${escapeHtml(comercio?.cuit || "N/A")}</div>
             <div><strong>Ingresos Brutos:</strong> ${escapeHtml(comercio?.ingresos_brutos || "N/A")}</div>
             <div><strong>Inicio de Actividades:</strong> ${escapeHtml(formatDate(comercio?.fecha_inicio_actividad))}</div>
@@ -584,11 +591,15 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
         </div>
       </div>
 
-      <div class="periodo-section">
+      ${!isOrden ? `<div class="periodo-section">
         <div class="periodo-item"><strong>Periodo Facturado Desde:</strong> ${escapeHtml(fechaVenta)} <strong>Hasta:</strong> ${escapeHtml(fechaVenta)}</div>
         <div class="periodo-item"><strong>Fecha de Vto. para el pago:</strong> ${escapeHtml(fechaVenta)}</div>
-      </div>
+      </div>` : ''}
 
+      ${(isPresupuesto || isOrden) && venta.taller_vehiculo ? `<div class="cliente-section">
+        <div class="cliente-row full"><div><strong>Vehículo:</strong> ${escapeHtml(venta.taller_vehiculo.patente)} — ${escapeHtml(venta.taller_vehiculo.marca)} ${escapeHtml(venta.taller_vehiculo.modelo)}${venta.taller_vehiculo.anio ? ` — Año: ${escapeHtml(String(venta.taller_vehiculo.anio))}` : ''}</div></div>
+        <div class="cliente-row full"><div><strong>Kilometraje de ingreso:</strong> ${escapeHtml(Number(venta.taller_vehiculo.kilometraje).toLocaleString('es-AR'))} km</div></div>
+      </div>` : ''}
       <div class="cliente-section">
         <div class="cliente-row">
           <div><strong>CUIT:</strong> ${escapeHtml(clienteCuit || "N/A")}</div>
@@ -599,10 +610,23 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
         </div>
         <div class="cliente-row">
           <div><strong>Condicion frente al IVA:</strong> ${escapeHtml(clienteCondicionIva || "Consumidor Final")}</div>
-          <div><strong>Condicion de venta:</strong> ${escapeHtml(getTipoPagoLabel(venta))}</div>
+          ${!isOrden ? `<div><strong>Condicion de venta:</strong> ${escapeHtml(getTipoPagoLabel(venta))}</div>` : ''}
         </div>
       </div>
 
+      ${isOrden && ordenTaller ? `<div class="cliente-section">
+        ${[
+          ['Estado', ESTADOS_TALLER[ordenTaller.orden.estado]], ['Responsable', ordenTaller.responsable || 'Sin asignar'],
+          ['Motivo del ingreso', ordenTaller.orden.motivo], ['Recepción', ordenTaller.orden.recepcion],
+          ['Diagnóstico', ordenTaller.orden.diagnostico], ['Trabajo realizado', ordenTaller.orden.trabajo_realizado],
+          ['Observaciones', ordenTaller.orden.observaciones], ['Aprobación del cliente', ordenTaller.orden.aprobacion_cliente],
+          ['Turno', ordenTaller.orden.turno ? formatDate(ordenTaller.orden.turno) : ''],
+          ['Entrega estimada', ordenTaller.orden.entrega_estimada ? formatDate(ordenTaller.orden.entrega_estimada) : ''],
+          ['Próximo servicio', [ordenTaller.orden.proximo_service ? formatDate(ordenTaller.orden.proximo_service) : '', ordenTaller.orden.proximo_service_km != null ? `${Number(ordenTaller.orden.proximo_service_km).toLocaleString('es-AR')} km` : ''].filter(Boolean).join(' / ')],
+          ['Entrega efectiva', ordenTaller.orden.entregado_at ? formatDate(ordenTaller.orden.entregado_at) : ''],
+          ['Motivo de cancelación', ordenTaller.orden.motivo_cancelacion],
+        ].filter(([, value]) => value).map(([label, value]) => `<div class="cliente-row full"><div class="orden-texto"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div></div>`).join('')}
+      </div>` : ''}
       <table class="items-table">
         <thead>
           <tr>
@@ -709,7 +733,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
           `
           : ""
       }
-      <div class="page-number">Pag. 1/1</div>
+      ${isOrden ? '<div class="orden-pie cliente-section"><div class="cliente-row full"><div>Firma / conformidad del cliente: __________________________</div></div><div class="cliente-row full"><div>Orden de trabajo no fiscal. El comprobante de venta se emite por separado.</div></div></div>' : '<div class="page-number">Pag. 1/1</div>'}
     </div>
   `;
 };
@@ -719,8 +743,18 @@ export const buildFacturaPrintHtml = (options: FacturaPrintOptions, htmlOptions:
   <html>
     <head>
       <meta charset="utf-8" />
-      <title>${options.documentType === "presupuesto" ? "Presupuesto" : "Comprobante"} ${escapeHtml(options.venta.numero_comprobante)}</title>
+      <title>${options.documentType === "orden_taller" ? "Orden de trabajo" : options.documentType === "presupuesto" ? "Presupuesto" : "Comprobante"} ${escapeHtml(options.venta.numero_comprobante)}</title>
       <style>${getFacturaPrintStyles(options.formato)}</style>
+      ${options.documentType === "orden_taller" ? `<style>
+        .orden-taller.sin-cae { padding-bottom: 0; display: flex; flex-direction: column; }
+        .orden-taller > * { flex-shrink: 0; }
+        .orden-taller .totales-section { position: static; }
+        .orden-taller .empty-rows { display: none; }
+        .orden-taller .orden-texto { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .orden-taller .cliente-row, .orden-taller .items-table tr { break-inside: avoid; }
+        .orden-taller .orden-pie { margin-top: auto; border-top: 1px solid #000; border-bottom: 0; padding-top: 18px; break-inside: avoid; }
+        ${options.formato === '58mm' ? '.orden-taller .orden-pie { margin-top: 4mm; border-top-style: dashed; padding-top: 3mm; }' : '.orden-taller.sin-cae { min-height: calc(297mm - 16mm); }'}
+      </style>` : ''}
     </head>
     <body>
       ${buildFacturaPrintBody(options)}
