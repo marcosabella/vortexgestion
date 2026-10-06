@@ -19,6 +19,7 @@ export type ModuloSistema =
   | "gastos_egresos"
   | "extintores"
   | "campo"
+  | "distribucion"
   | "taller";
 
 export type FuncionSistema =
@@ -76,6 +77,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "gastos_egresos", label: "Gastos y egresos", description: "Registro de gastos, pagos y obligaciones del comercio." },
   { key: "extintores", label: "Extintores", description: "Asignacion y seguimiento de extintores por cliente." },
   { key: "campo", label: "Vortex Campo", description: "Consulta de establecimientos y lotes del comercio." },
+  { key: "distribucion", label: "Vortex Distribución", description: "Pedidos, preparación, reparto, entregas parciales, devoluciones y rendición." },
   { key: "taller", label: "Vortex Taller", description: "Vehículos, órdenes, repuestos, mano de obra, turnos e historial integrados con presupuestos y ventas." },
 ];
 
@@ -106,6 +108,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     whatsapp: false,
     extintores: false,
     campo: false,
+    distribucion: false,
     taller: false,
   },
   funciones: {

@@ -80,6 +80,7 @@ type GroupKey =
   | "tesoreria"
   | "campo"
   | "taller"
+  | "distribucion"
   | "extintores"
   | "informes"
   | "configuracion"
@@ -156,6 +157,10 @@ const tallerItems: MenuItem[] = [
   { title: "Técnicos", url: "/taller/tecnicos", icon: Users },
 ];
 
+const distribucionItems: MenuItem[] = [
+  { title: "Pedidos, reparto y rendición", url: "/distribucion", icon: ClipboardList },
+];
+
 const extintoresItems: MenuItem[] = [
   { title: "Extintores", url: "/extintores", icon: Flame },
   { title: "Órdenes de trabajo", url: "/extintores/ordenes-trabajo", icon: ClipboardList },
@@ -168,6 +173,7 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   tesoreria: false,
   campo: false,
   taller: false,
+  distribucion: false,
   extintores: false,
   informes: false,
   configuracion: false,
@@ -186,6 +192,7 @@ const pathMatches = (currentPath: string, path: string) =>
 const getGroupForPath = (path: string): GroupKey | null => {
   if (path.startsWith("/campo")) return "campo";
   if (path.startsWith("/taller")) return "taller";
+  if (pathMatches(path, "/distribucion")) return "distribucion";
   if (path.startsWith("/extintores")) return "extintores";
   if (path.startsWith("/listados")) return "informes";
   if (path.startsWith("/admin")) return "administracion";
@@ -382,6 +389,7 @@ export function AppSidebar() {
               {renderCollapsibleGroup("tesoreria", "Tesorería", Banknote, enabledTesoreriaItems)}
               {parametrizacion.modulos.campo && renderCollapsibleGroup("campo", "Vortex Campo", Sprout, enabledCampoItems)}
               {parametrizacion.modulos.taller && renderCollapsibleGroup("taller", "Vortex Taller", Wrench, tallerItems)}
+              {parametrizacion.modulos.distribucion && renderCollapsibleGroup("distribucion", "Vortex Distribución", Truck, distribucionItems)}
               {parametrizacion.modulos.extintores && renderCollapsibleGroup("extintores", "Extintores", Flame, extintoresItems)}
               {parametrizacion.modulos.listados && renderCollapsibleGroup("informes", "Informes", FileText, listadosItems)}
               {renderCollapsibleGroup("configuracion", "Configuración", Settings, enabledConfiguracionItems)}

@@ -91,6 +91,7 @@ export function useUpdateCliente() {
         title: "Cliente actualizado",
         description: "Los datos del cliente se han actualizado correctamente.",
       });
+      queryClient.invalidateQueries({ queryKey: ['distribucion'] });
     }
   });
 }
