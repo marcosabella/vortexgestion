@@ -1,3 +1,5 @@
+import Restaurante from "@/pages/Restaurante";
+import { restauranteSecciones } from "@/config/restauranteNavigation";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -273,6 +275,8 @@ function AuthenticatedLayout() {
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
               <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
               <Route path="/taller" element={<ParametrizedRoute modulo="taller"><Taller seccion="resumen" /></ParametrizedRoute>} />
+              <Route path="/restaurante" element={<ParametrizedRoute modulo="restaurante"><Navigate to="/restaurante/pedidos" replace /></ParametrizedRoute>} />
+              {restauranteSecciones.map(({ vista }) => <Route key={vista} path={`/restaurante/${vista}`} element={<ParametrizedRoute modulo="restaurante"><Restaurante vista={vista} /></ParametrizedRoute>} />)}
               <Route path="/distribucion" element={<ParametrizedRoute modulo="distribucion"><Navigate to="/distribucion/pedidos" replace /></ParametrizedRoute>} />
               {distribucionSecciones.map(({ vista, url }) => (
                 <Route key={url} path={url} element={<ParametrizedRoute modulo="distribucion"><Distribucion vista={vista} /></ParametrizedRoute>} />

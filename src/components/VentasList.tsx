@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,10 +33,16 @@ interface OperacionMercadoPagoVenta {
   id: string;
   venta_id: string | null;
   estado: string;
+  importe: number;
   qr_data: string | null;
 }
 
-export const VentasList = () => {
+interface VentasListProps {
+  detalleId?: string;
+  onCerrarDetalle?: () => void;
+}
+
+export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {}) => {
   const { ventas, isLoading, deleteVenta } = useVentas();
   const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
@@ -51,7 +57,7 @@ export const VentasList = () => {
   const { comerciosQuery } = useAdminComercios(isAppAdmin);
   const { crearNotificacion } = useAdminNotificaciones(isAppAdmin);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(Boolean(detalleId));
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
   const [habilitarPagoMembresia, setHabilitarPagoMembresia] = useState(false);
@@ -105,18 +111,24 @@ export const VentasList = () => {
   };
 
   useEffect(() => {
-    const ventaId = searchParams.get("detalle");
+    const ventaId = detalleId || searchParams.get("detalle");
     if (!ventaId || isLoading) return;
 
     const venta = ventas.find((item) => item.id === ventaId);
     if (venta) {
       setSelectedVenta(venta);
       setShowDetails(true);
+    } else if (detalleId) {
+      setSelectedVenta(null);
     }
-  }, [isLoading, searchParams, ventas]);
+  }, [detalleId, isLoading, searchParams, ventas]);
 
   const handleDetailsOpenChange = (open: boolean) => {
     setShowDetails(open);
+    if (!open && detalleId) {
+      onCerrarDetalle?.();
+      return;
+    }
     if (!open && searchParams.has("detalle")) {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete("detalle");
@@ -423,7 +435,7 @@ export const VentasList = () => {
     });
   };
 
-  if (isLoading) {
+  if (isLoading && !detalleId) {
     return (
       <div className="flex justify-center items-center h-48">
         <p>Cargando ventas...</p>
@@ -433,7 +445,7 @@ export const VentasList = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
+      {!detalleId && <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Lista de Ventas</CardTitle>
@@ -549,13 +561,15 @@ export const VentasList = () => {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       <Dialog open={showDetails} onOpenChange={handleDetailsOpenChange}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Detalle de Venta</DialogTitle>
+            <DialogDescription className="sr-only">Consulta del comprobante, productos y medios de pago.</DialogDescription>
           </DialogHeader>
+          {detalleId && !selectedVenta && <p role="status">{isLoading ? "Cargando venta…" : "La venta no está disponible para tu usuario en este comercio."}</p>}
           {selectedVenta && (
             <div className="space-y-4">
               <div className="mb-4 space-y-3">
