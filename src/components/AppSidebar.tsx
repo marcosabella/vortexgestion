@@ -33,6 +33,7 @@ import {
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ModuloSistema } from "@/config/parametrizacion";
+import { distribucionSecciones } from "@/config/distribucionNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useComercio } from "@/hooks/useComercio";
@@ -157,9 +158,7 @@ const tallerItems: MenuItem[] = [
   { title: "Técnicos", url: "/taller/tecnicos", icon: Users },
 ];
 
-const distribucionItems: MenuItem[] = [
-  { title: "Pedidos, reparto y rendición", url: "/distribucion", icon: ClipboardList },
-];
+const distribucionItems: MenuItem[] = distribucionSecciones.map(({ title, url, icon }) => ({ title, url, icon }));
 
 const extintoresItems: MenuItem[] = [
   { title: "Extintores", url: "/extintores", icon: Flame },

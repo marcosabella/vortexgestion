@@ -269,7 +269,7 @@ export function RemitosReparto(
         >
           {reparto.papeles_preparados
             ? "Ejemplares impresos confirmados"
-            : "Confirmar que llevo dos ejemplares impresos por cliente"}
+            : "Confirmar ejemplares impresos (opcional)"}
         </Button>
       )}
     </div>
@@ -294,6 +294,9 @@ export function EntregaRemito(
   const [recibio, setRecibio] = useState("");
   const [firma, setFirma] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [tipoCobro, setTipoCobro] = useState("");
+  const [montoCobro, setMontoCobro] = useState("");
+  const [medioCobro, setMedioCobro] = useState("contado");
   const [foto, setFoto] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const fotoPendiente = useRef<{ file: File; path: string } | null>(null);
@@ -304,6 +307,7 @@ export function EntregaRemito(
   const resumen = resumenParada(data, remito.parada_id);
   const editable = reparto.estado === "en_reparto" &&
     remito.estado === "emitido";
+  const totalEntrega = items.reduce((total, i) => total + Math.round((cantidades[i.id] ?? i.cantidad) * Number(i.precio) * 100) / 100, 0);
   async function guardarFoto() {
     if (!foto || !comercio || subiendo) return;
     if (
@@ -391,9 +395,9 @@ export function EntregaRemito(
         <div className="flex flex-wrap items-center gap-2">
         <Badge>
           {remito.estado === "emitido"
-            ? "Pendiente de visita"
+            ? "Despacho pendiente"
             : remito.estado === "confirmado"
-            ? "Entrega confirmada"
+            ? "Despacho registrado"
             : "Anulado"}
         </Badge>
         {remito.estado === "confirmado" && <>
@@ -468,12 +472,16 @@ export function EntregaRemito(
           className="space-y-3"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (!data.circuito_pasos || !tipoCobro) return;
             await ejecutar("confirmar_remito", {
               reparto_id: reparto.id,
               remito_id: remito.id,
               recibido_por: recibio,
               firma_papel: firma,
               motivo,
+              cobro: tipoCobro === "cobro"
+                ? { monto: Number(montoCobro), medio: medioCobro }
+                : { monto: 0 },
               items: items.map((i) => ({
                 item_id: i.id,
                 recibida: cantidades[i.id] ?? i.cantidad,
@@ -486,7 +494,7 @@ export function EntregaRemito(
             dos ejemplares impresos.
           </p>
           <Label htmlFor={`recibio-${remito.id}`}>
-            Nombre de quien recibió
+            Nombre de quien recibió (opcional)
           </Label>
           <Input
             id={`recibio-${remito.id}`}
@@ -498,17 +506,31 @@ export function EntregaRemito(
               type="checkbox"
               checked={firma}
               onChange={(e) => setFirma(e.target.checked)}
-            />El cliente firmó ambos ejemplares del remito.
+            />Firma en papel registrada (opcional).
           </label>
           <Label htmlFor={`motivo-${remito.id}`}>
-            Motivo de faltantes, rechazo u observaciones
+            Faltantes, rechazo u observaciones (opcional)
           </Label>
           <Textarea
             id={`motivo-${remito.id}`}
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
           />
-          <Button disabled={query.trabajando}>Confirmar entrega</Button>
+          <div className="space-y-3 rounded-md border p-3">
+            <p className="text-sm">Entrega: <b>{money(totalEntrega)}</b>. Registrá el cobro de este cliente; el importe sin cobrar quedará como saldo al facturar.</p>
+            <Label htmlFor={`tipo-cobro-${remito.id}`}>Cobro en esta visita</Label>
+            <select id={`tipo-cobro-${remito.id}`} required className="h-11 w-full rounded-md border bg-background px-3" value={tipoCobro} onChange={e => setTipoCobro(e.target.value)}>
+              <option value="">Seleccionar</option>
+              <option value="sin_cobro">Sin cobro en esta visita</option>
+              <option value="cobro">Registrar cobro</option>
+            </select>
+            {tipoCobro === "cobro" && <div className="grid gap-3 sm:grid-cols-2">
+              <div><Label htmlFor={`monto-cobro-${remito.id}`}>Monto cobrado</Label><Input id={`monto-cobro-${remito.id}`} required type="number" min="0.01" max={Math.max(0, Math.round((totalEntrega - resumen.cobrado) * 100) / 100)} step="0.01" value={montoCobro} onChange={e => setMontoCobro(e.target.value)} /></div>
+              <div><Label htmlFor={`medio-cobro-${remito.id}`}>Medio de cobro</Label><select id={`medio-cobro-${remito.id}`} className="h-11 w-full rounded-md border bg-background px-3" value={medioCobro} onChange={e => setMedioCobro(e.target.value)}><option value="contado">Efectivo</option><option value="transferencia">Transferencia</option></select></div>
+            </div>}
+          </div>
+          {!data.circuito_pasos && <p className="text-sm text-muted-foreground">El registro conjunto de entrega y cobro todavía no está habilitado para este comercio.</p>}
+          <Button disabled={query.trabajando || !tipoCobro || !data.circuito_pasos}>Registrar despacho del cliente</Button>
         </form>
       )}
       {remito.estado === "confirmado" && (
@@ -653,7 +675,7 @@ export function FacturacionRemitos({ data }: { data: ResumenDistribucion }) {
   const [tipo, setTipo] = useState("");
   const [todos, setTodos] = useState(false);
   const remitos = (data.remitos || []).filter((m) =>
-    m.estado === "confirmado" && (todos || !m.venta_id)
+    m.estado === "confirmado" && data.repartos.some(r => r.id === m.reparto_id && r.estado === "rendido") && (todos || !m.venta_id)
   );
   const cantidadNeta = (id: string) =>
     (data.remito_items || []).filter((i) => i.remito_id === id).reduce(
@@ -662,6 +684,7 @@ export function FacturacionRemitos({ data }: { data: ResumenDistribucion }) {
     );
   return (
     <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">6. Facturación: emitir comprobantes sobre las cantidades netas entregadas, después de confirmar la rendición. Los cobros registrados se imputan una sola vez.</p>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"

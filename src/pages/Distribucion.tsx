@@ -1,15 +1,13 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  ClipboardList,
   CreditCard,
   Eye,
   MapPin,
-  PackageCheck,
   Pencil,
   Plus,
   RefreshCw,
@@ -47,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDistribucion } from "@/hooks/useDistribucion";
+import { distribucionSecciones, type VistaDistribucion } from "@/config/distribucionNavigation";
 import { useClientes } from "@/hooks/useClientes";
 import { useProductos } from "@/hooks/useProductos";
 import { useComercio } from "@/hooks/useComercio";
@@ -126,17 +125,17 @@ type ActionDialog = {
   titulo: string;
 };
 
-export default function Distribucion() {
+export default function Distribucion({ vista = "pedidos" }: { vista?: VistaDistribucion }) {
   const { comercio } = useComercio();
-  return <DistribucionContenido key={comercio?.id || "sin-comercio"} />;
+  return <DistribucionContenido key={`${comercio?.id || "sin-comercio"}:${vista}`} vista={vista} />;
 }
 
-function DistribucionContenido() {
+function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
+  const navigate = useNavigate();
   const query = useDistribucion();
   const clientes = useClientes();
   const productos = useProductos();
   const catalogoCache = useQueryClient();
-  const [vista, setVista] = useState("pedidos");
   const [busqueda, setBusqueda] = useState("");
   const [nuevoPedido, setNuevoPedido] = useState(false);
   const [pedidoEditando, setPedidoEditando] = useState<
@@ -147,7 +146,8 @@ function DistribucionContenido() {
   >(null);
   const [pedidoDetalleId, setPedidoDetalleId] = useState<string | null>(null);
   const [repartoDetalleId, setRepartoDetalleId] = useState<string | null>(null);
-  const [detalleTab, setDetalleTab] = useState("resumen");
+  const [detalleTab, setDetalleTab] = useState("pedidos");
+  const [etapaPedido, setEtapaPedido] = useState("todos");
   const [nuevoReparto, setNuevoReparto] = useState(false);
   const [lineas, setLineas] = useState<
     { producto_id: string; cantidad: number }[]
@@ -304,6 +304,8 @@ function DistribucionContenido() {
     );
   }
   const pedidosVisibles = data.pedidos.filter((p) =>
+    (vista !== "preparacion" || ["pendiente", "preparacion"].includes(p.estado) || (p.estado === "listo" && data.items.some(i => i.pedido_id === p.id && pendienteItem(data, i.id) > 0))) &&
+    (etapaPedido === "todos" || p.estado === etapaPedido) &&
     `${p.numero} ${p.cliente_nombre} ${p.direccion}`.toLowerCase().includes(
       busqueda.toLowerCase(),
     )
@@ -353,9 +355,10 @@ function DistribucionContenido() {
     <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Vortex Distribución</h1>
+          <p className="text-sm text-muted-foreground">Vortex Distribución</p>
+          <h1 className="text-2xl font-bold">{distribucionSecciones.find(s => s.vista === vista)?.title}</h1>
           <p className="text-sm text-muted-foreground">
-            Pedidos, preparación, entregas y cobros conectados.
+            Pedido → Preparación → Planificación y remitos → Entrega y cobro → Cierre y rendición → Facturación.
           </p>
         </div>
         <div className="flex gap-2">
@@ -367,7 +370,7 @@ function DistribucionContenido() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button
+          {vista === "pedidos" && <Button
             onClick={() => {
               setNuevoPedido(true);
               setPedidoEditando(null);
@@ -378,8 +381,8 @@ function DistribucionContenido() {
             }}
           >
             <Plus className="mr-2 h-4 w-4" />Pedido
-          </Button>
-          {data.admin && (
+          </Button>}
+          {data.admin && vista === "planificacion" && (
             <Button
               variant="outline"
               onClick={() => setNuevoReparto(true)}
@@ -397,28 +400,16 @@ function DistribucionContenido() {
           </div>
         ))}
       </dl>
-      <Tabs value={vista} onValueChange={setVista}>
-        <TabsList
-          className={`grid h-auto w-full ${
-            data.admin ? "grid-cols-4" : "grid-cols-3"
-          }`}
-        >
-          <TabsTrigger value="pedidos">
-            <ClipboardList className="mr-1 h-4 w-4" />Pedidos
-          </TabsTrigger>
-          <TabsTrigger value="repartos">
-            <Truck className="mr-1 h-4 w-4" />Reparto
-          </TabsTrigger>
-          <TabsTrigger value="rendiciones">
-            <PackageCheck className="mr-1 h-4 w-4" />Rendición
-          </TabsTrigger>
-          {data.admin && (
-            <TabsTrigger value="facturacion" className="whitespace-normal">
-              Facturación
-            </TabsTrigger>
-          )}
-        </TabsList>
-        <TabsContent value="pedidos" className="space-y-3">
+      <div className="space-y-4">
+        {["pedidos", "preparacion"].includes(vista) && <section className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {vista === "pedidos" ? "Preventista: registrar pedidos y consultar su seguimiento." : "Depósito: iniciar la preparación y marcar el pedido preparado para asignarlo a un reparto."}
+          </p>
+          <div className="flex flex-wrap gap-2" aria-label="Etapa del pedido">
+            {[["todos", "Todos"], ["pendiente", "Por preparar"], ["preparacion", "En preparación"], ["listo", "Preparados"]].map(([value, label]) => (
+              <Button key={value} size="sm" variant={etapaPedido === value ? "default" : "outline"} aria-pressed={etapaPedido === value} onClick={() => setEtapaPedido(value)}>{label}</Button>
+            ))}
+          </div>
           <Input
             aria-label="Buscar pedidos"
             placeholder="Buscar cliente, pedido o dirección"
@@ -553,20 +544,24 @@ function DistribucionContenido() {
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-        {data.admin && (
-          <TabsContent value="facturacion">
-            <FacturacionRemitos data={data} />
-          </TabsContent>
+        </section>}
+        {vista === "facturacion" && (
+          <section>
+            {data.admin ? <FacturacionRemitos data={data} /> : <p className="text-muted-foreground">La facturación de distribución requiere permisos de administración.</p>}
+          </section>
         )}
-        {["repartos", "rendiciones"].map((tab) => {
+        {["planificacion", "repartos", "rendiciones"].map((tab) => {
+          if (tab !== vista) return null;
           const rutas = data.repartos.filter((r) =>
             tab === "rendiciones"
-              ? ["pendiente_rendicion", "rendido"].includes(r.estado)
-              : true
+              ? ["en_reparto", "pendiente_rendicion", "rendido"].includes(r.estado)
+              : tab === "planificacion" ? ["planificado", "cancelado"].includes(r.estado) : r.estado === "en_reparto"
           );
           return (
-            <TabsContent key={tab} value={tab} className="space-y-4">
+            <section key={tab} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {tab === "planificacion" ? "Armá el reparto con pedidos preparados. En el detalle, revisá los clientes, generá los remitos y registrá la salida." : tab === "repartos" ? "Repartos en calle: registrá la entrega y el cobro de cada cliente en Pedidos y entregas." : "Revisá el cierre al regreso del camión y confirmá la rendición para habilitar la facturación."}
+              </p>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -674,11 +669,11 @@ function DistribucionContenido() {
                                 size="sm"
                                 title="Ver detalle"
                                 aria-label={"Ver reparto " + r.nombre}
-                                onClick={() => { setDetalleTab("resumen"); setRepartoDetalleId(r.id); }}
+                                onClick={() => { setDetalleTab("pedidos"); setRepartoDetalleId(r.id); }}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {tab === "repartos" && <>
+                              {tab !== "rendiciones" && <>
                               <Button variant="outline" size="sm" title="Ver hoja de ruta y mapa" aria-label={`Ver ruta de ${r.nombre}`} onClick={() => { setDetalleTab("ruta"); setRepartoDetalleId(r.id); }}><MapPin className="h-4 w-4"/></Button>
                               <HojaRutaImpresion
                                 data={data}
@@ -690,13 +685,13 @@ function DistribucionContenido() {
                                 <>
                                   <Button
                                     size="sm"
-                                    disabled={query.trabajando || paradas.length === 0 || (r.circuito_remitos && !r.papeles_preparados)}
+                                    disabled={query.trabajando || paradas.length === 0 || (r.circuito_remitos && paradas.some(p => !data.remitos?.some(m => m.parada_id === p.id && m.estado === "emitido")))}
                                     onClick={() =>
                                       ejecutar("despachar", {
                                         reparto_id: r.id,
                                       })}
                                   >
-                                    Despachar
+                                    Iniciar reparto
                                   </Button>
                                   <Button
                                     variant="outline"
@@ -716,9 +711,9 @@ function DistribucionContenido() {
                                   size="sm"
                                   disabled={query.trabajando}
                                   onClick={() =>
-                                    ejecutar("finalizar", { reparto_id: r.id })}
+                                    { setDetalleTab("cierre"); setRepartoDetalleId(r.id); }}
                                 >
-                                  Finalizar
+                                  Revisar cierre
                                 </Button>
                               )}
                               {data.admin &&
@@ -759,10 +754,10 @@ function DistribucionContenido() {
                   </TableBody>
                 </Table>
               </div>
-            </TabsContent>
+            </section>
           );
         })}
-      </Tabs>
+      </div>
       <Dialog
         open={Boolean(repartoDetalle)}
         onOpenChange={(open) => {
@@ -788,21 +783,41 @@ function DistribucionContenido() {
                 onValueChange={setDetalleTab}
                 className="flex min-h-0 flex-1 flex-col overflow-hidden"
               >
-                <TabsList className={`grid h-auto w-full shrink-0 ${vista === "repartos" ? "grid-cols-4" : "grid-cols-3"}`}>
-                  <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                <TabsList className="grid h-auto w-full shrink-0 grid-cols-2 sm:grid-cols-5">
                   <TabsTrigger value="pedidos" className="whitespace-normal">
                     Pedidos y entregas
                   </TabsTrigger>
+                  <TabsTrigger value="resumen" className="whitespace-normal">Remitos y salida</TabsTrigger>
+                  <TabsTrigger value="ruta" className="whitespace-normal">Hoja de ruta</TabsTrigger>
+                  <TabsTrigger value="cierre" className="whitespace-normal">Cierre y rendición</TabsTrigger>
                   <TabsTrigger value="historial">Historial</TabsTrigger>
-                  {vista === "repartos" && <TabsTrigger value="ruta" className="whitespace-normal">Hoja de ruta</TabsTrigger>}
                 </TabsList>
                 <TabsContent
                   value="resumen"
                   className="min-h-0 flex-1 space-y-4 overflow-y-auto [scrollbar-gutter:stable]"
                 >
-                  <ResumenReparto data={data} reparto={r} />
+                  <p className="text-sm text-muted-foreground">3. Despachante: revisar la carga por cliente, generar remitos y registrar la salida del camión. La confirmación de ejemplares impresos es opcional.</p>
                   <RemitosReparto data={data} reparto={r} />
-                  {vista === "repartos" && <div className="flex flex-wrap gap-2">
+                  {data.admin && r.estado === "planificado" && (
+                      <div className="flex gap-2">
+                        <Button
+                          disabled={query.trabajando || !data.paradas.some(p => p.reparto_id === r.id) || (r.circuito_remitos && data.paradas.filter(p => p.reparto_id === r.id).some(p => !data.remitos?.some(m => m.parada_id === p.id && m.estado === "emitido")))}
+                          onClick={() =>
+                            ejecutar("despachar", { reparto_id: r.id })}
+                        >
+                          Iniciar reparto y reservar stock
+                        </Button>
+                        <Button
+                          variant="outline"
+                          disabled={query.trabajando}
+                          onClick={() =>
+                            ejecutar("cancelar_reparto", { reparto_id: r.id })}
+                        >
+                          Cancelar reparto
+                        </Button>
+                      </div>
+                  )}
+                  {vista !== "rendiciones" && <div className="flex flex-wrap gap-2">
                     <HojaRutaImpresion data={data} reparto={r} />
                   </div>}
                 </TabsContent>
@@ -810,6 +825,7 @@ function DistribucionContenido() {
                   value="pedidos"
                   className="min-h-0 flex-1 space-y-4 overflow-y-auto [scrollbar-gutter:stable]"
                 >
+                  <p className="text-sm text-muted-foreground">Todos los clientes del reparto aparecen en esta lista. Ingresá a cada cliente para registrar sus despachos y cobros. Nombre, firma y observaciones son opcionales.</p>
                   {data.admin && r.estado === "planificado" && (
                     <div className="space-y-3">
                       <div className="flex flex-col gap-2 sm:flex-row">
@@ -846,50 +862,42 @@ function DistribucionContenido() {
                           Agregar
                         </Button>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          disabled={query.trabajando || (r.circuito_remitos && !r.papeles_preparados)}
-                          onClick={() =>
-                            ejecutar("despachar", { reparto_id: r.id })}
-                        >
-                          Despachar y reservar stock
-                        </Button>
-                        <Button
-                          variant="outline"
-                          disabled={query.trabajando}
-                          onClick={() =>
-                            ejecutar("cancelar_reparto", { reparto_id: r.id })}
-                        >
-                          Cancelar reparto
-                        </Button>
-                      </div>
                     </div>
                   )}
-                  {data.paradas.filter((p) => p.reparto_id === r.id).sort((a, b) => a.orden - b.orden).map((
-                    parada,
-                  ) => (
-                    <Parada
-                      key={parada.id}
-                      data={data}
-                      parada={parada}
-                      reparto={r}
-                      trabajando={query.trabajando}
-                      abrir={abrir}
-                      quitar={() =>
-                        ejecutar("quitar", {
-                          reparto_id: r.id,
-                          parada_id: parada.id,
-                        })}
-                    />
-                  ))}
-                  {!data.paradas.some((p) => p.reparto_id === r.id) && (
-                    <p className="py-4 text-center text-muted-foreground">
-                      No hay pedidos asignados a este reparto.
-                    </p>
+                  <ClientesReparto
+                    key={r.id}
+                    data={data}
+                    reparto={r}
+                    trabajando={query.trabajando}
+                    abrir={abrir}
+                    quitar={(parada) => ejecutar("quitar", {
+                      reparto_id: r.id,
+                      parada_id: parada.id,
+                    })}
+                  />
+                  {r.estado === "planificado" && (
+                    <Button variant="outline" disabled={!data.paradas.some(p => p.reparto_id === r.id)} onClick={() => setDetalleTab("resumen")}>
+                      Continuar con remitos y salida
+                    </Button>
                   )}
+                </TabsContent>
+                <TabsContent value="cierre" className="min-h-0 flex-1 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
+                  <p className="text-sm text-muted-foreground">5. Al regresar el camión: revisar despachos por cliente, mercadería que volvió y cobros. Finalizar el reparto y luego confirmar la rendición.</p>
+                  <ResumenReparto data={data} reparto={r} />
+                  <div className="space-y-2 rounded-md border p-3">
+                    {data.paradas.filter(p => p.reparto_id === r.id).map(p => {
+                      const remito = data.remitos?.find(m => m.parada_id === p.id && m.estado !== "anulado");
+                      const resumen = resumenParada(data, p.id);
+                      return <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-0">
+                        <span>{data.pedidos.find(pedido => pedido.id === p.pedido_id)?.cliente_nombre}</span>
+                        <span className="text-sm">{r.circuito_remitos ? remito?.estado === "confirmado" ? "Despacho registrado" : "Visita pendiente" : "Circuito anterior"} · Entregado: {money(resumen.total)} · Cobrado: {money(resumen.cobrado)} · Saldo: {money(resumen.saldo)}</span>
+                      </div>;
+                    })}
+                  </div>
+                  {r.circuito_remitos && data.paradas.some(p => p.reparto_id === r.id && !data.remitos?.some(m => m.parada_id === p.id && m.estado === "confirmado")) && <p className="text-sm text-muted-foreground">Registrá todas las visitas en Pedidos y entregas, incluso sin entrega, antes de finalizar.</p>}
                   {r.estado === "en_reparto" && (
                     <Button
-                      disabled={query.trabajando}
+                      disabled={query.trabajando || (r.circuito_remitos && data.paradas.some(p => p.reparto_id === r.id && !data.remitos?.some(m => m.parada_id === p.id && m.estado === "confirmado")))}
                       onClick={() =>
                         ejecutar("finalizar", { reparto_id: r.id })}
                     >
@@ -1006,9 +1014,9 @@ function DistribucionContenido() {
                     )}
                   </div>
                 </TabsContent>
-                {vista === "repartos" && <TabsContent value="ruta" className="min-h-0 flex-1 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
+                <TabsContent value="ruta" className="min-h-0 flex-1 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
                   <DistribucionHojaRuta key={r.id} data={data} reparto={r}/>
-                </TabsContent>}
+                </TabsContent>
               </Tabs>
             ))}
         </DialogContent>
@@ -1587,7 +1595,7 @@ function DistribucionContenido() {
               if (await ejecutar("reparto", values)) {
                 setNuevoReparto(false);
                 repartoForm.reset();
-                setVista("repartos");
+                navigate("/distribucion/planificacion");
               }
             })}
           >
@@ -1773,6 +1781,8 @@ function ResumenReparto(
       cargas.reduce((sum, c) => sum + c.entregada - c.devuelta, 0),
     ],
     ["Unidades devueltas", cargas.reduce((sum, c) => sum + c.devuelta, 0)],
+    ["Unidades sin entregar", cargas.reduce((sum, c) => sum + c.cargada - c.entregada, 0)],
+    ["Total que vuelve al depósito", cargas.reduce((sum, c) => sum + c.cargada - c.entregada + c.devuelta, 0)],
     ["Total neto", money(resumenes.reduce((sum, p) => sum + p.total, 0))],
     ["Cobrado", money(resumenes.reduce((sum, p) => sum + p.cobrado, 0))],
     ["Efectivo esperado", money(efectivo)],
@@ -1796,6 +1806,90 @@ function ResumenReparto(
         </div>
       ))}
     </dl>
+  );
+}
+
+function ClientesReparto({
+  data, reparto, trabajando, abrir, quitar,
+}: {
+  data: ResumenDistribucion;
+  reparto: RepartoDistribucion;
+  trabajando: boolean;
+  abrir: (dialog: ActionDialog) => void;
+  quitar: (parada: ParadaDistribucion) => Promise<boolean>;
+}) {
+  const [clienteId, setClienteId] = useState<string | null>(null);
+  const clientesReparto = new Map<string, {
+    id: string;
+    nombre: string;
+    paradas: ParadaDistribucion[];
+  }>();
+  for (const parada of data.paradas.filter(p => p.reparto_id === reparto.id).sort((a, b) => a.orden - b.orden)) {
+    const pedido = data.pedidos.find(p => p.id === parada.pedido_id);
+    const id = pedido?.cliente_id || parada.pedido_id;
+    const cliente = clientesReparto.get(id) || { id, nombre: pedido?.cliente_nombre || "Cliente sin datos", paradas: [] };
+    cliente.paradas.push(parada);
+    clientesReparto.set(id, cliente);
+  }
+  const seleccionado = clienteId ? clientesReparto.get(clienteId) : undefined;
+  if (seleccionado) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold">{seleccionado.nombre}</h3>
+          <Button variant="outline" disabled={trabajando} onClick={() => setClienteId(null)}>Volver a clientes</Button>
+        </div>
+        {seleccionado.paradas.map(parada => (
+          <Parada key={parada.id} data={data} parada={parada} reparto={reparto} trabajando={trabajando} abrir={abrir} quitar={() => quitar(parada)} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Clientes del reparto ({clientesReparto.size})</h3>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Orden</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Pedidos</TableHead>
+              <TableHead>Despachos</TableHead>
+              <TableHead className="text-right">Cobrado</TableHead>
+              <TableHead>Acción</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clientesReparto.size === 0 && <TableRow><TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No hay clientes asignados a este reparto. Agregá pedidos preparados.</TableCell></TableRow>}
+            {[...clientesReparto.values()].map(cliente => {
+              const confirmados = cliente.paradas.filter(p => data.remitos?.some(m => m.parada_id === p.id && m.estado === "confirmado")).length;
+              const pendiente = reparto.circuito_remitos && confirmados < cliente.paradas.length;
+              const pedidos = cliente.paradas.map(p => data.pedidos.find(pedido => pedido.id === p.pedido_id));
+              const direcciones = [...new Set(pedidos.map(p => p?.direccion).filter(Boolean))];
+              const cobrado = cliente.paradas.reduce((sum, p) => sum + resumenParada(data, p.id).cobrado, 0);
+              return (
+                <TableRow key={cliente.id}>
+                  <TableCell>{cliente.paradas.map(p => p.orden).join(", ")}</TableCell>
+                  <TableCell>
+                    <p className="font-medium">{cliente.nombre}</p>
+                    {direcciones.map(direccion => <p key={direccion} className="text-xs text-muted-foreground">{direccion}</p>)}
+                  </TableCell>
+                  <TableCell>{pedidos.map((p, i) => p ? `#${p.numero}` : `Pedido ${i + 1}`).join(", ")}</TableCell>
+                  <TableCell><Badge variant="outline">{reparto.estado === "cancelado" ? "Cancelado" : reparto.estado === "planificado" ? "Por salir" : reparto.circuito_remitos ? `${confirmados}/${cliente.paradas.length} registrados` : "Ver entregas"}</Badge></TableCell>
+                  <TableCell className="text-right">{money(cobrado)}</TableCell>
+                  <TableCell>
+                    <Button size="sm" variant={reparto.estado === "en_reparto" && pendiente ? "default" : "outline"} aria-label={`Abrir despachos de ${cliente.nombre}`} onClick={() => setClienteId(cliente.id)}>
+                      {reparto.estado === "planificado" ? "Ver pedidos" : reparto.estado === "en_reparto" && (pendiente || !reparto.circuito_remitos) ? "Registrar despachos" : "Ver despachos"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
@@ -1842,7 +1936,7 @@ function Parada({
         </h3>
         <p>{pedido?.direccion}</p>
         <p className="text-sm text-muted-foreground">
-          Generá los remitos desde Resumen antes de imprimir y salir.
+          Generá los remitos desde Remitos y salida antes de iniciar el reparto.
         </p>
         {data.admin && reparto.estado === "planificado" && (
           <Button variant="outline" onClick={quitar} disabled={trabajando}>

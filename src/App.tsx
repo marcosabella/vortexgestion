@@ -52,6 +52,7 @@ import MercadoPago from "./pages/MercadoPago";
 import Extintores from "./pages/Extintores";
 import Taller from "./pages/Taller";
 import Distribucion from "./pages/Distribucion";
+import { distribucionSecciones } from "@/config/distribucionNavigation";
 import TallerOrdenDetalle from "./pages/TallerOrdenDetalle";
 import TallerFormulario from "./pages/TallerFormulario";
 import OrdenesTrabajoExtintores from "./pages/OrdenesTrabajoExtintores";
@@ -272,7 +273,10 @@ function AuthenticatedLayout() {
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
               <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
               <Route path="/taller" element={<ParametrizedRoute modulo="taller"><Taller seccion="resumen" /></ParametrizedRoute>} />
-              <Route path="/distribucion" element={<ParametrizedRoute modulo="distribucion"><Distribucion /></ParametrizedRoute>} />
+              <Route path="/distribucion" element={<ParametrizedRoute modulo="distribucion"><Navigate to="/distribucion/pedidos" replace /></ParametrizedRoute>} />
+              {distribucionSecciones.map(({ vista, url }) => (
+                <Route key={url} path={url} element={<ParametrizedRoute modulo="distribucion"><Distribucion vista={vista} /></ParametrizedRoute>} />
+              ))}
               <Route path="/taller/vehiculos/nuevo" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="vehiculo" /></ParametrizedRoute>} />
               <Route path="/taller/vehiculos/:vehiculoId/editar" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="vehiculo" editar /></ParametrizedRoute>} />
               <Route path="/taller/tecnicos/nuevo" element={<ParametrizedRoute modulo="taller"><TallerFormulario tipo="tecnico" /></ParametrizedRoute>} />

@@ -9,6 +9,8 @@ export function probarRemitos({ sql, test, actor, call, fails, check, tenant, ot
     CREATE FUNCTION storage.foldername(p text) RETURNS text[] LANGUAGE sql AS $$ SELECT (string_to_array(p,'/'))[1:array_length(string_to_array(p,'/'),1)-1]; $$;
     GRANT USAGE ON SCHEMA storage TO authenticated; GRANT SELECT,INSERT ON storage.objects TO authenticated;`);
   sql(migration('20261007120000_distribucion_remitos_entrega_facturacion.sql'));
+  sql(migration('20261007150000_distribucion_circuito_pasos.sql'));
+  test('Resumen anuncia registro conjunto de despacho y cobro', actor(driver) + check(`(distribucion_resumen('${tenant}')->>'circuito_pasos')::boolean`, 'circuito disponible'));
   const product = randomUUID();
   sql(`INSERT INTO productos(id,comercio_id,stock) VALUES('${product}','${tenant}',10);`);
   const pedido = sql(actor() + call('pedido', { cliente_id: client, direccion: 'Cliente remito', items: [{ producto_id: product, cantidad: 3 }] }));
@@ -26,12 +28,15 @@ export function probarRemitos({ sql, test, actor, call, fails, check, tenant, ot
   sql(`UPDATE distribucion_pedidos SET estado='preparacion' WHERE id='${pedido}';`);
   test('Despacho revalida preparación en backend', actor() + fails(call('despachar', { reparto_id: ruta }), 'deben estar preparados'));
   sql(`UPDATE distribucion_pedidos SET estado='listo' WHERE id='${pedido}';`);
-  test('Despacho exige confirmación de los ejemplares impresos', actor() + fails(call('despachar', { reparto_id: ruta }), 'dos ejemplares impresos'));
-  sql(actor() + call('confirmar_papeles', { reparto_id: ruta }));
+  test('La salida permite omitir la confirmacion de impresos', check(`SELECT papeles_preparados=false FROM distribucion_repartos WHERE id='${ruta}'`, 'sin impresos'));
   sql(actor() + call('despachar', { reparto_id: ruta }));
   test('Despacho reserva sin descontar stock', check(`SELECT stock=10 FROM productos WHERE id='${product}'`, 'sin descuento') + check(`SELECT distribucion_stock_reservado('${product}')=3`, 'reserva remito'));
-  const entrega = { reparto_id: ruta, remito_id: remito, recibido_por: 'Cliente firmante', firma_papel: true, motivo: 'Una unidad rechazada', items: [{ item_id: item, recibida: 2 }] };
-  test('Entrega exige repartidor asignado, firma y cantidades válidas', actor(stranger) + fails(call('confirmar_remito', entrega), 'repartidor asignado') + actor(driver) + fails(call('confirmar_remito', { ...entrega, firma_papel: false }), 'firma en ambos') + fails(call('confirmar_remito', { ...entrega, items: [{ item_id: item, recibida: 4 }] }), 'fuera de lo cargado'));
+  const entrega = { reparto_id: ruta, remito_id: remito, recibido_por: '', firma_papel: false, motivo: '', items: [{ item_id: item, recibida: 2 }] };
+  test('Entrega exige repartidor asignado y cantidades válidas', actor(stranger) + fails(call('confirmar_remito', entrega), 'repartidor asignado') + actor(driver) + fails(call('confirmar_remito', { ...entrega, items: [{ item_id: item, recibida: 4 }] }), 'fuera de lo cargado'));
+  test('No finaliza con visitas pendientes', actor(driver) + fails(call('finalizar', { reparto_id: ruta }), 'incluso los rechazados'));
+  test('Cobro excesivo revierte entrega y stock', actor(driver) + fails(call('confirmar_remito', { ...entrega, cobro: { monto: 999, medio: 'contado' } }), 'supera lo entregado') + check(`SELECT stock=10 FROM productos WHERE id='${product}'`, 'stock intacto') + check(`SELECT estado='emitido' FROM distribucion_remitos WHERE id='${remito}'`, 'visita pendiente'));
+  test('Cobro invalido no confirma el despacho', actor(driver) + fails(call('confirmar_remito', { ...entrega, cobro: { monto: -1 } }), 'Cobro invalido'));
+  entrega.cobro = { monto: 100, medio: 'contado' };
   const entregaKey = randomUUID();
   sql(actor(driver) + call('confirmar_remito', entrega, entregaKey) + call('confirmar_remito', entrega, entregaKey));
   test('Entrega parcial descuenta una vez y conserva el original', check(`SELECT stock=8 FROM productos WHERE id='${product}'`, 'stock entregado') + check(`SELECT distribucion_stock_reservado('${product}')=1`, 'reserva remanente') + check(`SELECT cantidad=3 AND recibida=2 FROM distribucion_remito_items WHERE id='${item}'`, 'original intacto') + actor(driver) + fails(call('confirmar_remito', entrega), 'ya confirmada') + fails(call('entrega', { reparto_id: ruta, parada_id: parada, cantidad: 1 }), 'desde el remito'));
@@ -39,7 +44,7 @@ export function probarRemitos({ sql, test, actor, call, fails, check, tenant, ot
   test('Fotos privadas aisladas por reparto y tenant', actor(stranger) + fails(`INSERT INTO storage.objects(bucket_id,name) VALUES('distribucion-remitos','${path}');`, 'row-level security') + check(`distribucion_remito_acceso('${tenant}','${remito}')=false`, 'sin acceso') + actor(driver) + check(`distribucion_remito_acceso('${other}','${remito}')=false`, 'tenant ajeno'));
   sql(actor(driver) + `INSERT INTO storage.objects(bucket_id,name) VALUES('distribucion-remitos','${path}');` + call('foto_remito', { reparto_id: ruta, remito_id: remito, path }));
   test('Foto firmada se conserva sin sustitución', actor(driver) + fails(call('foto_remito', { reparto_id: ruta, remito_id: remito, path }), 'foto adjunta se conserva'));
-  sql(actor(driver) + call('cobro', { reparto_id: ruta, parada_id: parada, monto: 100, medio: 'contado' }));
+  test('Cobro del despacho se guarda una vez al reintentar', check(`SELECT count(*)=1 AND sum((datos->>'monto')::numeric)=100 FROM distribucion_eventos WHERE parada_id='${parada}' AND tipo='cobro'`, 'cobro unico'));
   sql(actor() + call('devolver_remito', { reparto_id: ruta, remito_id: remito, item_id: item, cantidad: 1, motivo: 'Devolución' }));
   test('Devolución previa repone stock y valida cobros', check(`SELECT stock=9 FROM productos WHERE id='${product}'`, 'stock repuesto') + actor() + fails(call('devolver_remito', { reparto_id: ruta, remito_id: remito, item_id: item, cantidad: 1, motivo: 'Devolver todo' }), 'Corregí el cobro'));
   const facturaDatos = { reparto_id: ruta, remito_id: remito, tipo_comprobante: 'factura_c' };
@@ -65,7 +70,7 @@ export function probarRemitos({ sql, test, actor, call, fails, check, tenant, ot
   test('Remito autorizado conserva CAI y número único; pedido sólo carga lo pendiente', check(`SELECT numero_autorizado=40 AND punto_venta=2 AND cai='12345678901234' FROM distribucion_remitos WHERE id='${autorizado}'`, 'CAI snapshot') + check(`SELECT cantidad=2 FROM distribucion_remito_items WHERE id='${itemAutorizado}'`, 'sólo pendientes') + check(`distribucion_estado_pedido('${pedido}')='asignado'`, 'estado asignado'));
   sql(actor() + cfg + call('confirmar_papeles', { reparto_id: duplicado }) + call('despachar', { reparto_id: duplicado }));
   test('Estado refleja en reparto y la configuración no reutiliza números', check(`distribucion_estado_pedido('${pedido}')='en_reparto'`, 'estado en calle') + check(`SELECT ultimo=40 FROM distribucion_remitos_autorizacion WHERE comercio_id='${tenant}'`, 'número conservado'));
-  sql(actor(driver) + call('confirmar_remito', { reparto_id: duplicado, remito_id: autorizado, recibido_por: 'Cliente', firma_papel: true, motivo: '', items: [{ item_id: itemAutorizado, recibida: 2 }] }) + call('finalizar', { reparto_id: duplicado }));
+  sql(actor(driver) + call('confirmar_remito', { reparto_id: duplicado, remito_id: autorizado, recibido_por: '', firma_papel: false, motivo: '', cobro: { monto: 0 }, items: [{ item_id: itemAutorizado, recibida: 2 }] }) + call('finalizar', { reparto_id: duplicado }));
   test('Estado refleja pendiente de rendición', check(`distribucion_estado_pedido('${pedido}')='pendiente_rendicion'`, 'estado por rendir'));
   sql(actor() + call('rendir', { reparto_id: duplicado, efectivo: 0 }));
   test('Entrega completa pasa a pendiente de facturar', check(`distribucion_estado_pedido('${pedido}')='pendiente_facturacion'`, 'estado por facturar'));
@@ -77,4 +82,11 @@ export function probarRemitos({ sql, test, actor, call, fails, check, tenant, ot
   const extraRuta = sql(actor() + call('reparto', { nombre: 'Rango agotado', fecha: '2026-10-09', repartidor_id: driver }));
   sql(actor() + call('preparar', { pedido_id: extraPedido }) + call('listo', { pedido_id: extraPedido }) + call('asignar', { reparto_id: extraRuta, pedido_id: extraPedido }));
   test('Rango agotado revierte remito y conserva números; se puede optar por no fiscal', actor() + fails(call('emitir_remitos', { reparto_id: extraRuta, usar_cai: true }), 'agotado') + check(`SELECT count(*)=0 FROM distribucion_remitos WHERE reparto_id='${extraRuta}'`, 'remito revertido') + actor() + call('emitir_remitos', { reparto_id: extraRuta, usar_cai: false }) + check(`SELECT cai IS NULL FROM distribucion_remitos WHERE reparto_id='${extraRuta}'`, 'no fiscal disponible'));
+  const sinEntrega = sql(`SELECT id FROM distribucion_remitos WHERE reparto_id='${extraRuta}';`);
+  const sinEntregaItem = sql(`SELECT id FROM distribucion_remito_items WHERE remito_id='${sinEntrega}';`);
+  sql(actor() + call('despachar', { reparto_id: extraRuta }));
+  test('Visita sin entrega no admite cobro', actor(driver) + fails(call('confirmar_remito', { reparto_id: extraRuta, remito_id: sinEntrega, items: [{ item_id: sinEntregaItem, recibida: 0 }], cobro: { monto: 1, medio: 'contado' } }), 'supera lo entregado'));
+  sql(actor(driver) + call('confirmar_remito', { reparto_id: extraRuta, remito_id: sinEntrega, items: [{ item_id: sinEntregaItem, recibida: 0 }], cobro: { monto: 0 } }) + call('finalizar', { reparto_id: extraRuta }));
+  sql(actor() + call('rendir', { reparto_id: extraRuta, efectivo: 0 }));
+  test('Visita sin entrega ni datos opcionales permite rendir sin facturar', check(`SELECT estado='rendido' FROM distribucion_repartos WHERE id='${extraRuta}'`, 'rendido sin entrega') + check(`SELECT stock=7 FROM productos WHERE id='${product}'`, 'stock intacto') + actor() + fails(call('facturar_remito', { reparto_id: extraRuta, remito_id: sinEntrega, tipo_comprobante: 'factura_c' }), 'sin mercadería recibida'));
 }

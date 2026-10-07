@@ -78,6 +78,7 @@ export type EventoDistribucion = {
   };
 };
 export type ResumenDistribucion = {
+  circuito_pasos?: boolean;
   remitos?: RemitoDistribucion[];
   remitos_autorizacion?: {
     punto_venta: number;
