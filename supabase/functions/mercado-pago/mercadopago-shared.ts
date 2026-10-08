@@ -36,7 +36,7 @@ export async function assertComercio(
 ) {
   const { data, error } = await db.from("comercio_usuarios").select(
     "comercio_id",
-  ).eq("user_id", userId).eq("comercio_id", comercioId).eq("activo", true)
+  ).eq("user_id", userId).eq("comercio_id", comercioId).eq("activo", true).eq("solo_restaurante", false)
     .maybeSingle();
   if (error || !data) throw new Error("No tiene acceso al comercio");
 }

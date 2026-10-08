@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 export type OpcionRestaurante = { id: string; nombre: string; detalle?: string; buscar?: string };
 const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
 
-export function RestauranteBusqueda({ label, value, opciones, cambiar, placeholder = "Sin seleccionar", disabled = false, name, className = "" }: {
+export function RestauranteBusqueda({ label, value, opciones, cambiar, placeholder = "Sin seleccionar", disabled = false, name, className = "", compacto = false }: {
   label: string; value: string; opciones: OpcionRestaurante[]; cambiar: (id: string) => void;
-  placeholder?: string; disabled?: boolean; name?: string; className?: string;
+  placeholder?: string; disabled?: boolean; name?: string; className?: string; compacto?: boolean;
 }) {
   const labelId = useId();
   const [open, setOpen] = useState(false);
@@ -19,12 +19,12 @@ export function RestauranteBusqueda({ label, value, opciones, cambiar, placehold
   const seleccionada = opciones.find(o => o.id === value);
   const palabras = normalizar(buscar).trim().split(/\s+/).filter(Boolean);
   const resultados = opciones.filter(o => palabras.every(palabra => normalizar(`${o.nombre} ${o.detalle || ""} ${o.buscar || ""}`).includes(palabra)));
-  return <div className={`grid gap-2 ${className}`}>
+  return <div className={`grid min-w-0 ${compacto ? "gap-1" : "gap-2"} ${className}`}>
     <span id={labelId} className="text-sm font-medium">{label}</span>
     {name && <input type="hidden" name={name} value={value} />}
-    <div className="flex flex-wrap items-center gap-2 rounded-md border p-3">
+    <div className={`flex items-center gap-2 rounded-md border ${compacto ? "min-h-10 px-2 py-1" : "flex-wrap p-3"}`}>
       <div className="min-w-0 flex-1"><p className="break-words text-sm">{seleccionada?.nombre || (value ? "Selección no disponible" : placeholder)}</p>{seleccionada?.detalle && <p className="text-xs text-muted-foreground">{seleccionada.detalle}</p>}</div>
-      <Button type="button" variant="outline" disabled={disabled} aria-labelledby={labelId} aria-haspopup="dialog" onClick={() => { setBuscar(""); setOpen(true); }}><Search className="mr-2 h-4 w-4" />{value ? "Cambiar" : "Buscar"}</Button>
+      <Button type="button" variant="outline" size={compacto ? "sm" : "default"} className={compacto ? "shrink-0" : undefined} disabled={disabled} aria-labelledby={labelId} aria-haspopup="dialog" onClick={() => { setBuscar(""); setOpen(true); }}><Search className="mr-2 h-4 w-4" />{value ? "Cambiar" : "Buscar"}</Button>
     </div>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-2xl">

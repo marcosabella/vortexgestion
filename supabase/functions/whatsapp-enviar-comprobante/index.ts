@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     ).eq("user_id", userData.user.id).eq("comercio_id", comercioId).eq(
       "activo",
       true,
-    ).maybeSingle();
+    ).eq("solo_restaurante", false).maybeSingle();
     if (!membership) throw new Error("No tiene acceso a este comercio");
     const { data: credentials, error: credentialsError } = await db
       .from("whatsapp_credenciales")

@@ -39,6 +39,7 @@ import { distribucionSecciones } from "@/config/distribucionNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useComercio } from "@/hooks/useComercio";
+import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
 
@@ -222,6 +223,8 @@ export function AppSidebar() {
   const { data: isAdmin } = useIsAppAdmin();
   const { comercio, isLoading: isComercioLoading } = useComercio();
   const campoAccess = useCampoAccess(comercio?.id);
+  const restauranteAccess = useRestauranteAcceso(comercio?.id);
+  const soloRestaurante = restauranteAccess.data?.solo_restaurante;
   const { data: parametrizacion } = useComercioParametrizacion();
   const { notificaciones } = useNotificaciones(true);
 
@@ -328,6 +331,11 @@ export function AppSidebar() {
     icon: typeof Banknote,
     items: MenuItem[],
   ) => {
+    if (soloRestaurante) {
+      if (key === "restaurante") items = items.filter(item => restauranteAccess.data?.permisos.includes(item.url.split("/")[2] as import("@/types/restaurante").PermisoRestaurante));
+      else if (key === "configuracion") items = items.filter(item => item.url === "/seguridad");
+      else return null;
+    }
     if (items.length === 0) return null;
     if (collapsed) return renderCollapsedGroup(label, icon, items);
 
@@ -371,7 +379,7 @@ export function AppSidebar() {
         <SidebarGroup className="mt-2 pb-3">
           <SidebarGroupContent>
             <SidebarMenu>
-              {parametrizacion.inicio.habilitado && (
+              {!soloRestaurante && parametrizacion.inicio.habilitado && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild

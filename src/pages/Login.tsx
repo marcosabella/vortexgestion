@@ -123,7 +123,7 @@ export default function Login() {
               Ventas, clientes, productos y cuenta corriente para cada negocio.
             </h2>
             <p className="mt-5 max-w-xl text-base leading-7 text-white/78">
-              Cada comercio ingresa con su usuario para trabajar sobre sus registros operativos.
+              Cada persona ingresa con su cuenta y los permisos asignados en su comercio.
             </p>
           </div>
 

@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.meta-desautorizacion]
 verify_jwt = false
+
+[functions.restaurante-usuarios]
+verify_jwt = false

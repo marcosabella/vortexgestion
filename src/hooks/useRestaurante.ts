@@ -7,6 +7,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { AccionRestaurante, ResumenRestaurante } from "@/types/restaurante";
+import { generarUuid } from "@/utils/uuid";
 
 type RestauranteDatabase = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Functions"> & { Functions: Database["public"]["Functions"] & {
@@ -28,6 +29,7 @@ export function useRestaurante() {
   const comercioId = comercio?.id;
   const storageKey = `restaurante-intentos:${comercioId}:${user?.id}`;
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
+  const [errorOperacion, setErrorOperacion] = useState<string | null>(null);
   const bloqueo = useRef(false);
   useEffect(() => {
     setPendientes(leerPendientes(storageKey));
@@ -61,6 +63,7 @@ export function useRestaurante() {
   async function ejecutar(intento: Pendiente) {
     if (bloqueo.current) return null;
     bloqueo.current = true;
+    setErrorOperacion(null);
     try {
       const stored = leerPendientes(storageKey);
       if (!stored.some(p => p.clave === intento.clave)) guardar([...stored, intento]);
@@ -71,15 +74,16 @@ export function useRestaurante() {
       return result;
     } catch (error) {
       const err = error as { code?: string; message?: string };
+      setErrorOperacion(err.message || "Verificá la conexión. Podés reintentar la operación pendiente sin duplicarla.");
       if (err.code && /^(P0001|42501|40001|22|23)/.test(err.code)) guardar(leerPendientes(storageKey).filter(p => p.clave !== intento.clave));
       toast({ title: "No se pudo confirmar", description: err.message || "Verificá la conexión. Podés reintentar la operación pendiente sin duplicarla.", variant: "destructive" });
       return null;
     } finally { bloqueo.current = false; }
   }
-  return { ...query, trabajando: mutation.isPending, pendientes,
+  return { ...query, trabajando: mutation.isPending, pendientes, errorOperacion,
     operar: (accion: AccionRestaurante, datos: Json) => {
       const anterior = pendientes.find(p => p.accion === accion && JSON.stringify(p.datos) === JSON.stringify(datos));
-      return ejecutar(anterior || { clave: crypto.randomUUID(), accion, datos });
+      return ejecutar(anterior || { clave: generarUuid(), accion, datos });
     },
     reintentar: (pendiente: Pendiente) => ejecutar(pendiente),
   };

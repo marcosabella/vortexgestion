@@ -7,9 +7,9 @@ import { printHtml } from "@/utils/documentoPrint";
 import { restauranteComandaHtml, restauranteCuentaHtml } from "@/utils/restaurantePrint";
 import type { ComandaRestaurante, PedidoRestaurante, ResumenRestaurante } from "@/types/restaurante";
 
-export function RestauranteImpresion({ data, pedido, comanda, disabled, registrar }: {
+export function RestauranteImpresion({ data, pedido, comanda, disabled, registrar, vertical = false }: {
   data: ResumenRestaurante; pedido: PedidoRestaurante; comanda?: ComandaRestaurante; disabled?: boolean;
-  registrar?: () => Promise<boolean>;
+  registrar?: () => Promise<boolean>; vertical?: boolean;
 }) {
   const { comercio } = useComercio();
   const { toast } = useToast();
@@ -28,8 +28,8 @@ export function RestauranteImpresion({ data, pedido, comanda, disabled, registra
       toast({ title: "No se pudo abrir el documento", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally { setAbriendo(null); }
   };
-  return <div className="flex flex-wrap items-center gap-2">
-    <Button type="button" variant="print" size="sm" disabled={disabled || !comercio || abriendo !== null} onClick={() => void abrir("print")}><Printer className="h-4 w-4" />{abriendo === "print" ? "Abriendo…" : comanda ? comanda.impresiones ? "Reimprimir" : "Imprimir comanda" : "Imprimir detalle de cuenta"}</Button>
-    <Button type="button" variant="cancel" size="sm" aria-label={comanda ? `PDF de comanda #${comanda.numero}` : `PDF de cuenta del pedido #${pedido.numero}`} disabled={disabled || !comercio || abriendo !== null} onClick={() => void abrir("pdf")}><FileDown className="h-4 w-4" />{abriendo === "pdf" ? "Generando…" : "PDF"}</Button>
+  return <div className={vertical ? "grid gap-2 [&>button]:w-full [&>button]:justify-start" : "flex flex-wrap items-center gap-2"}>
+    <Button type="button" variant="print" size="sm" disabled={disabled || !comercio || abriendo !== null} onClick={() => void abrir("print")}><Printer className="h-4 w-4" />{abriendo === "print" ? "Abriendo…" : comanda ? comanda.impresiones ? "Reimprimir" : "Imprimir comanda" : vertical ? "Imprimir cuenta" : "Imprimir detalle de cuenta"}</Button>
+    <Button type="button" variant={vertical ? "outline" : "cancel"} size="sm" aria-label={comanda ? `PDF de comanda #${comanda.numero}` : `PDF de cuenta del pedido #${pedido.numero}`} disabled={disabled || !comercio || abriendo !== null} onClick={() => void abrir("pdf")}><FileDown className="h-4 w-4" />{abriendo === "pdf" ? "Generando…" : "PDF"}</Button>
   </div>;
 }

@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
     const { data: membresia } = await db.from("comercio_usuarios")
       .select("comercio_id")
-      .eq("user_id", user.id).eq("comercio_id", comercioId).eq("activo", true)
+      .eq("user_id", user.id).eq("comercio_id", comercioId).eq("activo", true).eq("solo_restaurante", false)
       .maybeSingle();
     if (!membresia) throw new Error("No tiene acceso al comercio");
 

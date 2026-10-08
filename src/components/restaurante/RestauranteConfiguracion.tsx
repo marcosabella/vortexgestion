@@ -6,9 +6,9 @@ import { RestauranteGrilla, RestauranteAccion } from "./RestauranteGrilla";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { restauranteSecciones } from "@/config/restauranteNavigation";
+import { RestauranteUsuarios } from "./RestauranteUsuarios";
 import { useProductos } from "@/hooks/useProductos";
-import type { AccionRestaurante, ContextoRestaurante, ModalidadRestaurante, PermisoRestaurante } from "@/types/restaurante";
+import type { AccionRestaurante, ContextoRestaurante, ModalidadRestaurante } from "@/types/restaurante";
 import { Field } from "./RestauranteForms";
 import { RestauranteBusqueda } from "./RestauranteBusqueda";
 import { restauranteMoney as money } from "@/utils/restaurante";
@@ -17,7 +17,7 @@ const formatos = [{ id: "58mm", nombre: "Ticket 58 mm" }, { id: "a4", nombre: "A
 const secciones = [
   { id: "general", nombre: "General" }, { id: "sectores", nombre: "Sectores" },
   { id: "mesas", nombre: "Mesas" }, { id: "carta", nombre: "Carta" },
-  { id: "adicionales", nombre: "Adicionales" }, { id: "usuarios", nombre: "Usuarios y funciones" },
+  { id: "adicionales", nombre: "Adicionales" }, { id: "usuarios", nombre: "Usuarios y roles" },
 ];
 function ConfigForm({ title, children, guardar, trabajando, disabled = false }: {
   title: string; children: ReactNode; guardar: (e: FormEvent<HTMLFormElement>) => void; trabajando: boolean; disabled?: boolean;
@@ -29,9 +29,6 @@ export function RestauranteConfiguracion({ data, operar, trabajando }: ContextoR
   const [modalidades, setModalidades] = useState<ModalidadRestaurante[]>(data.config.modalidades);
   const [impresion, setImpresion] = useState(data.config.impresion);
   const [ivaEnvio, setIvaEnvio] = useState(data.config.iva_envio);
-  const [usuario, setUsuario] = useState("");
-  const [permisos, setPermisos] = useState<PermisoRestaurante[]>([]);
-  const [sector, setSector] = useState("");
   const [productoCarta, setProductoCarta] = useState("");
   const [sectorCarta, setSectorCarta] = useState("");
   const [formatoSector, setFormatoSector] = useState("");
@@ -94,13 +91,6 @@ export function RestauranteConfiguracion({ data, operar, trabajando }: ContextoR
         <RestauranteGrilla label="Adicionales configurados" columnas={[{ titulo: "Adicional" }, { titulo: "Precio", derecha: true }, { titulo: "Estado" }, { titulo: "Acciones", derecha: true }]} vacia={!data.adicionales.length ? "No hay adicionales configurados." : undefined}>{data.adicionales.map(a => <TableRow key={a.id}><TableCell className="font-medium">{a.nombre}</TableCell><TableCell className="whitespace-nowrap text-right">{money(a.precio)}</TableCell><TableCell><Badge variant={a.activo ? "secondary" : "outline"}>{a.activo ? "Activo" : "Inactivo"}</Badge></TableCell><TableCell><div className="flex justify-end"><RestauranteAccion icon={Power} variant={a.activo ? "destructive" : "success"} disabled={trabajando} onClick={() => void operar("adicional", { ...a, activo: !a.activo })}>{a.activo ? "Desactivar" : "Activar"}</RestauranteAccion></div></TableCell></TableRow>)}</RestauranteGrilla>
       </ConfigForm>
     </TabsContent>
-    {data.admin && <TabsContent value="usuarios">
-      <ConfigForm title="Usuarios y funciones" trabajando={trabajando} disabled={!usuario} guardar={async e => { e.preventDefault(); if (usuario) await operar("permisos", { usuario_id: usuario, permisos, sector_id: sector || null }); }}>
-        <RestauranteBusqueda label="Usuario activo del comercio" value={usuario} opciones={data.usuarios.map(u => ({ id: u.id, nombre: u.nombre, detalle: u.admin ? "Administración" : "Operador" }))} cambiar={id => { setUsuario(id); const a = data.asignaciones.find(a => a.usuario_id === id); setPermisos(a?.permisos || []); setSector(a?.sector_id || ""); }} disabled={trabajando} />
-        {restauranteSecciones.map(s => <label key={s.vista} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={permisos.includes(s.vista)} onChange={e => setPermisos(e.target.checked ? [...permisos, s.vista] : permisos.filter(x => x !== s.vista))} />{s.title}</label>)}
-        <RestauranteBusqueda label="Sector de cocina asignado" value={sector} opciones={[{ id: "", nombre: "Todos los sectores" }, ...sectores]} cambiar={setSector} disabled={trabajando} />
-        <p className="text-sm">El repartidor consulta únicamente sus envíos. El cierre que genera ventas y facturas requiere administración del comercio; el permiso de cierre permite recibir rendiciones.</p>
-      </ConfigForm>
-    </TabsContent>}
+    {data.admin && <TabsContent value="usuarios"><RestauranteUsuarios data={data} /></TabsContent>}
   </Tabs>;
 }

@@ -1,4 +1,5 @@
 import Restaurante from "@/pages/Restaurante";
+import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
 import { restauranteSecciones } from "@/config/restauranteNavigation";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -228,7 +229,7 @@ function AuthenticatedLayout() {
             </Button>
           </header>
           <main className="flex-1 bg-background">
-            {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <Routes>
+            {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <RestauranteAcceso><Routes>
               <Route path="/" element={<Navigate to={parametrizacion.inicio.habilitado ? "/inicio" : "/caja"} replace />} />
               <Route path="/inicio" element={parametrizacion.inicio.habilitado ? <InicioOperativo /> : <Navigate to="/caja" replace />} />
               <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
@@ -315,7 +316,7 @@ function AuthenticatedLayout() {
               <Route path="/listados/gastos-egresos" element={<ParametrizedRoute modulo="listados"><ListadoGastosEgresos /></ParametrizedRoute>} />
               <Route path="/listados/cuenta-corriente" element={<ParametrizedRoute modulo="listados"><ListadoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="*" element={<NotFound />} />
-            </Routes>}
+            </Routes></RestauranteAcceso>}
           </main>
           <MembershipReminder comercio={comercio} />
           <Dialog open={seleccionRequerida} onOpenChange={() => undefined}>

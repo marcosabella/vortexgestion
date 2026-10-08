@@ -302,7 +302,8 @@ async function getAuthorizedComercioId(req: Request, supabase: any, requestedCom
     .from('comercio_usuarios')
     .select('comercio_id')
     .eq('user_id', userData.user.id)
-    .eq('activo', true);
+    .eq('activo', true)
+    .eq('solo_restaurante', false);
 
   if (requestedComercioId) {
     query = query.eq('comercio_id', requestedComercioId);

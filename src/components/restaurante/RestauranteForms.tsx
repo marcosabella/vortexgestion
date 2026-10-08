@@ -5,35 +5,53 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useClientes } from "@/hooks/useClientes";
+import { useRestauranteClientes } from "@/hooks/useRestauranteClientes";
 import type { ContextoRestaurante, ModalidadRestaurante, PedidoRestaurante } from "@/types/restaurante";
 import { restauranteMoney as money } from "@/utils/restaurante";
 import { RestauranteBusqueda } from "./RestauranteBusqueda";
+import { cn } from "@/lib/utils";
 
-export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-1 text-sm font-medium">{label}{children}</label>; }
-export function Modal({ title, children, close, amplio = false, description = "Completá los datos y confirmá la operación." }: { title: string; children: ReactNode; close: () => void; amplio?: boolean; description?: string }) {
-  return <Dialog open onOpenChange={open => { if (!open) close(); }}><DialogContent className={`max-h-[90dvh] overflow-y-auto ${amplio ? "sm:max-w-5xl" : "sm:max-w-2xl"}`}><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>{children}</DialogContent></Dialog>;
+export function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid min-w-0 gap-1 text-sm font-medium">{label}{children}</label>; }
+export function Modal({ title, children, close, amplio = false, className, description = "Completá los datos y confirmá la operación." }: { title: string; children: ReactNode; close: () => void; amplio?: boolean; className?: string; description?: string }) {
+  return <Dialog open onOpenChange={open => { if (!open) close(); }}><DialogContent className={cn("max-h-[90dvh] overflow-y-auto", amplio ? "sm:max-w-5xl" : "sm:max-w-2xl", className)}><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>{children}</DialogContent></Dialog>;
 }
 const schema = z.object({ modalidad: z.enum(["delivery", "retiro", "mesa"]), cliente_id: z.string(), cliente_nombre: z.string().trim().max(200), direccion: z.string().trim().max(500), telefono: z.string().max(100), comensales: z.coerce.number().int().min(1).max(100), mesa_id: z.string(), costo_envio: z.coerce.number().min(0).multipleOf(0.01), prometido_at: z.string(), observaciones: z.string().max(1000), instrucciones_envio: z.string().max(1000), prioridad: z.boolean() }).superRefine((v, c) => {
   if (v.modalidad === "delivery" && !v.direccion) c.addIssue({ code: "custom", path: ["direccion"], message: "Indicá el domicilio." });
   if (v.modalidad === "mesa" && !v.mesa_id) c.addIssue({ code: "custom", path: ["mesa_id"], message: "Seleccioná una mesa." });
 });
-export function NuevoPedido({ data, operar, trabajando, close, abrir, mesaId }: ContextoRestaurante & { close: () => void; abrir: (id: string) => void; mesaId?: string }) {
-  const { data: clientes = [] } = useClientes();
+export function NuevoPedido({ data, operar, trabajando, errorOperacion, close, abrir, mesaId }: ContextoRestaurante & { close: () => void; abrir: (id: string) => void; mesaId?: string }) {
+  const clientesQuery = useRestauranteClientes();
+  const clientes = clientesQuery.data || [];
+  const [rechazado, setRechazado] = useState(false);
   const modalidades = data.config.modalidades.filter(m => data.admin || data.permisos.includes(m === "mesa" ? "salon" : "pedidos"));
-  const { register, watch, setValue, handleSubmit, formState: { errors } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { modalidad: mesaId ? "mesa" : modalidades[0], cliente_id: "", cliente_nombre: "", direccion: "", telefono: "", comensales: 1, mesa_id: mesaId || "", costo_envio: 0, prometido_at: "", observaciones: "", instrucciones_envio: "", prioridad: false } });
+  const { register, watch, setValue, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { modalidad: mesaId ? "mesa" : modalidades[0], cliente_id: "", cliente_nombre: "", direccion: "", telefono: "", comensales: 1, mesa_id: mesaId || "", costo_envio: 0, prometido_at: "", observaciones: "", instrucciones_envio: "", prioridad: false } });
   const modalidad = watch("modalidad");
-  return <Modal title="1. Registrar pedido" close={close}><form className="grid gap-4" onSubmit={handleSubmit(async v => { const id = await operar("pedido", { ...v, costo_envio: v.modalidad === "delivery" ? v.costo_envio : 0, prometido_at: v.prometido_at ? new Date(v.prometido_at).toISOString() : null }); if (id) { close(); abrir(id); } })}>
-    <RestauranteBusqueda label="Modalidad" value={modalidad} opciones={modalidades.map(m => ({ id: m, nombre: m === "mesa" ? "Salón / mesa" : m === "retiro" ? "Retiro" : "Delivery" }))} cambiar={id => setValue("modalidad", id as ModalidadRestaurante, { shouldValidate: true, shouldDirty: true })} disabled={trabajando} />
-    <RestauranteBusqueda label="Cliente de Vortex (opcional)" value={watch("cliente_id")} opciones={[{ id: "", nombre: "Consumidor final / nombre libre" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: `${c.apellido} ${c.nombre}`, detalle: [c.cuit, c.telefono, c.localidad].filter(Boolean).join(" · ") }))]} cambiar={id => { setValue("cliente_id", id, { shouldDirty: true }); const c = clientes.find(c => c.id === id); if (c) { setValue("cliente_nombre", `${c.nombre} ${c.apellido}`); setValue("direccion", `${c.calle} ${c.numero}, ${c.localidad}`); setValue("telefono", c.telefono || ""); } }} disabled={trabajando} />
-    <Field label="Nombre"><Input {...register("cliente_nombre")} /></Field>
-    <Field label="Teléfono"><Input type="tel" {...register("telefono")} /></Field>
-    {modalidad === "mesa" && <><RestauranteBusqueda label="Mesa libre" value={watch("mesa_id")} opciones={data.mesas.filter(m => m.activo && !data.cuenta_mesas.some(c => c.mesa_id === m.id && c.activa)).map(m => ({ id: m.id, nombre: m.nombre, detalle: `${m.capacidad} personas` }))} cambiar={id => setValue("mesa_id", id, { shouldValidate: true, shouldDirty: true })} disabled={trabajando} /><Field label="Comensales"><Input type="number" {...register("comensales")} /></Field></>}
-    {modalidad === "delivery" && <><Field label="Domicilio de entrega"><Input {...register("direccion")} /></Field><Field label="Costo de envío"><Input type="number" step="0.01" {...register("costo_envio")} /></Field><Field label="Indicaciones para el reparto"><Input {...register("instrucciones_envio")} /></Field></>}
-    <Field label="Horario prometido (opcional)"><Input type="datetime-local" {...register("prometido_at")} /></Field><Field label="Observaciones para cocina"><Input {...register("observaciones")} /></Field>
-    <label className="flex items-center gap-2"><input type="checkbox" {...register("prioridad")} /> Prioridad</label>
+  return <Modal title="1. Registrar pedido" close={close} className="w-[calc(100%-2rem)] sm:max-w-4xl" description="Elegí la modalidad y completá los datos del pedido para agregar productos."><form noValidate className="grid gap-4" onSubmit={handleSubmit(async v => {
+    setRechazado(false);
+    try {
+      const id = await operar("pedido", { ...v, costo_envio: v.modalidad === "delivery" ? v.costo_envio : 0, prometido_at: v.prometido_at ? new Date(v.prometido_at).toISOString() : null });
+      if (id) { close(); abrir(id); } else setRechazado(true);
+    } catch (error) {
+      setError("root", { message: error instanceof Error ? error.message : "No se pudo crear el pedido. Volvé a intentar." });
+    }
+  })}>
+    <div className="grid items-start gap-3 sm:grid-cols-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+      <RestauranteBusqueda compacto label="Modalidad" value={modalidad} opciones={modalidades.map(m => ({ id: m, nombre: m === "mesa" ? "Salón / mesa" : m === "retiro" ? "Retiro" : "Delivery" }))} cambiar={id => setValue("modalidad", id as ModalidadRestaurante, { shouldValidate: true, shouldDirty: true })} disabled={trabajando} />
+      {modalidad === "mesa" && <><RestauranteBusqueda compacto label="Mesa libre" value={watch("mesa_id")} opciones={data.mesas.filter(m => m.activo && !data.cuenta_mesas.some(c => c.mesa_id === m.id && c.activa)).map(m => ({ id: m.id, nombre: m.nombre, detalle: `${m.capacidad} personas` }))} cambiar={id => setValue("mesa_id", id, { shouldValidate: true, shouldDirty: true })} disabled={trabajando} /><Field label="Comensales"><Input type="number" {...register("comensales")} /></Field></>}
+    </div>
+    <fieldset className="grid gap-3 border-t pt-3"><legend className="pr-2 text-sm font-semibold">Datos del cliente</legend>
+      <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_12rem]">
+        <RestauranteBusqueda compacto label="Cliente de Vortex (opcional)" value={watch("cliente_id")} opciones={[{ id: "", nombre: "Consumidor final / nombre libre" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: [c.apellido, c.nombre].filter(Boolean).join(" "), detalle: [c.cuit, c.telefono, c.localidad].filter(Boolean).join(" · ") }))]} cambiar={id => { setValue("cliente_id", id, { shouldDirty: true }); const c = clientes.find(c => c.id === id); if (c) { setValue("cliente_nombre", [c.nombre, c.apellido].filter(Boolean).join(" ")); setValue("direccion", [[c.calle, c.numero].filter(Boolean).join(" "), c.localidad].filter(Boolean).join(", ")); setValue("telefono", c.telefono || ""); } }} disabled={trabajando} />
+        <Field label="Nombre (opcional)"><Input {...register("cliente_nombre")} /></Field>
+        <Field label="Teléfono (opcional)"><Input type="tel" {...register("telefono")} /></Field>
+      </div>
+    {clientesQuery.error && <p role="alert" className="text-sm text-destructive">No se pudieron cargar los clientes. <button type="button" className="underline" onClick={() => void clientesQuery.refetch()}>Reintentar</button></p>}
+    </fieldset>
+    {modalidad === "delivery" && <fieldset className="grid gap-3 border-t pt-3"><legend className="pr-2 text-sm font-semibold">Entrega</legend><div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]"><Field label="Domicilio de entrega"><Input {...register("direccion")} /></Field><Field label="Costo de envío"><Input type="number" step="0.01" {...register("costo_envio")} /></Field></div><Field label="Indicaciones para el reparto"><Input {...register("instrucciones_envio")} /></Field></fieldset>}
+    <div className="grid items-start gap-3 border-t pt-3 md:grid-cols-[15rem_minmax(0,1fr)]"><Field label="Horario prometido (opcional)"><Input type="datetime-local" {...register("prometido_at")} /></Field><Field label="Observaciones para cocina"><Input {...register("observaciones")} /></Field></div>
     {Object.entries(errors).map(([key, e]) => <p key={key} role="alert" className="text-sm text-destructive">{e.message}</p>)}
-    <Button disabled={trabajando || !modalidades.length}>Crear y agregar productos</Button>
+    {rechazado && <p role="alert" className="text-sm text-destructive">{errorOperacion || "No se pudo confirmar el pedido. Verificá la conexión y volvé a intentar."}</p>}
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("prioridad")} /> Prioridad</label><Button type="submit" className="w-full sm:w-auto" disabled={trabajando || isSubmitting || !modalidades.length}>{trabajando || isSubmitting ? "Creando pedido…" : "Crear y agregar productos"}</Button></div>
   </form></Modal>;
 }
 export function AgregarProducto({ data, operar, trabajando, pedido, close }: ContextoRestaurante & { pedido: PedidoRestaurante; close: () => void }) {

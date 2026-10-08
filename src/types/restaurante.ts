@@ -19,7 +19,7 @@ export type ItemRestaurante = {
   created_at: string;
 };
 export type ComandaRestaurante = { id: string; numero: number; pedido_id: string; sector_id: string; impresiones: number; aviso_cancelacion: boolean; created_at: string };
-export type CobroRestaurante = { id: string; pedido_id: string; monto: number; medio: string; pagador: string; usuario_id: string; anulado: boolean; motivo_anulacion: string; rendicion_id: string | null; created_at: string };
+export type CobroRestaurante = { id: string; pedido_id: string; monto: number; medio: string; pagador: string; usuario_id: string; recibido_por?: string | null; responsable_id?: string; anulado: boolean; motivo_anulacion: string; rendicion_id: string | null; created_at: string };
 export type ResumenRestaurante = {
   admin: boolean; usuario_id: string; permisos: PermisoRestaurante[]; sector_id: string | null;
   config: { modalidades: ModalidadRestaurante[]; impresion: "58mm" | "a4"; iva_envio: number };
@@ -38,4 +38,4 @@ export type ResumenRestaurante = {
   asignaciones: { usuario_id: string; permisos: PermisoRestaurante[]; sector_id: string | null }[];
 };
 export type OperarRestaurante = (accion: AccionRestaurante, datos: Json) => Promise<string | null>;
-export type ContextoRestaurante = { data: ResumenRestaurante; operar: OperarRestaurante; trabajando: boolean };
+export type ContextoRestaurante = { data: ResumenRestaurante; operar: OperarRestaurante; trabajando: boolean; errorOperacion?: string | null };

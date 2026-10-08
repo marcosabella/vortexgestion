@@ -4,13 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { RestauranteAccion, RestauranteGrilla } from "./RestauranteGrilla";
 import { RestauranteImpresion } from "./RestauranteImpresion";
+import { RestauranteMesasMovil } from "./RestauranteMesasMovil";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { restauranteAbierto, restauranteMesas, restauranteMoney as money, restauranteTiempo } from "@/utils/restaurante";
 import type { AccionRestaurante, ComandaRestaurante, PedidoRestaurante, ResumenRestaurante } from "@/types/restaurante";
 
 export function RestauranteMesasGrilla({ data, buscar, abrir, ocupar, estado }: {
   data: ResumenRestaurante; buscar: string; abrir: (id: string) => void; ocupar: (id: string) => void; estado: (p: PedidoRestaurante) => ReactNode;
 }) {
+  const isMobile = useIsMobile();
   const mesas = data.mesas.filter(m => m.activo).map(m => ({ ...m, pedido: data.pedidos.find(p => data.cuenta_mesas.some(c => c.activa && c.mesa_id === m.id && c.pedido_id === p.id)) })).filter(m => `${m.nombre} ${m.pedido?.numero || ""} ${m.pedido?.cliente_nombre || ""}`.toLowerCase().includes(buscar.toLowerCase()));
+  if (isMobile) return <RestauranteMesasMovil mesas={mesas} abrir={abrir} ocupar={ocupar} />;
   return <RestauranteGrilla label="Salón y mesas" columnas={[{ titulo: "Mesa" }, { titulo: "Capacidad", derecha: true }, { titulo: "Comensales", derecha: true }, { titulo: "Pedido / cliente" }, { titulo: "Estado" }, { titulo: "Cuenta" }, { titulo: "Total", derecha: true }, { titulo: "Acciones", derecha: true }]} vacia={!mesas.length ? "No hay mesas para mostrar." : undefined}>
     {mesas.map(m => <TableRow key={m.id}>
       <TableCell className="font-medium">{m.nombre}</TableCell><TableCell className="text-right">{m.capacidad}</TableCell><TableCell className="text-right">{m.pedido?.comensales || "—"}</TableCell>

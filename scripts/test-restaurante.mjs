@@ -1,4 +1,5 @@
 import { runTests } from "./fixtures/restaurante-tests.mjs";
+import { prepareUsuariosTests, runUsuariosTests } from "./fixtures/restaurante-usuarios-tests.mjs";
 // Integración en PostgreSQL temporal local. Nunca usa Supabase ni datos remotos.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -78,7 +79,9 @@ try {
   sql(migration('20260916180000_ventas_desde_orden_permiten_stock_negativo.sql'));
   sql('CREATE TRIGGER stock_insert AFTER INSERT ON venta_items FOR EACH ROW EXECUTE FUNCTION apply_venta_item_stock();');
   for (const file of ["20261008100000_restaurante_estructura.sql","20261008110000_restaurante_operaciones.sql","20261008120000_restaurante_consultas.sql"]) sql(migration(file));
+  prepareUsuariosTests({sql,tenant,migration});
   await runTests({sql,test,actor,call,check,fails,asyncSql,tenant,other,admin,driver,stranger,client,foreignClient,product,foreignProduct,json});
+  runUsuariosTests({sql,test,actor,check,fails,tenant,other,admin,driver,stranger,migration});
   console.log(passed + ' pruebas PostgreSQL locales correctas.');
 } catch(error) { console.error(error); process.exitCode=1; }
 finally {
