@@ -1,4 +1,6 @@
 import Restaurante from "@/pages/Restaurante";
+import RestauranteTerminal from "@/pages/RestauranteTerminal";
+import { restauranteTerminalKey } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
 import { restauranteSecciones } from "@/config/restauranteNavigation";
 import { Toaster } from "@/components/ui/toaster";
@@ -183,7 +185,7 @@ function AuthenticatedLayout() {
   }
 
   if (!session) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to={localStorage.getItem(restauranteTerminalKey) ? "/restaurante-terminal" : "/login"} replace state={{ from: location }} />;
   }
 
   if (comercioLoading) {
@@ -200,7 +202,7 @@ function AuthenticatedLayout() {
     await signOut();
     localStorage.removeItem("selectedComercioId");
     queryClient.clear();
-    navigate("/login", { replace: true });
+    navigate(localStorage.getItem(restauranteTerminalKey) ? "/restaurante-terminal" : "/login", { replace: true });
   };
 
   return (
@@ -227,6 +229,7 @@ function AuthenticatedLayout() {
               <LogOut className="h-4 w-4" />
               Salir
             </Button>
+            {localStorage.getItem(restauranteTerminalKey) && <Button variant="outline" size="sm" onClick={() => navigate("/restaurante-terminal")}>Cambiar empleado</Button>}
           </header>
           <main className="flex-1 bg-background">
             {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <RestauranteAcceso><Routes>
@@ -359,6 +362,7 @@ const App = () => (
             <Route path="/terminos" element={<TermsOfService />} />
             <Route path="/eliminacion-de-datos" element={<DataDeletion />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/restaurante-terminal" element={<RestauranteTerminal />} />
             <Route path="/login/:comercioId" element={<Login />} />
             <Route path="/*" element={<AuthenticatedLayout />} />
           </Routes>

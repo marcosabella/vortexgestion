@@ -2,7 +2,7 @@ import type { Json } from "@/integrations/supabase/types";
 
 export type PermisoRestaurante = "pedidos" | "salon" | "cocina" | "despacho" | "envios" | "cobros" | "cierre" | "configuracion";
 export type ModalidadRestaurante = "delivery" | "retiro" | "mesa";
-export type AccionRestaurante = "config" | "sector" | "mesa" | "carta" | "adicional" | "permisos" | "pedido" | "agregar" | "enviar" | "aceptar" | "preparar" | "listo" | "reconocer" | "impresion" | "servir" | "armar" | "retirar" | "asignar_envio" | "salida" | "entregar" | "incidencia" | "cancelar" | "cancelar_item" | "mover_mesa" | "unir" | "solicitar_cuenta" | "cobro" | "anular_cobro" | "cerrar" | "rendir";
+export type AccionRestaurante = "config" | "sector" | "mesa" | "carta" | "adicional" | "permisos" | "pedido" | "agregar" | "enviar" | "aceptar" | "preparar" | "listo" | "reconocer" | "impresion" | "servir" | "armar" | "retirar" | "asignar_envio" | "salida" | "entregar" | "incidencia" | "cancelar" | "cancelar_item" | "mover_mesa" | "unir" | "solicitar_cuenta" | "cobro" | "anular_cobro" | "cerrar" | "rendir" | "reserva_guardar" | "reserva_cancelar" | "reserva_ausente" | "reserva_recibir";
 export type PedidoRestaurante = {
   id: string; numero: number; modalidad: ModalidadRestaurante; cliente_id: string | null;
   cliente_nombre: string; direccion: string; telefono: string; comensales: number;

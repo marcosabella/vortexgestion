@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { RestauranteGrilla } from "./RestauranteGrilla";
+import { RestaurantePin } from "./RestaurantePin";
 
 const schema = z.object({ nombre: z.string().trim().min(1, "Ingresá un nombre").max(100), email: z.string().trim().email("Ingresá un email válido"), password: z.string().max(128), roles: z.array(z.enum(["mozo", "repartidor", "cocina", "barra"])).min(1, "Seleccioná una función"), sector_id: z.string(), cobros: z.boolean(), activo: z.boolean() }).superRefine((v, ctx) => {
   if (v.roles.some(r => r === "cocina" || r === "barra") && (v.roles.length !== 1 || !v.sector_id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["sector_id"], message: "Cocina o barra requieren un único rol y un sector de preparación." });
@@ -62,5 +63,6 @@ export function RestauranteUsuarios({ data }: { data: ResumenRestaurante }) {
         <div className="flex flex-wrap gap-2"><Button disabled={mutation.isPending || query.isError}>{mutation.isPending ? "Guardando…" : editando ? "Guardar acceso" : "Crear usuario"}</Button>{editando && <Button type="button" variant="outline" onClick={nuevo}>Cancelar edición</Button>}</div>
       </form>
     </section>
+    {query.data && <RestaurantePin usuarios={query.data} />}
   </div>;
 }

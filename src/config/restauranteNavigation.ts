@@ -1,7 +1,10 @@
-import { ClipboardList, UtensilsCrossed, CookingPot, PackageCheck, Truck, CreditCard, Banknote, Settings } from "lucide-react";
+import { ClipboardList, UtensilsCrossed, CookingPot, PackageCheck, Truck, CreditCard, Banknote, Settings, CalendarDays } from "lucide-react";
+import type { PermisoRestaurante } from "@/types/restaurante";
+export const restaurantePermisoVista = (vista: string): PermisoRestaurante => (vista === "reservas" ? "salon" : vista) as PermisoRestaurante;
 export const restauranteSecciones = [
   { vista: "pedidos", title: "Pedidos", icon: ClipboardList },
   { vista: "salon", title: "Salón y mesas", icon: UtensilsCrossed },
+  { vista: "reservas", title: "Reservas", icon: CalendarDays },
   { vista: "cocina", title: "Cocina y comandas", icon: CookingPot },
   { vista: "despacho", title: "Despacho y retiro", icon: PackageCheck },
   { vista: "envios", title: "Envíos", icon: Truck },

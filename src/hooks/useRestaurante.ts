@@ -13,6 +13,7 @@ type RestauranteDatabase = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Functions"> & { Functions: Database["public"]["Functions"] & {
     restaurante_resumen: { Args: { p_comercio_id: string }; Returns: Json };
     restaurante_operar: { Args: { p_comercio_id: string; p_accion: string; p_datos: Json; p_clave: string }; Returns: string };
+    restaurante_reserva_operar: { Args: { p_comercio_id: string; p_accion: string; p_datos: Json; p_clave: string }; Returns: string };
   } };
 };
 type Pendiente = { clave: string; accion: AccionRestaurante; datos: Json };
@@ -55,7 +56,7 @@ export function useRestaurante() {
   const mutation = useMutation({
     mutationFn: async (intento: Pendiente) => {
       if (!comercioId || !user) throw new Error("Seleccioná un comercio e iniciá sesión.");
-      const { data, error } = await client.rpc("restaurante_operar", { p_comercio_id: comercioId, p_accion: intento.accion, p_datos: intento.datos, p_clave: intento.clave });
+      const { data, error } = await client.rpc(intento.accion.startsWith("reserva_") ? "restaurante_reserva_operar" : "restaurante_operar", { p_comercio_id: comercioId, p_accion: intento.accion, p_datos: intento.datos, p_clave: intento.clave });
       if (error) throw error;
       return data;
     },

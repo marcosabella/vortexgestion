@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useComercio } from "@/hooks/useComercio";
 import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
 import { Button } from "@/components/ui/button";
+import { restaurantePermisoVista } from "@/config/restauranteNavigation";
 
 export function RestauranteAcceso({ children }: { children: ReactNode }) {
   const { comercio } = useComercio();
@@ -15,7 +16,7 @@ export function RestauranteAcceso({ children }: { children: ReactNode }) {
   if (acceso?.solo_restaurante && location.pathname !== "/seguridad") {
     if (!acceso.permisos.length) return <p className="p-6" role="alert">Tu acceso a Restaurante está desactivado. Comunicate con el administrador.</p>;
     const vista = location.pathname.split("/")[2];
-    if (!location.pathname.startsWith("/restaurante/") || !acceso.permisos.includes(vista as typeof acceso.permisos[number])) {
+    if (!location.pathname.startsWith("/restaurante/") || !acceso.permisos.includes(restaurantePermisoVista(vista))) {
       return <Navigate to={`/restaurante/${acceso.permisos[0]}`} replace />;
     }
   }

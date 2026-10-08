@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.restaurante-usuarios]
 verify_jwt = false
+
+[functions.restaurante-pin]
+verify_jwt = false

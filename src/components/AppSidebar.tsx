@@ -34,7 +34,7 @@ import {
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ModuloSistema } from "@/config/parametrizacion";
-import { restauranteSecciones } from "@/config/restauranteNavigation";
+import { restauranteSecciones, restaurantePermisoVista } from "@/config/restauranteNavigation";
 import { distribucionSecciones } from "@/config/distribucionNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
@@ -332,7 +332,7 @@ export function AppSidebar() {
     items: MenuItem[],
   ) => {
     if (soloRestaurante) {
-      if (key === "restaurante") items = items.filter(item => restauranteAccess.data?.permisos.includes(item.url.split("/")[2] as import("@/types/restaurante").PermisoRestaurante));
+      if (key === "restaurante") items = items.filter(item => restauranteAccess.data?.permisos.includes(restaurantePermisoVista(item.url.split("/")[2])));
       else if (key === "configuracion") items = items.filter(item => item.url === "/seguridad");
       else return null;
     }

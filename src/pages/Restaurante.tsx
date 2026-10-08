@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { useRestaurante } from "@/hooks/useRestaurante";
 import { useComercio } from "@/hooks/useComercio";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { restauranteSecciones } from "@/config/restauranteNavigation";
+import { restauranteSecciones, restaurantePermisoVista, type VistaRestaurante } from "@/config/restauranteNavigation";
+import { RestauranteReservas } from "@/components/restaurante/RestauranteReservas";
 import { NuevoPedido, AgregarProducto } from "@/components/restaurante/RestauranteForms";
 import { RestauranteOperacion, type OperacionElegida } from "@/components/restaurante/RestauranteOperacion";
 import { RestauranteBusqueda } from "@/components/restaurante/RestauranteBusqueda";
@@ -30,7 +31,7 @@ function Etapa({ p, items, envio }: { p: PedidoRestaurante; items: ItemRestauran
   const texto = !abierto(p) ? p.estado : envio || (p.cuenta === "solicitada" ? "Cuenta solicitada" : activos.length && activos.every(i => i.estado === "entregada") ? "Entregado · pendiente de cierre" : p.armado ? "Armado" : activos.length && activos.every(i => ["lista", "entregada"].includes(i.estado)) ? "Listo" : p.estado);
   return <Badge className="max-w-full whitespace-normal break-words" variant={p.prioridad ? "destructive" : "secondary"}>{texto}</Badge>;
 }
-export default function Restaurante({ vista }: { vista: PermisoRestaurante }) {
+export default function Restaurante({ vista }: { vista: VistaRestaurante }) {
   const query = useRestaurante(); const { comercio } = useComercio();
   const salonMovil = useIsMobile() && vista === "salon";
   const [nuevo, setNuevo] = useState<string | boolean>(false); const [detalle, setDetalle] = useState<string | null>(null); const [agregar, setAgregar] = useState(false);
@@ -76,11 +77,11 @@ export default function Restaurante({ vista }: { vista: PermisoRestaurante }) {
     </TableCell>
   </TableRow>;
   return <div className="grid min-w-0 gap-5 p-4 md:p-6">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div>{!salonMovil && <p className="text-sm text-muted-foreground">Vortex Restaurante / Delivery</p>}<h1 className="text-2xl font-bold">{restauranteSecciones.find(s => s.vista === vista)?.title}</h1>{!salonMovil && <p className="mt-1 text-sm text-muted-foreground">{instrucciones[vista]}</p>}</div>{!salonMovil && ["pedidos", "salon"].includes(vista) && puede(vista) && <Button variant="new" onClick={() => setNuevo(true)}><Plus className="h-4 w-4" />Nuevo pedido / abrir mesa</Button>}</header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div>{!salonMovil && <p className="text-sm text-muted-foreground">Vortex Restaurante / Delivery</p>}<h1 className="text-2xl font-bold">{restauranteSecciones.find(s => s.vista === vista)?.title}</h1>{!salonMovil && <p className="mt-1 text-sm text-muted-foreground">{vista === "reservas" ? "Organizá las reservas y recibí al cliente para abrir su cuenta." : instrucciones[vista]}</p>}</div>{!salonMovil && ["pedidos", "salon"].includes(vista) && puede(restaurantePermisoVista(vista)) && <Button variant="new" onClick={() => setNuevo(true)}><Plus className="h-4 w-4" />Nuevo pedido / abrir mesa</Button>}</header>
     {!online && <p role="status" className="rounded border p-3">Sin conexión. No confirmes una entrega o cobro hasta recibir respuesta del sistema. Al volver la conexión se actualizarán los datos.</p>}
     {query.error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded border p-3"><p>No se pudo actualizar la bandeja: {query.error.message}. Se muestra la última consulta recibida.</p><Button variant="outline" onClick={() => void query.refetch()}>Actualizar</Button></div>}
     {query.pendientes.length > 0 && <section className="grid gap-2 rounded border p-3"><p>Operaciones pendientes de confirmación. Reintentá para comprobar el resultado sin duplicar registros.</p>{query.pendientes.map(p => <Button key={p.clave} variant="outline" disabled={query.trabajando} onClick={() => void query.reintentar(p)}>Reintentar {p.accion}</Button>)}</section>}
-    {!puede(vista) ? <p>Tu usuario no tiene permiso para esta pantalla. Elegí una opción disponible.</p> : vista === "configuracion" ? <RestauranteConfiguracion {...ctx} /> : <>
+    {!puede(restaurantePermisoVista(vista)) ? <p>Tu usuario no tiene permiso para esta pantalla. Elegí una opción disponible.</p> : vista === "configuracion" ? <RestauranteConfiguracion {...ctx} /> : vista === "reservas" ? <RestauranteReservas {...ctx} abrir={id => setDetalle(id)} /> : <>
       {!salonMovil && <div className="flex flex-wrap gap-3"><Input className="max-w-sm" aria-label="Buscar pedido" placeholder="Pedido, cliente o mesa…" value={buscar} onChange={e => setBuscar(e.target.value)} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={historial} onChange={e => setHistorial(e.target.checked)} />Incluir finalizados</label>{vista === "cocina" && <RestauranteBusqueda label="Sector de cocina" className="w-full sm:max-w-xs" value={sector} opciones={[{ id: "", nombre: "Todos los sectores disponibles" }, ...data.sectores.filter(s => !data.sector_id || data.sector_id === s.id).map(s => ({ id: s.id, nombre: s.nombre }))]} cambiar={setSector} />}{vista === "cierre" && <Button disabled={query.trabajando || !hayRendicion} title={hayRendicion ? "Recibir efectivo pendiente" : "No hay cobros en efectivo disponibles para rendir"} onClick={() => accion("rendir")}><CreditCard className="h-4 w-4" />Recibir rendición</Button>}</div>}
       {vista === "salon" ? <RestauranteMesasGrilla data={data} buscar={salonMovil ? "" : buscar} abrir={setDetalle} ocupar={setNuevo} estado={p => <Etapa p={p} items={itemsPedido(p)} />} />
       : vista === "cocina" ? <RestauranteCocinaGrilla data={data} comandas={comandas} ahora={ahora} trabajando={query.trabajando} ejecutar={ejecutar} imprimir={imprimir} />
