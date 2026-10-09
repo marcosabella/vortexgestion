@@ -10,7 +10,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus, CreditCard } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus, CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
 import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
@@ -20,7 +21,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
 import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf";
-import { enviarComprobantePorWhatsApp } from "@/hooks/useWhatsAppComprobante";
+import { enviarComprobantePorWhatsApp, useWhatsAppConexion } from "@/hooks/useWhatsAppComprobante";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
+import { compartirPdfWhatsApp } from "@/utils/compartirWhatsApp";
+import { ToastAction } from "@/components/ui/toast";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
 import { useMercadoPago } from "@/hooks/useMercadoPago";
@@ -28,6 +32,8 @@ import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
 const automaticWhatsAppEnabled = import.meta.env.VITE_WHATSAPP_API_ENABLED === "true";
+const ventasPageSizes = [12, 24, 48, 96];
+const ventasPageSizeStorageKey = "ventas-registros-por-pagina";
 
 interface OperacionMercadoPagoVenta {
   id: string;
@@ -46,8 +52,11 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
   const { ventas, isLoading, deleteVenta } = useVentas();
   const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
-  const { comercio } = useComercio();
-  const { data: afipConfig } = useAfipConfig();
+  const { comercio, isLoading: comercioLoading } = useComercio();
+  const { data: afipConfig, isLoading: afipLoading } = useAfipConfig();
+  const { data: parametrizacion } = useComercioParametrizacion();
+  const apiHabilitada = automaticWhatsAppEnabled && parametrizacion.modulos.whatsapp;
+  const { data: whatsappConexion } = useWhatsAppConexion(comercio?.id, apiHabilitada);
   const hasAfipCertificates = Boolean(
     afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
   );
@@ -63,6 +72,15 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
   const [habilitarPagoMembresia, setHabilitarPagoMembresia] = useState(false);
   const [cuentaCobroId, setCuentaCobroId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(ventasPageSizeStorageKey));
+      return ventasPageSizes.includes(saved) ? saved : 12;
+    } catch {
+      return 12;
+    }
+  });
   const [qrPreview, setQrPreview] = useState("");
   const [showCancelMercadoPagoDialog, setShowCancelMercadoPagoDialog] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
@@ -109,6 +127,10 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
     setShowCancelMercadoPagoDialog(false);
     await mercadoPagoStatus.refetch();
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize, comercio?.id]);
 
   useEffect(() => {
     const ventaId = detalleId || searchParams.get("detalle");
@@ -228,6 +250,26 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
       return Number(b.numero_comprobante) - Number(a.numero_comprobante);
     });
 
+  const totalPages = Math.max(1, Math.ceil(filteredVentas.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const firstIndex = (activePage - 1) * pageSize;
+  const paginatedVentas = filteredVentas.slice(firstIndex, firstIndex + pageSize);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const changePageSize = (value: string) => {
+    const size = Number(value);
+    if (!ventasPageSizes.includes(size)) return;
+    setPageSize(size);
+    try {
+      localStorage.setItem(ventasPageSizeStorageKey, value);
+    } catch {
+      // La seleccion sigue funcionando si el navegador no permite guardarla.
+    }
+  };
+
   const getTipoComprobanteBadgeVariant = (tipo: string) => {
     if (tipo.includes('factura')) return 'default';
     if (tipo.includes('nota')) return 'secondary';
@@ -330,33 +372,17 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
     ].join("\n");
   };
 
-  const downloadFile = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const openWhatsAppText = (venta: Venta) => {
-    const phone = getWhatsAppPhone(venta.cliente?.telefono);
-    const text = encodeURIComponent(buildWhatsAppMessage(venta));
-    const url = phone
-      ? `https://wa.me/${phone}?text=${text}`
-      : `https://wa.me/?text=${text}`;
-
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleSendWhatsApp = async (venta: Venta) => {
-    const message = buildWhatsAppMessage(venta);
-    let qrDataUrl = "";
-
-    if (venta.cae?.trim() && comercio && afipConfig) {
-      try {
+  const { data: comprobanteFile, isFetching: preparandoPdf, refetch: prepararPdf } = useQuery({
+    queryKey: ["venta-whatsapp-pdf", selectedVenta, comercio, afipConfig],
+    enabled: showDetails && Boolean(selectedVenta) && !comercioLoading && !afipLoading,
+    gcTime: 0,
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const venta = selectedVenta!;
+      let qrDataUrl = "";
+      if (venta.cae?.trim() && comercio && afipConfig) {
         qrDataUrl = await generarQRAfip({
           fecha: venta.fecha_venta,
           cuit: comercio.cuit,
@@ -367,72 +393,65 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
           cae: venta.cae,
           cuitReceptor: venta.cliente?.cuit,
         });
-      } catch (error) {
-        console.error("Error generando QR ARCA para WhatsApp:", error);
       }
-    }
+      return buildFacturaWhatsAppPdfFile({ venta, comercio, afipConfig, qrDataUrl });
+    },
+  });
 
-    let comprobanteFile: File;
-
+  const compartirManualmente = async (venta: Venta, file: File, soloChat = false) => {
+    const phone = getWhatsAppPhone(venta.cliente?.telefono);
+    const text = buildWhatsAppMessage(venta);
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
     try {
-      comprobanteFile = await buildFacturaWhatsAppPdfFile({ venta, comercio, afipConfig, qrDataUrl });
+      const resultado = await compartirPdfWhatsApp({
+        title: `Comprobante ${venta.numero_comprobante}`, text, files: [file],
+      }, url, soloChat);
+      if (resultado === "descargado") {
+        toast({ title: "Comprobante descargado", description: "Adjuntá el PDF descargado al chat de WhatsApp." });
+      }
     } catch (error) {
-      console.error("No se pudo generar el comprobante ARCA PDF para WhatsApp:", error);
+      console.error("No se pudo compartir el comprobante:", error);
       toast({
-        title: "No se pudo generar el PDF",
-        description: "No se pudo preparar el comprobante ARCA para compartir.",
-        variant: "destructive",
+        title: "No se pudo abrir el selector de compartir",
+        description: "Podés abrir WhatsApp y adjuntar el PDF descargado.",
+        action: <ToastAction altText="Descargar el PDF y abrir WhatsApp" onClick={() => compartirManualmente(venta, file, true)}>Abrir WhatsApp</ToastAction>,
       });
+    }
+  };
+
+  const handleSendWhatsApp = async (venta: Venta) => {
+    if (!comprobanteFile) {
+      const resultado = await prepararPdf();
+      toast(resultado.data
+        ? { title: "PDF preparado", description: "Presioná WhatsApp nuevamente para compartirlo." }
+        : { title: "No se pudo generar el PDF", description: "Reintentá preparar el comprobante.", variant: "destructive" });
       return;
     }
-
-    // Mientras Meta no esté habilitado, se prioriza la acción manual para que el
-    // navegador conserve el permiso de mostrar el selector de compartir.
-    if (automaticWhatsAppEnabled && venta.id && comercio?.id) {
-      setIsSendingWhatsApp(true);
-      try {
-        await enviarComprobantePorWhatsApp({
-          ventaId: venta.id,
-          comercioId: comercio.id,
-          file: comprobanteFile,
-          caption: `${TIPOS_COMPROBANTE.find((tipo) => tipo.value === venta.tipo_comprobante)?.label || "Comprobante"} ${venta.numero_comprobante}`,
-        });
-        toast({ title: "Comprobante enviado", description: "La factura fue enviada por WhatsApp correctamente." });
-        return;
-      } catch (error) {
-        console.error("No se pudo enviar el comprobante por WhatsApp Cloud API:", error);
-        toast({
-          title: "No se pudo enviar desde VORTEX",
-          description: error instanceof Error ? `${error.message}. Se abrirá la opción manual.` : "Se abrirá la opción manual.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsSendingWhatsApp(false);
-      }
+    if (!apiHabilitada || whatsappConexion?.estado !== "conectado" || !venta.id || !comercio?.id) {
+      return compartirManualmente(venta, comprobanteFile);
     }
-
-    const shareData: ShareData = {
-      title: `Comprobante ${venta.numero_comprobante}`,
-      text: message,
-      files: [comprobanteFile],
-    };
-
+    setIsSendingWhatsApp(true);
     try {
-      if (navigator.share && navigator.canShare?.(shareData)) {
-        await navigator.share(shareData);
-        return;
-      }
+      await enviarComprobantePorWhatsApp({
+        ventaId: venta.id,
+        comercioId: comercio.id,
+        file: comprobanteFile,
+        caption: `${TIPOS_COMPROBANTE.find((tipo) => tipo.value === venta.tipo_comprobante)?.label || "Comprobante"} ${venta.numero_comprobante}`,
+      });
+      toast({ title: "Comprobante enviado", description: "La factura fue enviada por WhatsApp correctamente." });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      console.error("No se pudo compartir el comprobante por WhatsApp:", error);
+      console.error("No se pudo enviar el comprobante por WhatsApp Cloud API:", error);
+      toast({
+        title: "No se pudo enviar desde VORTEX",
+        description: error instanceof Error ? error.message : "Podés compartir el comprobante manualmente.",
+        variant: "destructive",
+        action: <ToastAction altText="Compartir el comprobante manualmente" onClick={() => compartirManualmente(venta, comprobanteFile)}>Compartir</ToastAction>,
+      });
+    } finally {
+      setIsSendingWhatsApp(false);
     }
-
-    downloadFile(comprobanteFile);
-    openWhatsAppText(venta);
-    toast({
-      title: "Comprobante generado",
-      description: "WhatsApp Web no permite adjuntar archivos automaticamente. Se descargo el comprobante ARCA en PDF para adjuntarlo al chat.",
-    });
   };
 
   if (isLoading && !detalleId) {
@@ -484,7 +503,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVentas.map((venta) => (
+                {paginatedVentas.map((venta) => (
                   <TableRow key={venta.id}>
                     <TableCell className="w-px whitespace-nowrap">
                       {format(new Date(venta.fecha_venta), "dd/MM/yyyy")}
@@ -560,6 +579,31 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
               <p className="text-muted-foreground">No se encontraron ventas</p>
             </div>
           )}
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label htmlFor="ventas-page-size" className="whitespace-nowrap">Registros por página</Label>
+              <Select value={String(pageSize)} onValueChange={changePageSize}>
+                <SelectTrigger id="ventas-page-size" className="h-9 w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ventasPageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+                {filteredVentas.length === 0 ? "0 ventas" : `Mostrando ${firstIndex + 1}–${firstIndex + paginatedVentas.length} de ${filteredVentas.length} ventas`}
+              </p>
+            </div>
+            <nav aria-label="Paginación de ventas" className="flex items-center justify-between gap-3 sm:justify-end">
+              <Button type="button" variant="outline" size="sm" disabled={activePage === 1} onClick={() => setCurrentPage(activePage - 1)}>
+                <ChevronLeft className="mr-1 h-4 w-4" aria-hidden="true" />Anterior
+              </Button>
+              <span className="whitespace-nowrap text-sm">Página {activePage} de {totalPages}</span>
+              <Button type="button" variant="outline" size="sm" disabled={activePage === totalPages} onClick={() => setCurrentPage(activePage + 1)}>
+                Siguiente<ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" />
+              </Button>
+            </nav>
+          </div>
         </CardContent>
       </Card>}
 
@@ -615,11 +659,11 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                   <Button
                     onClick={() => handleSendWhatsApp(selectedVenta)}
                     size="sm"
-                    disabled={isSendingWhatsApp}
+                    disabled={isSendingWhatsApp || preparandoPdf || comercioLoading || afipLoading}
                     className="bg-[#25D366] text-white hover:bg-[#1DA851]"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
-                    {isSendingWhatsApp ? "Enviando..." : "WhatsApp"}
+                    {isSendingWhatsApp ? "Enviando..." : preparandoPdf ? "Preparando PDF..." : comprobanteFile ? "WhatsApp" : "Reintentar PDF"}
                   </Button>
                 </div>
               </div>

@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { restaurantePinRequest, restauranteTerminalKey } from "@/hooks/useRestaurantePin";
+import { restaurantePinRequest, restauranteTerminalKey, useRestauranteTerminalAcceso } from "@/hooks/useRestaurantePin";
+import { useComercio } from "@/hooks/useComercio";
+import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +14,12 @@ import { ArrowRight, ChevronDown, Loader2, LockKeyhole, Monitor, UserRound, Uten
 type Info = { nombre: string; usuarios: { id: string; nombre: string }[] };
 export default function RestauranteTerminal() {
   const { session, isLoading } = useAuth();
+  const { comercio, isLoading: comercioLoading } = useComercio();
+  const parametrizacion = useComercioParametrizacion();
+  const restauranteHabilitado = Boolean(comercio && parametrizacion.data.modulos.restaurante);
+  const terminalAcceso = useRestauranteTerminalAcceso(comercio?.id, restauranteHabilitado && Boolean(session));
+  const terminalPermitida = restauranteHabilitado && !terminalAcceso.isError
+    && terminalAcceso.data?.comercio_id === comercio?.id;
   const navigate = useNavigate();
   const [token] = useState(() => localStorage.getItem(restauranteTerminalKey));
   const [usuario, setUsuario] = useState("");
@@ -20,6 +28,7 @@ export default function RestauranteTerminal() {
   const [error, setError] = useState("");
   const info = useQuery({ queryKey: ["restaurante-terminal-publica"], enabled: Boolean(token) && !session && !isLoading, staleTime: 0, gcTime: 0, retry: false, queryFn: () => restaurantePinRequest<Info>({ action: "listar", token }) });
   async function salir() {
+    if (!terminalPermitida) return;
     setBusy(true); setError("");
     try {
       const { error } = await supabase.auth.signOut({ scope: "local" });
@@ -28,6 +37,7 @@ export default function RestauranteTerminal() {
     finally { setBusy(false); setPin(""); }
   }
   async function ingresar() {
+    if (session || isLoading || !token) return;
     setBusy(true); setError("");
     try {
       const login = await restaurantePinRequest<{ access_token: string; refresh_token: string; comercio_id: string }>({ action: "ingresar", token, usuario_id: usuario, pin });
@@ -36,6 +46,12 @@ export default function RestauranteTerminal() {
       navigate("/restaurante", { replace: true });
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); setPin(""); }
+  }
+  if (isLoading || (session && (comercioLoading || parametrizacion.isFetching || (token && restauranteHabilitado && terminalAcceso.isPending)))) {
+    return <main className="flex min-h-screen items-center justify-center p-6" role="status">Verificando acceso…</main>;
+  }
+  if (session && !terminalPermitida) {
+    return <main className="flex min-h-screen items-center justify-center p-6"><div className="grid max-w-md gap-4" role="alert"><h1 className="text-xl font-semibold">Acceso no permitido</h1><p>El comercio activo no tiene acceso a esta terminal de restaurante.</p><Button asChild><Link to="/inicio">Volver a mi comercio</Link></Button></div></main>;
   }
   return <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-8 sm:px-8">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_15%_20%,#164e63_0%,transparent_55%),radial-gradient(ellipse_at_90%_90%,#78350f_0%,transparent_45%)]" />

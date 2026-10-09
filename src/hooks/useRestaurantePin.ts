@@ -22,6 +22,22 @@ export async function restaurantePinRequest<T>(body: Record<string, unknown>): P
   return data;
 }
 
+export function useRestauranteTerminalAcceso(comercioId?: string, enabled = true) {
+  const { user } = useAuth();
+  const token = localStorage.getItem(restauranteTerminalKey);
+  return useQuery({
+    queryKey: ["restaurante-terminal-acceso", comercioId, user?.id],
+    enabled: enabled && Boolean(comercioId && user && token),
+    gcTime: 0,
+    staleTime: 0,
+    retry: false,
+    refetchInterval: 5000,
+    queryFn: () => restaurantePinRequest<{ comercio_id: string }>({
+      action: "validar_terminal", token, comercio_id: comercioId,
+    }),
+  });
+}
+
 export function useRestaurantePin(comercioId?: string) {
   const { user } = useAuth();
   const cache = useQueryClient();
@@ -42,6 +58,9 @@ export function useRestaurantePin(comercioId?: string) {
       if (!result.token) throw new Error("No se recibió la habilitación de la terminal.");
       localStorage.setItem(restauranteTerminalKey, result.token);
     }
-  }, onSuccess: () => cache.invalidateQueries({ queryKey: ["restaurante-terminales"] }) });
+  }, onSuccess: async () => {
+    await cache.invalidateQueries({ queryKey: ["restaurante-terminales"] });
+    await cache.invalidateQueries({ queryKey: ["restaurante-terminal-acceso"] });
+  } });
   return { query, mutation };
 }

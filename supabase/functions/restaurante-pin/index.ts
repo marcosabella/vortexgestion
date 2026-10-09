@@ -12,11 +12,20 @@ Deno.serve(async req => {
     const body = JSON.parse(text);
     const url = Deno.env.get('SUPABASE_URL')!; const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
-    if (body.action === 'listar' || body.action === 'ingresar') {
+    if (body.action === 'listar' || body.action === 'ingresar' || body.action === 'validar_terminal') {
       if (typeof body.token !== 'string' || !/^[0-9a-f]{64}$/.test(body.token)) return reply({ error: 'Terminal no habilitada o vencida' }, 403);
       const tokenHash = await hashTerminal(body.token);
       const { data: info, error } = await admin.rpc('restaurante_terminal_info', { p_token_hash: tokenHash });
       if (error || !info) return reply({ error: 'Terminal no habilitada o vencida' }, 403);
+      if (body.action === 'validar_terminal') {
+        if (!uuid(body.comercio_id) || info.comercio_id !== body.comercio_id) return reply({ error: 'La terminal no pertenece al comercio activo' }, 403);
+        const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') || '' } }, auth: { persistSession: false } });
+        const { data: identity, error: identityError } = await caller.auth.getUser();
+        if (identityError || !identity.user) return reply({ error: 'Sin acceso' }, 401);
+        const { data: permitido, error: accessError } = await caller.rpc('restaurante_acceso', { p_comercio: info.comercio_id });
+        if (accessError || permitido !== true) return reply({ error: 'Este usuario no tiene acceso al restaurante del comercio activo' }, 403);
+        return reply({ comercio_id: info.comercio_id });
+      }
       if (body.action === 'listar') return reply({ nombre: info.nombre, usuarios: info.usuarios });
       if (!uuid(body.usuario_id) || typeof body.pin !== 'string' || !/^\d{6}$/.test(body.pin)) return reply({ error: 'Elegí una persona e ingresá un PIN de 6 dígitos' }, 400);
       const { data: pin, error: pinError } = await admin.from('restaurante_pines').select('salt').eq('comercio_id', info.comercio_id).eq('usuario_id', body.usuario_id).maybeSingle();

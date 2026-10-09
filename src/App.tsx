@@ -1,6 +1,6 @@
 import Restaurante from "@/pages/Restaurante";
 import RestauranteTerminal from "@/pages/RestauranteTerminal";
-import { restauranteTerminalKey } from "@/hooks/useRestaurantePin";
+import { useRestauranteTerminalAcceso } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
 import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
 import { restauranteSecciones } from "@/config/restauranteNavigation";
@@ -161,6 +161,9 @@ function AuthenticatedLayout() {
   const { noLeidas } = useNotificaciones();
   const { data: parametrizacion } = useComercioParametrizacion();
   const accesoRestaurante = useRestauranteAcceso(comercio?.id);
+  const terminalAcceso = useRestauranteTerminalAcceso(comercio?.id, parametrizacion.modulos.restaurante);
+  const puedeCambiarEmpleado = parametrizacion.modulos.restaurante
+    && !terminalAcceso.isError && terminalAcceso.data?.comercio_id === comercio?.id && Boolean(comercio);
   const terminalSalon = accesoRestaurante.data?.solo_restaurante && !accesoRestaurante.data.admin
     && accesoRestaurante.data.permisos.length === 1 && accesoRestaurante.data.permisos[0] === "salon";
   const terminalCocina = accesoRestaurante.data?.solo_restaurante && !accesoRestaurante.data.admin
@@ -194,7 +197,7 @@ function AuthenticatedLayout() {
   }
 
   if (!session) {
-    return <Navigate to={localStorage.getItem(restauranteTerminalKey) ? "/restaurante-terminal" : "/login"} replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (comercioLoading) {
@@ -208,10 +211,11 @@ function AuthenticatedLayout() {
   const seleccionRequerida = !comercio && comerciosDisponibles.length > 1;
 
   const handleSignOut = async () => {
+    const destino = puedeCambiarEmpleado ? "/restaurante-terminal" : "/login";
     await signOut();
     localStorage.removeItem("selectedComercioId");
     queryClient.clear();
-    navigate(localStorage.getItem(restauranteTerminalKey) ? "/restaurante-terminal" : "/login", { replace: true });
+    navigate(destino, { replace: true });
   };
 
   return (
@@ -241,7 +245,7 @@ function AuthenticatedLayout() {
               <LogOut className="h-4 w-4" />
               Salir
             </Button>
-            {localStorage.getItem(restauranteTerminalKey) && <Button variant="outline" size="sm" onClick={() => navigate("/restaurante-terminal")}>Cambiar empleado</Button>}
+            {puedeCambiarEmpleado && <Button variant="outline" size="sm" onClick={() => navigate("/restaurante-terminal")}>Cambiar empleado</Button>}
           </header>
           <main className="flex-1 bg-background">
             {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <RestauranteAcceso><Routes>

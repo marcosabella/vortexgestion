@@ -1,4 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export function useWhatsAppConexion(comercioId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["whatsapp-conexion-estado", comercioId],
+    enabled: enabled && Boolean(comercioId),
+    retry: false,
+    queryFn: async () => {
+      // Esta tabla todavia no esta incluida en los tipos generados.
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("whatsapp_comercios").select("estado")
+        .eq("comercio_id", comercioId!).maybeSingle();
+      if (error) throw error;
+      return data as { estado: string } | null;
+    },
+  });
+}
 
 const fileToBase64 = async (file: File) => {
   const buffer = new Uint8Array(await file.arrayBuffer());
