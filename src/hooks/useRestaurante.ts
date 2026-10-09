@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { AccionRestaurante, ResumenRestaurante } from "@/types/restaurante";
 import { generarUuid } from "@/utils/uuid";
+import { restauranteSolicitud, restauranteCocinaIntentoResuelto } from "@/utils/restauranteSolicitud";
 
 type RestauranteDatabase = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Functions"> & { Functions: Database["public"]["Functions"] & {
@@ -38,7 +39,7 @@ export function useRestaurante() {
   const query = useQuery({
     queryKey: ["restaurante", comercioId, user?.id], enabled: Boolean(comercioId && user), refetchInterval: 5000,
     queryFn: async () => {
-      const { data, error } = await client.rpc("restaurante_resumen", { p_comercio_id: comercioId! });
+      const { data, error } = await restauranteSolicitud(signal => client.rpc("restaurante_resumen", { p_comercio_id: comercioId! }).abortSignal(signal));
       if (error) throw error;
       return data as unknown as ResumenRestaurante;
     },
@@ -56,11 +57,21 @@ export function useRestaurante() {
   const mutation = useMutation({
     mutationFn: async (intento: Pendiente) => {
       if (!comercioId || !user) throw new Error("Seleccioná un comercio e iniciá sesión.");
-      const { data, error } = await client.rpc(intento.accion.startsWith("reserva_") ? "restaurante_reserva_operar" : "restaurante_operar", { p_comercio_id: comercioId, p_accion: intento.accion, p_datos: intento.datos, p_clave: intento.clave });
+      const { data, error } = await restauranteSolicitud(signal => client.rpc(intento.accion.startsWith("reserva_") ? "restaurante_reserva_operar" : "restaurante_operar", { p_comercio_id: comercioId, p_accion: intento.accion, p_datos: intento.datos, p_clave: intento.clave }).abortSignal(signal));
       if (error) throw error;
       return data;
     },
   });
+  useEffect(() => {
+    if (!query.data || !query.isFetchedAfterMount || query.isFetching || query.isError || mutation.isPending) return;
+    const stored = leerPendientes(storageKey);
+    const restantes = stored.filter(p => !restauranteCocinaIntentoResuelto(query.data, p));
+    if (restantes.length === stored.length) return;
+    sessionStorage.setItem(storageKey, JSON.stringify(restantes));
+    setPendientes(restantes);
+    setErrorOperacion(null);
+    toast({ title: "Estado de cocina verificado", description: "El pedido ya avanzó. Se confirmó el intento pendiente sin repetir la operación." });
+  }, [query.data, query.dataUpdatedAt, query.isFetchedAfterMount, query.isFetching, query.isError, mutation.isPending, storageKey, toast]);
   async function ejecutar(intento: Pendiente) {
     if (bloqueo.current) return null;
     bloqueo.current = true;
@@ -70,7 +81,8 @@ export function useRestaurante() {
       if (!stored.some(p => p.clave === intento.clave)) guardar([...stored, intento]);
       const result = await mutation.mutateAsync(intento);
       guardar(leerPendientes(storageKey).filter(p => p.clave !== intento.clave));
-      await Promise.all(["restaurante", "ventas", "productos", "cuenta-corriente", "caja-diaria", "caja-diaria-ventas", "caja-diaria-ventas-previas-pendientes", "cajas-diarias"].map(key => cache.invalidateQueries({ queryKey: [key] })));
+      // La operación ya está confirmada. Las otras bandejas se refrescan sin retener el bloqueo.
+      void Promise.allSettled(["restaurante", "ventas", "productos", "cuenta-corriente", "caja-diaria", "caja-diaria-ventas", "caja-diaria-ventas-previas-pendientes", "cajas-diarias"].map(key => cache.invalidateQueries({ queryKey: [key] })));
       toast({ title: "Operación registrada" });
       return result;
     } catch (error) {

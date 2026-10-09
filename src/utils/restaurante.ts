@@ -1,7 +1,12 @@
 import type { CobroRestaurante, PedidoRestaurante, ResumenRestaurante } from "@/types/restaurante";
 export const restauranteMoney = (value: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
 export const restauranteAbierto = (p: PedidoRestaurante) => !["completado", "cancelado", "unido"].includes(p.estado);
+export const restaurantePuedeCobrar = (p: PedidoRestaurante) => restauranteAbierto(p) && !p.venta_id && (p.modalidad !== "mesa" || p.cuenta === "solicitada");
 export const restauranteResponsableCobro = (c: CobroRestaurante) => c.recibido_por || c.responsable_id || c.usuario_id;
+export const restauranteCobrosMesaSinCerrar = (data: ResumenRestaurante) => data.cobros.filter(c =>
+  c.medio === "contado" && !c.anulado && !c.rendicion_id
+  && data.pedidos.some(p => p.id === c.pedido_id && p.modalidad === "mesa" && restauranteAbierto(p) && (p.cuenta !== "cerrada" || !p.venta_id))
+);
 export const restauranteCobrosRendibles = (data: ResumenRestaurante) => data.cobros.filter(c =>
   c.medio === "contado" && !c.anulado && !c.rendicion_id && data.usuarios.some(u => u.id === restauranteResponsableCobro(c))
   && data.pedidos.some(p => p.id === c.pedido_id && (p.modalidad !== "mesa" || (p.cuenta === "cerrada" && p.venta_id)))

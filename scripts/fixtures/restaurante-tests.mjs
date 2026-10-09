@@ -33,7 +33,18 @@ export async function runTests({sql,test,actor,call,check,fails,asyncSql,tenant,
   const kitchenComanda=sql(`SELECT id FROM restaurante_comandas WHERE pedido_id='${pickup}' AND sector_id='${kitchen}';`),barComanda=sql(`SELECT id FROM restaurante_comandas WHERE pedido_id='${pickup}' AND sector_id='${bar}';`);
   test('Cocina ve su sector y no los contactos ni cobros',actor(chef)+check(`jsonb_array_length(restaurante_resumen('${tenant}')->'items')=1`,'sector')+actor(chef)+check(`(restaurante_resumen('${tenant}')->'pedidos'->0->>'telefono')=''`,'contacto')+actor(chef)+check(`jsonb_array_length(restaurante_resumen('${tenant}')->'cobros')=0`,'cobros'));
   test('Cocina no salta estados ni prepara otro sector',actor(chef)+fails(call('listo',{pedido_id:pickup,version:version(pickup),comanda_id:kitchenComanda}),'fuera de estado')+fails(call('aceptar',{pedido_id:pickup,version:version(pickup),comanda_id:barComanda}),'otro sector'));
-  op(pickup,'aceptar',{comanda_id:kitchenComanda},chef);prepare(pickup);
+  test('Terminal cocina recibe sólo información operativa del sector',actor(chef)+`
+    SELECT test_assert(jsonb_array_length(restaurante_resumen('${tenant}')->'sectores')=1,'sector propio');
+    SELECT test_assert(jsonb_array_length(restaurante_resumen('${tenant}')->'carta')=0,'sin carta comercial');
+    SELECT test_assert(jsonb_array_length(restaurante_resumen('${tenant}')->'envios')=0,'sin domicilios de reparto');
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'pedidos') p WHERE (p->>'total')::numeric<>0 OR p->>'cliente_nombre' NOT LIKE 'Pedido %'),'sin importes ni clientes');
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'items') i WHERE (i->>'precio')::numeric<>0),'sin precios');
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'items') i CROSS JOIN LATERAL jsonb_array_elements(i->'adicionales') a WHERE (a->>'precio')::numeric<>0),'sin precio de adicionales');
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'eventos') e WHERE e->>'accion' NOT IN ('cancelar','cancelar_item')),'sin eventos de cobros');
+  `);
+  for (const action of ['aceptar','preparar','listo']) op(pickup,action,{comanda_id:kitchenComanda},chef);
+  test('Cocina completa etapas con su identidad sin registrar entrega',check(`SELECT bool_and(estado='lista') FROM restaurante_items WHERE comanda_id='${kitchenComanda}'`,'lista para retirar')+actor(chef)+fails(call('retirar',{pedido_id:pickup,version:version(pickup)}),'sin permiso'));
+  prepare(pickup);
   op(pickup,'cobro',{monto:300,medio:'tarjeta'},cashier);op(pickup,'cobro',{monto:220,medio:'transferencia'},cashier);
   test('Cobros mixtos no permiten sobrepago',actor(cashier)+fails(call('cobro',{pedido_id:pickup,version:version(pickup),monto:1,medio:'contado'}),'supera el saldo'));
   op(pickup,'armar',{},dispatcher);op(pickup,'retirar',{},dispatcher);
@@ -50,6 +61,7 @@ export async function runTests({sql,test,actor,call,check,fails,asyncSql,tenant,
   test('Ampliación genera comanda sólo con productos nuevos',check(`SELECT count(*)=2 FROM restaurante_comandas WHERE pedido_id='${mesa}'`,'rondas')+check(`SELECT sum(cantidad)=1 FROM restaurante_items WHERE pedido_id='${mesa}' AND estado='pendiente'`,'nuevo')+check(`SELECT sum(cantidad)=2 FROM restaurante_items WHERE pedido_id='${mesa}' AND estado='entregada'`,'previos'));
   test('No solicita cuenta antes de servir toda la ronda',actor(waiter)+fails(call('solicitar_cuenta',{pedido_id:mesa,version:version(mesa)}),'Serví todos'));
   prepare(mesa);for(const item_id of items(mesa).filter(id=>sql(`SELECT estado FROM restaurante_items WHERE id='${id}';`)==='lista'))op(mesa,'servir',{item_id},waiter);
+  test('Mesa servida no se cobra ni cierra sin solicitar cuenta',actor(waiter)+fails(call('cobro',{pedido_id:mesa,version:version(mesa),monto:1,medio:'contado'}),'Solicitá la cuenta')+actor(admin)+fails(call('cobro',{pedido_id:mesa,version:version(mesa),monto:1,medio:'contado'}),'Solicitá la cuenta')+fails(call('cerrar',{pedido_id:mesa,version:version(mesa),tipo_comprobante:'recibo_x'}),'Solicitá la cuenta')+check(`NOT EXISTS(SELECT 1 FROM restaurante_cobros WHERE pedido_id='${mesa}')`,'sin pagos creados'));
   op(mesa,'mover_mesa',{mesa_id:table2},waiter);op(mesa,'solicitar_cuenta',{},waiter);
   test('Cuenta solicitada impide nuevas rondas',actor(waiter)+fails(call('agregar',{pedido_id:mesa,version:version(mesa),items:[{carta_id:dish,cantidad:1}]}),'pidió la cuenta'));
   const dishItem=sql(`SELECT id FROM restaurante_items WHERE pedido_id='${mesa}' AND carta_id='${dish}';`);
@@ -58,6 +70,17 @@ export async function runTests({sql,test,actor,call,check,fails,asyncSql,tenant,
   test('División por productos impide reutilizar unidades cobradas',actor(cashier)+fails(call('cobro',{pedido_id:mesa,version:version(mesa),monto:200,medio:'contado',items:[{item_id:dishItem,cantidad:1}]}),'supera el saldo'));
   op(mesa,'cobro',{monto:100,medio:'transferencia'},cashier);op(mesa,'cerrar',{tipo_comprobante:'recibo_x'});
   test('Cerrar mesa libera ocupación y preserva historial',check(`SELECT NOT EXISTS(SELECT 1 FROM restaurante_cuenta_mesas WHERE pedido_id='${mesa}' AND activa)`,'liberada')+check(`SELECT count(*)=2 FROM restaurante_cuenta_mesas WHERE pedido_id='${mesa}'`,'historial'));
+  // Simular un pago previo a la corrección en el clúster ficticio, sin reparar producción.
+  const legacyMesa=order('mesa',{mesa_id:table},waiter);add(legacyMesa,[{carta_id:dish,cantidad:1}],waiter);op(legacyMesa,'enviar',{},waiter);
+  sql(`UPDATE restaurante_items SET estado='entregada',precio=82280 WHERE pedido_id='${legacyMesa}';`);
+  const legacyCash=sql(`INSERT INTO restaurante_cobros(comercio_id,pedido_id,monto,medio,usuario_id,recibido_por) VALUES('${tenant}','${legacyMesa}',82280,'contado','${admin}','${waiter}') RETURNING id;`);
+  test('Mesa con pago anterior conserva saldo cero y espera solicitud y cierre',actor(admin)+`SELECT test_assert(EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'pedidos') p WHERE p->>'id'='${legacyMesa}' AND p->>'cuenta'='abierta' AND (p->>'total')::numeric=(p->>'cobrado')::numeric),'pago conservado');`+fails(call('cerrar',{pedido_id:legacyMesa,version:version(legacyMesa),tipo_comprobante:'recibo_x'}),'Solicitá la cuenta')+actor(cashier)+fails(call('rendir',{usuario_id:waiter,cobro_ids:[legacyCash],recibido:82280}),'Cerrá la mesa'));
+  op(legacyMesa,'solicitar_cuenta',{},waiter);
+  const legacyKey=randomUUID(),legacyDatos={pedido_id:legacyMesa,version:version(legacyMesa),tipo_comprobante:'recibo_x'};
+  const legacySale=sql(actor()+call('cerrar',legacyDatos,legacyKey));assert.equal(sql(actor()+call('cerrar',legacyDatos,legacyKey)),legacySale);
+  test('Cierre de mesa pagada no duplica cobro ni pago de venta',check(`SELECT count(*)=1 AND sum(monto)=82280 FROM restaurante_cobros WHERE pedido_id='${legacyMesa}' AND NOT anulado`,'un cobro')+check(`SELECT count(*)=1 AND sum(monto)=82280 FROM pagos_venta WHERE venta_id='${legacySale}'`,'un pago de venta')+check(`SELECT cuenta='cerrada' AND venta_id='${legacySale}' FROM restaurante_pedidos WHERE id='${legacyMesa}'`,'cuenta cerrada'));
+  op(legacyMesa,'rendir',{usuario_id:waiter,cobro_ids:[legacyCash],recibido:82280},cashier);
+  test('Mesa con pago anterior habilita rendición después del cierre',check(`SELECT rendicion_id IS NOT NULL AND NOT anulado FROM restaurante_cobros WHERE id='${legacyCash}'`,'efectivo rendido'));
   const a=order('mesa',{mesa_id:table},waiter),b=order('mesa',{mesa_id:table3},waiter);
   add(a,[{carta_id:dish,cantidad:1}],waiter);op(a,'enviar',{},waiter);add(b,[{carta_id:drink,cantidad:1}],waiter);
   op(a,'unir',{destino_id:b,destino_version:version(b)},waiter);
@@ -82,8 +105,16 @@ export async function runTests({sql,test,actor,call,check,fails,asyncSql,tenant,
   test('Incidencia cobrada requiere resolver entrega o devolución antes de rendir',actor(cashier)+fails(call('rendir',{usuario_id:driver,cobro_ids:[incidentCash],recibido:100}),'incidencias pendientes'));
   op(incident,'anular_cobro',{cobro_id:incidentCash,motivo:'Dinero devuelto por entrega fallida',devolucion_confirmada:true});op(incident,'cancelar',{motivo:'Sin entrega'});
   test('Incidencia permite cancelación administrada y cancela envío',check(`SELECT estado='cancelado' FROM restaurante_envios WHERE pedido_id='${incident}'`,'cancelado'));
-  const cancel=order('retiro');add(cancel,[{carta_id:dish,cantidad:1},{carta_id:drink,cantidad:1}]);op(cancel,'enviar');const canceledItem=items(cancel)[0];op(cancel,'cancelar_item',{item_id:canceledItem,motivo:'Cliente cambió'});
+  const cancel=order('retiro');add(cancel,[{carta_id:dish,cantidad:1},{carta_id:drink,cantidad:1}]);op(cancel,'enviar');const canceledItem=sql(`SELECT id FROM restaurante_items WHERE pedido_id='${cancel}' AND sector_id='${kitchen}';`);op(cancel,'cancelar_item',{item_id:canceledItem,motivo:'Cliente cambió'});
   test('Cancelación queda visible para cocina con motivo',actor(chef)+check(`EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'eventos') e WHERE e->>'accion'='cancelar_item' AND e->'datos'->>'motivo'='Cliente cambió')`,'aviso'));
+  const canceledDrink=sql(`SELECT id FROM restaurante_items WHERE pedido_id='${cancel}' AND sector_id='${bar}';`);op(cancel,'cancelar_item',{item_id:canceledDrink,motivo:'Aviso exclusivo barra'});
+  test('Cocina no recibe motivos de cancelación de otro sector',actor(chef)+`SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(restaurante_resumen('${tenant}')->'eventos') e WHERE e->'datos'->>'motivo'='Aviso exclusivo barra'),'sector de cancelación');`);
+  test('RLS de eventos de cocina limita lectura directa y Realtime al sector',actor(chef)+`
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM restaurante_eventos WHERE accion IN ('cobro','rendir','anular_cobro','cerrar')),'sin eventos financieros');
+    SELECT test_assert(NOT EXISTS(SELECT 1 FROM restaurante_eventos WHERE datos->>'motivo'='Aviso exclusivo barra'),'cancelación ajena');
+    SELECT test_assert(EXISTS(SELECT 1 FROM restaurante_eventos WHERE datos->>'motivo'='Cliente cambió'),'cancelación propia');
+    SELECT test_assert(EXISTS(SELECT 1 FROM restaurante_eventos WHERE pedido_id='${pickup}' AND accion='listo'),'avance propio');
+  `);
   const avisoComanda=sql(`SELECT comanda_id FROM restaurante_items WHERE id='${canceledItem}';`);
   test('Aviso de cancelación permanece hasta recepción explícita',check(`SELECT aviso_cancelacion FROM restaurante_comandas WHERE id='${avisoComanda}'`,'pendiente'));
   op(cancel,'reconocer',{comanda_id:avisoComanda});

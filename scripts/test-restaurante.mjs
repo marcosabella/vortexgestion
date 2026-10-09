@@ -81,6 +81,8 @@ try {
   sql('CREATE TRIGGER stock_insert AFTER INSERT ON venta_items FOR EACH ROW EXECUTE FUNCTION apply_venta_item_stock();');
   for (const file of ["20261008100000_restaurante_estructura.sql","20261008110000_restaurante_operaciones.sql","20261008120000_restaurante_consultas.sql"]) sql(migration(file));
   prepareUsuariosTests({sql,tenant,migration});
+  sql(migration('20261009100000_restaurante_cocina_resumen.sql'));
+  sql(migration('20261009110000_restaurante_cobro_mesa_cuenta_solicitada.sql'));
   await runTests({sql,test,actor,call,check,fails,asyncSql,tenant,other,admin,driver,stranger,client,foreignClient,product,foreignProduct,json});
   runUsuariosTests({sql,test,actor,check,fails,tenant,other,admin,driver,stranger,migration});
   runPinReservasTests({sql,test,actor,check,fails,tenant,other,admin,driver,migration,json});

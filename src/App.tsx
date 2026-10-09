@@ -2,12 +2,13 @@ import Restaurante from "@/pages/Restaurante";
 import RestauranteTerminal from "@/pages/RestauranteTerminal";
 import { restauranteTerminalKey } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
+import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
 import { restauranteSecciones } from "@/config/restauranteNavigation";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ModuleHelp } from "@/components/ModuleHelp";
@@ -159,6 +160,14 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const { noLeidas } = useNotificaciones();
   const { data: parametrizacion } = useComercioParametrizacion();
+  const accesoRestaurante = useRestauranteAcceso(comercio?.id);
+  const terminalSalon = accesoRestaurante.data?.solo_restaurante && !accesoRestaurante.data.admin
+    && accesoRestaurante.data.permisos.length === 1 && accesoRestaurante.data.permisos[0] === "salon";
+  const terminalCocina = accesoRestaurante.data?.solo_restaurante && !accesoRestaurante.data.admin
+    && accesoRestaurante.data.permisos.length === 1 && accesoRestaurante.data.permisos[0] === "cocina";
+  const terminalRepartidor = accesoRestaurante.data?.solo_restaurante && !accesoRestaurante.data.admin
+    && accesoRestaurante.data.permisos.includes("envios") && accesoRestaurante.data.permisos.every(p => ["envios", "cobros"].includes(p));
+  const terminalRestaurante = terminalCocina || terminalSalon || terminalRepartidor;
   const [selectingComercioId, setSelectingComercioId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -208,23 +217,26 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="h-14 border-b border-border bg-background flex items-center gap-3 px-4">
-            <SidebarTrigger />
+        {!terminalRestaurante && <AppSidebar />}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className={terminalRestaurante ? "flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2" : "h-14 border-b border-border bg-background flex items-center gap-3 px-4"}>
+            {!terminalRestaurante && <SidebarTrigger />}
+            {terminalRestaurante && <div className="flex shrink-0 items-center gap-2"><img src="/logo.png" alt="Vortex" className="h-8 w-8 object-contain" /><span className="hidden text-sm font-semibold sm:inline">Restaurante</span></div>}
             <div className="min-w-0 flex-1" />
             <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
               {user?.email}
             </span>
-            <ModuleHelp />
-            <Button variant="outline" size="sm" onClick={() => navigate("/notificaciones")} className="relative">
+            {terminalSalon && <nav aria-label="Terminal de salón" className="flex gap-1"><Button size="sm" variant="ghost" asChild><Link to="/restaurante/salon">Mesas</Link></Button><Button size="sm" variant="ghost" asChild><Link to="/restaurante/reservas">Reservas</Link></Button></nav>}
+            {terminalRepartidor && accesoRestaurante.data?.permisos.includes("cobros") && <Button size="sm" variant="ghost" asChild><Link to="/restaurante/cobros">Cuentas y cobros</Link></Button>}
+            {!terminalRestaurante && <ModuleHelp />}
+            {!terminalRestaurante && <Button variant="outline" size="sm" onClick={() => navigate("/notificaciones")} className="relative">
               <Bell className="h-4 w-4" />
               {noLeidas > 0 && (
                 <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
                   {noLeidas}
                 </span>
               )}
-            </Button>
+            </Button>}
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
               Salir
@@ -321,7 +333,7 @@ function AuthenticatedLayout() {
               <Route path="*" element={<NotFound />} />
             </Routes></RestauranteAcceso>}
           </main>
-          <MembershipReminder comercio={comercio} />
+          {!terminalRestaurante && <MembershipReminder comercio={comercio} />}
           <Dialog open={seleccionRequerida} onOpenChange={() => undefined}>
             <DialogContent className="sm:max-w-xl [&>button]:hidden" onEscapeKeyDown={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
               <DialogHeader>
