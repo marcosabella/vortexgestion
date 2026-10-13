@@ -30,12 +30,14 @@ import {
   Car,
   CalendarDays,
   UtensilsCrossed,
+  Calculator,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ModuloSistema } from "@/config/parametrizacion";
 import { restauranteSecciones, restaurantePermisoVista } from "@/config/restauranteNavigation";
 import { distribucionSecciones } from "@/config/distribucionNavigation";
+import { utilidadesSecciones } from "@/config/utilidadesNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useComercio } from "@/hooks/useComercio";
@@ -82,6 +84,7 @@ type GroupKey =
   | "compras"
   | "inventario"
   | "tesoreria"
+  | "utilidades"
   | "campo"
   | "taller"
   | "restaurante"
@@ -114,6 +117,8 @@ const tesoreriaItems: MenuItem[] = [
   { title: "Gastos y egresos", url: "/gastos-egresos", icon: ReceiptText, modulo: "gastos_egresos" },
   { title: "Cartera de Cheques", url: "/cheques", icon: Receipt, modulo: "cheques" },
 ];
+
+const utilidadesItems: MenuItem[] = utilidadesSecciones.map(item => ({ title: item.title, url: `/utilidades/${item.vista}`, icon: item.icon, modulo: "utilidades" }));
 
 const configuracionItems: MenuItem[] = [
   { title: "Mi Comercio", url: "/comercio", icon: Store },
@@ -175,6 +180,7 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   compras: false,
   inventario: false,
   tesoreria: false,
+  utilidades: false,
   campo: false,
   taller: false,
   distribucion: false,
@@ -195,6 +201,7 @@ const pathMatches = (currentPath: string, path: string) =>
   currentPath === path || currentPath.startsWith(`${path}/`);
 
 const getGroupForPath = (path: string): GroupKey | null => {
+  if (pathMatches(path, "/utilidades")) return "utilidades";
   if (path.startsWith("/campo")) return "campo";
   if (path.startsWith("/taller")) return "taller";
   if (pathMatches(path, "/restaurante")) return "restaurante";
@@ -400,6 +407,7 @@ export function AppSidebar() {
               {renderCollapsibleGroup("compras", "Compras", PackagePlus, enabledComprasItems)}
               {renderCollapsibleGroup("inventario", "Inventario", Package, enabledInventarioItems)}
               {renderCollapsibleGroup("tesoreria", "Tesorería", Banknote, enabledTesoreriaItems)}
+              {parametrizacion.modulos.utilidades && renderCollapsibleGroup("utilidades", "Utilidades", Calculator, utilidadesItems)}
               {parametrizacion.modulos.campo && renderCollapsibleGroup("campo", "Vortex Campo", Sprout, enabledCampoItems)}
               {parametrizacion.modulos.taller && renderCollapsibleGroup("taller", "Vortex Taller", Wrench, tallerItems)}
               {parametrizacion.modulos.restaurante && renderCollapsibleGroup("restaurante", "Vortex Restaurante", UtensilsCrossed, restauranteItems)}

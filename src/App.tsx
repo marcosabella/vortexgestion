@@ -1,6 +1,8 @@
 import Restaurante from "@/pages/Restaurante";
 import RestauranteTerminal from "@/pages/RestauranteTerminal";
 import RestauranteCarta from "@/pages/RestauranteCarta";
+import Utilidades from "@/pages/Utilidades";
+import { utilidadesSecciones } from "@/config/utilidadesNavigation";
 import { useRestauranteTerminalAcceso } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
 import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
@@ -282,6 +284,8 @@ function AuthenticatedLayout() {
               <Route path="/comercio" element={<Comercio />} />
               <Route path="/whatsapp" element={<ParametrizedRoute modulo="whatsapp"><WhatsApp /></ParametrizedRoute>} />
               <Route path="/bancos" element={<ParametrizedRoute modulo="bancos"><Bancos /></ParametrizedRoute>} />
+              <Route path="/utilidades" element={<ParametrizedRoute modulo="utilidades"><Navigate to="/utilidades/cotizaciones" replace /></ParametrizedRoute>} />
+              {utilidadesSecciones.map(({ vista }) => <Route key={vista} path={`/utilidades/${vista}`} element={<ParametrizedRoute modulo="utilidades"><Utilidades vista={vista} /></ParametrizedRoute>} />)}
               <Route path="/bancos/nuevo" element={<ParametrizedRoute modulo="bancos"><NuevoBanco /></ParametrizedRoute>} />
               <Route path="/tarjetas" element={<ParametrizedRoute modulo="tarjetas"><Tarjetas /></ParametrizedRoute>} />
               <Route path="/tarjetas/nueva" element={<ParametrizedRoute modulo="tarjetas"><NuevaTarjeta /></ParametrizedRoute>} />

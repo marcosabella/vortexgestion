@@ -21,7 +21,8 @@ export type ModuloSistema =
   | "campo"
   | "distribucion"
   | "restaurante"
-  | "taller";
+  | "taller"
+  | "utilidades";
 
 export type FuncionSistema =
   | "venta_items_manuales"
@@ -58,6 +59,7 @@ export type ComercioParametrizacion = {
 };
 
 export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; description: string }> = [
+  { key: "utilidades", label: "Utilidades", description: "Billetes del Banco Nación y consultas BCRA: divisas, Central de Deudores y cheques." },
   { key: "caja", label: "Caja diaria", description: "Apertura, movimientos y cierre de caja." },
   { key: "clientes", label: "Clientes", description: "Alta, edicion y consulta de clientes." },
   { key: "proveedores", label: "Proveedores", description: "Gestion de proveedores." },
@@ -113,6 +115,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     distribucion: false,
     taller: false,
     restaurante: false,
+    utilidades: false,
   },
   funciones: {
     ...FUNCIONES_SISTEMA.reduce(
