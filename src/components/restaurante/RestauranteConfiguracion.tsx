@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RestauranteUsuarios } from "./RestauranteUsuarios";
+import { RestauranteQrMesas } from "./RestauranteQrMesas";
+import { useComercio } from "@/hooks/useComercio";
 import { useProductos } from "@/hooks/useProductos";
 import type { AccionRestaurante, ContextoRestaurante, ModalidadRestaurante } from "@/types/restaurante";
 import { Field } from "./RestauranteForms";
@@ -17,6 +19,7 @@ const formatos = [{ id: "58mm", nombre: "Ticket 58 mm" }, { id: "a4", nombre: "A
 const secciones = [
   { id: "general", nombre: "General" }, { id: "sectores", nombre: "Sectores" },
   { id: "mesas", nombre: "Mesas" }, { id: "carta", nombre: "Carta" },
+  { id: "qr", nombre: "QR por mesa" },
   { id: "adicionales", nombre: "Adicionales" }, { id: "usuarios", nombre: "Usuarios y roles" },
 ];
 function ConfigForm({ title, children, guardar, trabajando, disabled = false }: {
@@ -25,6 +28,7 @@ function ConfigForm({ title, children, guardar, trabajando, disabled = false }: 
   return <section className="rounded-xl border p-4"><h2 className="mb-4 text-lg font-semibold">{title}</h2><form className="grid gap-4" onSubmit={guardar}>{children}<Button className="justify-self-start" disabled={trabajando || disabled}>Guardar</Button></form></section>;
 }
 export function RestauranteConfiguracion({ data, operar, trabajando }: ContextoRestaurante) {
+  const { comercio } = useComercio();
   const { productos } = useProductos();
   const [modalidades, setModalidades] = useState<ModalidadRestaurante[]>(data.config.modalidades);
   const [impresion, setImpresion] = useState(data.config.impresion);
@@ -60,6 +64,9 @@ export function RestauranteConfiguracion({ data, operar, trabajando }: ContextoR
         <p className="text-sm text-muted-foreground">Imprimir y PDF usan el formato guardado aquí para el detalle de cuenta y las comandas sin formato propio. Cada sector puede tener su formato de comanda.</p>
         <RestauranteBusqueda label="IVA del servicio de envío (precio final)" value={String(ivaEnvio)} opciones={[0, 10.5, 21, 27].map(v => ({ id: String(v), nombre: `${v}%` }))} cambiar={id => setIvaEnvio(Number(id))} disabled={trabajando} />
       </ConfigForm>
+    </TabsContent>
+    <TabsContent value="qr">
+      {comercio && <RestauranteQrMesas key={comercio.id} comercioId={comercio.id} nombreComercio={comercio.nombre_comercio} />}
     </TabsContent>
     <TabsContent value="sectores">
       <ConfigForm title="Sectores de preparación" trabajando={trabajando} guardar={guardar("sector")}>

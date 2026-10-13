@@ -617,7 +617,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
           {selectedVenta && (
             <div className="space-y-4">
               <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 gap-x-10 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-[auto_auto_auto_auto]">
                   <p className="whitespace-nowrap"><strong>Fecha:</strong> {format(new Date(selectedVenta.fecha_venta), "dd/MM/yyyy HH:mm")}</p>
                   <p className="whitespace-nowrap"><strong>Comprobante:</strong> {TIPOS_COMPROBANTE.find(t => t.value === selectedVenta.tipo_comprobante)?.label}</p>
                   <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {mostrarNumeroComprobante(selectedVenta)}</p>

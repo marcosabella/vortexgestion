@@ -1,6 +1,7 @@
 import { runTests } from "./fixtures/restaurante-tests.mjs";
 import { prepareUsuariosTests, runUsuariosTests } from "./fixtures/restaurante-usuarios-tests.mjs";
 import { runPinReservasTests } from "./fixtures/restaurante-pin-reservas-tests.mjs";
+import { runConsultaQrTests } from "./fixtures/restaurante-consulta-qr-tests.mjs";
 // Integración en PostgreSQL temporal local. Nunca usa Supabase ni datos remotos.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -86,6 +87,7 @@ try {
   await runTests({sql,test,actor,call,check,fails,asyncSql,tenant,other,admin,driver,stranger,client,foreignClient,product,foreignProduct,json});
   runUsuariosTests({sql,test,actor,check,fails,tenant,other,admin,driver,stranger,migration});
   runPinReservasTests({sql,test,actor,check,fails,tenant,other,admin,driver,migration,json});
+  runConsultaQrTests({sql,test,actor,call,fails,tenant,other,stranger,migration});
   console.log(passed + ' pruebas PostgreSQL locales correctas.');
 } catch(error) { console.error(error); process.exitCode=1; }
 finally {

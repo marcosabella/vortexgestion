@@ -1,5 +1,6 @@
 import Restaurante from "@/pages/Restaurante";
 import RestauranteTerminal from "@/pages/RestauranteTerminal";
+import RestauranteCarta from "@/pages/RestauranteCarta";
 import { useRestauranteTerminalAcceso } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
 import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
@@ -379,6 +380,7 @@ const App = () => (
             <Route path="/eliminacion-de-datos" element={<DataDeletion />} />
             <Route path="/login" element={<Login />} />
             <Route path="/restaurante-terminal" element={<RestauranteTerminal />} />
+            <Route path="/carta/mesa/:qr" element={<RestauranteCarta />} />
             <Route path="/login/:comercioId" element={<Login />} />
             <Route path="/*" element={<AuthenticatedLayout />} />
           </Routes>
