@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { build } from "esbuild";
+const bundled = await build({entryPoints:["src/utils/arcaText.ts"],bundle:true,write:false,format:"esm",platform:"node"});
+const {decodificarTextoArca,normalizarTextosArca}=await import("data:text/javascript;base64,"+Buffer.from(bundled.outputFiles[0].text).toString("base64"));
+for (const encoded of ["ROQUE SAENZ PE&#209;A","ROQUE SAENZ PE&#xD1;A","ROQUE SAENZ PE&Ntilde;A","ROQUE SAENZ PE&amp;#209;A","ROQUE SAENZ PEÑA"]) assert.equal(decodificarTextoArca(encoded),"ROQUE SAENZ PEÑA");
+assert.equal(decodificarTextoArca("MU&#209;OZ · JOS&Eacute; · G&Uuml;EMES · Uno &amp; Dos"),"MUÑOZ · JOSÉ · GÜEMES · Uno & Dos");
+const datos={nombre:"PE&#209;A",apellido:"MU&ntilde;OZ",razonSocial:"Uno &amp; Dos",domicilioFiscal:{calle:"ROQUE SAENZ PE&#209;A",numero:"123",localidad:"PE&amp;#209;A",provincia:"C&Oacute;RDOBA"},tipoPersona:"fisica",cuitEncontrado:"20123456786",fuente:"afip_oficial",extra:[null,123,false,"&#241;"]};
+const normalizado=normalizarTextosArca(datos);
+assert.equal(normalizado.domicilioFiscal.calle,"ROQUE SAENZ PEÑA");assert.equal(normalizado.domicilioFiscal.localidad,"PEÑA");assert.equal(normalizado.domicilioFiscal.provincia,"CÓRDOBA");
+assert.equal(normalizado.apellido,"MUñOZ");assert.equal(normalizado.cuitEncontrado,datos.cuitEncontrado);assert.equal(normalizado.tipoPersona,datos.tipoPersona);assert.deepEqual(normalizado.extra,[null,123,false,"ñ"]);
+assert.equal(datos.nombre,"PE&#209;A","No modificar el informe original");assert.deepEqual(normalizarTextosArca(normalizado),normalizado);
+assert.equal(decodificarTextoArca("&#99999999; &#xD800; &#0; &desconocida;"),"&#99999999; &#xD800; &#0; &desconocida;");
+assert.equal(decodificarTextoArca("&lt;script&gt;alert(1)&lt;/script&gt;"),"<script>alert(1)</script>","Se devuelve texto, sin ejecutar HTML");
+assert.equal(normalizarTextosArca(null),null);
+console.log("OK ARCA: Ñ decimal/hexadecimal/nombrada, doble escape, tildes, nombres y domicilios, datos inválidos y preservación del informe.");

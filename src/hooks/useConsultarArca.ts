@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { normalizarTextosArca } from '@/utils/arcaText';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { esDNI, generarCUITsDesdeDNI, formatCUIT } from '@/utils/validations';
@@ -44,7 +45,7 @@ export function useConsultarArca() {
       }
 
       // Verificar que realmente se encontró información útil
-      const datosArca = data.data as DatosArca;
+      const datosArca = normalizarTextosArca(data.data as DatosArca);
       if (datosArca && (datosArca.nombre || datosArca.apellido || datosArca.razonSocial)) {
         return { data: { ...datosArca, cuitEncontrado: cuit }, encontrado: true };
       }
@@ -161,7 +162,7 @@ export function useConsultarArca() {
         });
       }
 
-      return data.data as DatosArca;
+      return normalizarTextosArca(data.data as DatosArca);
 
     } catch (error: unknown) {
       console.error('Error consultando padrón AFIP:', error);
