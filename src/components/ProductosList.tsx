@@ -17,11 +17,13 @@ import { ProductoForm } from "@/components/ProductoForm";
 import { AjusteStockDialog } from "@/components/AjusteStockDialog";
 import { Producto } from "@/types/producto";
 import { buildProductoEtiquetasPdfFile, buildProductosEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import { TablePaginationControls } from "@/components/TablePaginationControls";
 
 type PrintMode = "full-sheet" | "selected-products";
 
 export const ProductosList = () => {
-  const { productos, isLoading, deleteProducto } = useProductos();
+  const { productos, isLoading, error, deleteProducto } = useProductos();
   const { data: parametrizacion } = useComercioParametrizacion();
   const { comercio } = useComercio();
   const { toast } = useToast();
@@ -47,6 +49,8 @@ export const ProductosList = () => {
     (producto.marca?.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (producto.proveedor?.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const pagination = useTablePagination(filteredProductos, 'productos-registros-por-pagina', searchTerm);
 
   const selectedLabelProductIds = new Set(
     Object.entries(labelQuantities)
@@ -177,6 +181,7 @@ export const ProductosList = () => {
     return `${symbol} ${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  if (error) return <p role="alert" className="text-destructive">No se pudieron cargar los productos. Volvé a cargar el listado.</p>;
   if (isLoading) {
     return <div className="text-center p-4">Cargando productos...</div>;
   }
@@ -241,7 +246,7 @@ export const ProductosList = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProductos.map((producto) => (
+                pagination.items.map((producto) => (
                   <TableRow key={producto.id}>
                     <TableCell className="font-medium">{producto.cod_producto}</TableCell>
                     <TableCell>{producto.cod_barras || '-'}</TableCell>
@@ -321,6 +326,7 @@ export const ProductosList = () => {
             </TableBody>
           </Table>
         </div>
+        <TablePaginationControls id="productos" label="productos" pagination={pagination} />
       </CardContent>
       <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useComercio } from '@/hooks/useComercio';
 import { isLegacyDeletedClient } from '@/utils/legacyVisibility';
+import { fetchMasterRecords } from '@/utils/fetchMasterRecords';
 
 export interface Cliente {
   id?: string;
@@ -29,14 +30,14 @@ export function useClientes() {
   return useQuery({
     queryKey: ['clientes', comercioId], enabled: Boolean(comercioId),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const data = await fetchMasterRecords<Cliente>((from, to) => supabase
         .from('clientes')
-        .select('*, cliente_usuarios(user_id,metodo,created_at)')
+        .select('*, cliente_usuarios(user_id,metodo,created_at)', { count: 'exact' })
         .eq('comercio_id', comercioId)
-        .order('apellido', { ascending: true });
-      
-      if (error) throw error;
-      return (data as Cliente[]).filter((cliente) => !isLegacyDeletedClient(cliente));
+        .order('apellido', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to));
+      return data.filter((cliente) => !isLegacyDeletedClient(cliente));
     },
   });
 }

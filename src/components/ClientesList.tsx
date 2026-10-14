@@ -11,20 +11,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useClientes, useDeleteCliente } from '@/hooks/useClientes';
 import { ClienteForm } from './ClienteForm';
 import { Cliente } from '@/types/cliente';
+import { useTablePagination } from '@/hooks/useTablePagination';
+import { TablePaginationControls } from './TablePaginationControls';
+import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
 
 export function ClientesList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const { data: clientes = [], isLoading } = useClientes();
+  const { data: clientes = [], isLoading, error } = useClientes();
   const deleteCliente = useDeleteCliente();
+  const { data: parametrizacion } = useComercioParametrizacion();
+  const mostrarCuentaOnline = parametrizacion?.modulos.pedidos_online === true;
 
   const filteredClientes = clientes.filter((cliente) =>
     `${cliente.nombre} ${cliente.apellido} ${cliente.cuit}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
+
+  const pagination = useTablePagination(filteredClientes, 'clientes-registros-por-pagina', searchTerm);
 
   const handleEdit = (cliente: Cliente) => {
     setSelectedCliente(cliente);
@@ -40,6 +47,7 @@ export function ClientesList() {
     setSelectedCliente(null);
   };
 
+  if (error) return <p role="alert" className="text-destructive">No se pudieron cargar los clientes. Volvé a cargar el listado.</p>;
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -105,12 +113,12 @@ export function ClientesList() {
                   <TableHead>Situación AFIP</TableHead>
                   <TableHead>Localidad</TableHead>
                   <TableHead>Teléfono</TableHead>
-                  <TableHead>Cuenta online</TableHead>
+                  {mostrarCuentaOnline && <TableHead>Cuenta online</TableHead>}
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClientes.map((cliente) => (
+                {pagination.items.map((cliente) => (
                   <TableRow key={cliente.id}>
                     <TableCell className="font-medium">
                       {cliente.nombre} {cliente.apellido}
@@ -124,7 +132,7 @@ export function ClientesList() {
                     <TableCell>{cliente.situacion_afip}</TableCell>
                     <TableCell>{cliente.localidad}</TableCell>
                     <TableCell>{cliente.telefono || '-'}</TableCell>
-                    <TableCell>{cliente.cliente_usuarios?.length ? <Badge>Vinculada</Badge> : <Badge variant="outline">Sin vincular</Badge>}</TableCell>
+                    {mostrarCuentaOnline && <TableCell>{cliente.cliente_usuarios?.length ? <Badge>Vinculada</Badge> : <Badge variant="outline">Sin vincular</Badge>}</TableCell>}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Dialog open={isEditDialogOpen && selectedCliente?.id === cliente.id} onOpenChange={(open) => {
@@ -188,6 +196,7 @@ export function ClientesList() {
           </CardContent>
         </Card>
       )}
+      <TablePaginationControls id="clientes" label="clientes" pagination={pagination} />
     </div>
   );
 }

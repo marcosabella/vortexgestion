@@ -2,6 +2,7 @@ import { format, subDays } from "date-fns";
 import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { Comercio } from "@/types/comercio";
 import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
+import type { ResumenCuentaClientePdf } from "@/utils/resumenesCuentaCliente";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -658,10 +659,11 @@ const createPdfBlob = (contents: string[], logoImage?: PdfImage | null) => {
   return new Blob(pdfParts, { type: "application/pdf" });
 };
 
-export const buildCuentaCorrientePdfFile = (
+const buildResumenPages = (
   resumen: CuentaCorrienteResumen,
   movimientos: CuentaCorriente[],
-  options: CuentaCorrientePdfOptions = {}
+  options: CuentaCorrientePdfOptions,
+  logoImage?: PdfImage | null,
 ) => {
   const rows = buildRows(movimientos, options);
   const pageRows: PdfRow[][] = [];
@@ -670,13 +672,20 @@ export const buildCuentaCorrientePdfFile = (
     pageRows.push(rows.slice(index, index + MAX_ROWS_PER_PAGE));
   }
 
-  const contents = (logoImage?: PdfImage | null) => (pageRows.length ? pageRows : [[{ fecha: "", comprobante: "Sin movimientos registrados", debe: "", haber: "", saldo: formatMoney(0) }]]).map(
+  return (pageRows.length ? pageRows : [[{ fecha: "", comprobante: "Sin movimientos registrados", debe: "", haber: "", saldo: formatMoney(0) }]]).map(
     (rowsForPage, index, allPages) =>
       createPageContent(resumen, rowsForPage, index + 1, allPages.length, index === allPages.length - 1, options.comercio, logoImage)
   );
+};
+
+export const buildCuentaCorrientePdfFile = (
+  resumen: CuentaCorrienteResumen,
+  movimientos: CuentaCorriente[],
+  options: CuentaCorrientePdfOptions = {}
+) => {
 
   return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
-    const blob = createPdfBlob(contents(logoImage), logoImage);
+    const blob = createPdfBlob(buildResumenPages(resumen, movimientos, options, logoImage), logoImage);
     const clienteFilename = sanitizeFilename(`${resumen.cliente_nombre}-${resumen.cliente_apellido}`) || "cliente";
     const periodFilename = options.fechaDesde || options.fechaHasta
       ? `-${options.fechaDesde || "inicio"}-${options.fechaHasta || "actual"}`
@@ -686,6 +695,21 @@ export const buildCuentaCorrientePdfFile = (
     return new File([blob], filename, { type: "application/pdf" });
   });
 };
+
+export async function buildResumenesCuentaCorrientePdfFile(resumenes: ResumenCuentaClientePdf[], options: { comercio?: Comercio | null; fechaCorte: string }) {
+  if (!resumenes.length) throw new Error("Seleccioná al menos un cliente.");
+  const logoImage = await loadLogoImage(getLogoUrl(options.comercio));
+  const contents: string[] = [];
+  for (let index = 0; index < resumenes.length; index++) {
+    const report = resumenes[index];
+    contents.push(...buildResumenPages(report.resumen, report.movimientos, {
+      comercio: options.comercio, saldoInicial: report.saldoInicial, fechaDesde: report.fechaDesde,
+    }, logoImage));
+    if (index % 10 === 9) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  const blob = createPdfBlob(contents, logoImage);
+  return new File([blob], `resumenes-cta-cte-corte-${options.fechaCorte}.pdf`, { type: "application/pdf" });
+}
 
 export const buildListadoCuentaCorrientePdfFile = (
   clientes: CuentaCorrienteResumen[],

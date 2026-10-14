@@ -1,0 +1,93 @@
+// Navegador local con datos ficticios; no consulta ni modifica cuentas reales.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { readFileSync, readdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { build } from 'esbuild';
+import WebSocket from 'ws';
+const require = createRequire(import.meta.url), repo = process.cwd();
+const privateDir = path.join(repo, 'private-backups/bostico-incremental-20261013');
+const assets = path.join(repo, 'dist/assets');
+const css = readFileSync(path.join(assets, readdirSync(assets).find(f => /^index-.*\.css$/.test(f))), 'utf8');
+const hooks = `
+import {useSyncExternalStore} from 'react';
+let tenant='tenant';const listeners=new Set();window.setTenant=id=>{tenant=id;listeners.forEach(fn=>fn());};
+export function useComercio(){const id=useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn)},()=>tenant);return {comercio:{id,nombre_comercio:'Prueba'}};}
+const people=Array.from({length:53},(_,i)=>({id:'p'+i,nombre:'Nombre '+String(i+1).padStart(3,'0'),apellido:'Apellido',razon_social:'Nombre '+String(i+1).padStart(3,'0'),cuit:String(30000000000+i),localidad:'Prueba',situacion_afip:'RI',tipo_persona:'juridica',cliente_usuarios:[]}));
+const noop={mutate:()=>{},mutateAsync:async()=>{},isPending:false};
+export const useClientes=()=>({data:people,isLoading:false});export const useDeleteCliente=()=>noop;
+export const useProveedores=id=>({data:id?people.filter(p=>p.id===id):people,isLoading:false});export const useDeleteProveedor=()=>noop;
+export const useComercioParametrizacion=()=>({data:{modulos:{pedidos_online:location.search.includes('online=true')},funciones:{impresion_etiquetas_productos:false}}});
+export const useToast=()=>({toast:()=>{}});export const useAfipConfig=()=>({data:{punto_venta:6}});export const useGastosEgresos=()=>({data:[],isLoading:false});export const useCheques=()=>({cheques:[]});
+const month=new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'}).slice(0,7);const start=month+'-01';const prev=new Date(start+'T12:00:00');prev.setDate(0);const cutoff=prev.toLocaleDateString('en-CA');window.testCutoff=cutoff;
+const detail=[{id:'a',fecha:cutoff,tipo:'deuda',monto:200000,observaciones:'Historico Access CompraProveedor:1 | Comprobante 0001 - 1'}, {id:'b',fecha:cutoff,tipo:'pago',monto:29000,observaciones:'Historico Access PagosProveedores:2'}, {id:'c',fecha:start,tipo:'deuda',monto:1000,observaciones:'Historico Access CompraProveedor:2202 | Comprobante 0007 - 124576'}, {id:'d',fecha:start,tipo:'pago',monto:500,observaciones:'Historico Access PagosProveedores:839'}].map(m=>({...m,proveedor_id:'p0',factura_id:null,gasto_egreso_id:null,proveedor:people[0]}));
+const all=people.map((p,i)=>({id:'m'+i,proveedor_id:p.id,proveedor:p,tipo:'deuda',monto:100,fecha:start,factura_id:null,gasto_egreso_id:null,observaciones:'Historico Access CompraProveedor:'+i+' | Comprobante '+i}));
+export const useCompras=()=>({movimientos:location.pathname.includes('/detalle/')?detail:all,facturas:[],isLoading:false,editarPago:noop,eliminarPago:noop,editarPagoGasto:noop,eliminarPagoGasto:noop,eliminarPagoCheque:noop,registrarPagosMultiDocumento:{...noop,mutate:(args,opts)=>{window.calls.push(args);opts?.onSuccess?.();}}});
+const clientMovements=people.map((p,i)=>({id:'cm'+i,cliente_id:p.id,cliente:p,tipo_movimiento:'debito',monto:100,fecha_movimiento:start,concepto:'factura',observaciones:''}));
+clientMovements[0]={...clientMovements[0],monto:1000,fecha_movimiento:start+'T12:00:00'};
+clientMovements[51].monto=0;clientMovements[52].tipo_movimiento='credito';
+clientMovements.push(...[{id:'old1',fecha_movimiento:cutoff+'T12:00:00',tipo_movimiento:'debito',monto:200000},{id:'old2',fecha_movimiento:cutoff+'T12:00:00',tipo_movimiento:'credito',monto:29000},{id:'newpay',fecha_movimiento:start+'T12:00:00',tipo_movimiento:'credito',monto:500}].map(m=>({...m,cliente_id:'p0',cliente:people[0],concepto:'factura',observaciones:''})));
+export const useCuentaCorriente=()=>({movimientos:clientMovements,isLoading:false,deleteMovimiento:()=>{},deleteVentaFromCuenta:()=>{},eliminarPagoCliente:noop,useResumenCuentaCorriente:()=>({data:people.map(p=>({cliente_id:p.id,cliente_nombre:p.nombre,cliente_apellido:p.apellido,cliente_cuit:p.cuit,total_debitos:100,total_creditos:0,saldo_actual:100,ultimo_movimiento:start})),isLoading:false})});
+export const useProductos=()=>({productos:people.map((p,i)=>({id:p.id,descripcion:p.nombre,cod_producto:'COD'+i,cod_barras:'',precio_venta:10,precio_costo:5,stock:2,tipo_moneda:'ARS'})),isLoading:false,deleteProducto:()=>{}});
+`;
+const entry = `import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter,Routes,Route} from 'react-router-dom';
+import {ClientesList} from './src/components/ClientesList';import {ProveedoresList} from './src/components/ProveedoresList';import {ProductosList} from './src/components/ProductosList';import {CuentaCorrienteList} from './src/components/CuentaCorrienteList';import CuentaCorrienteProveedores from './src/pages/CuentaCorrienteProveedores';import Detalle from './src/pages/CuentaCorrienteProveedorDetalle';import Listado from './src/pages/listados/ListadoCuentaCorriente';
+window.calls=[];window.reports=[];window.massReports=[];window.open=()=>({opener:null,document:{title:'',body:{textContent:''}},location:{replace:()=>{}},closed:false,close:()=>{}});createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/clientes' element={<ClientesList/>}/><Route path='/proveedores' element={<ProveedoresList/>}/><Route path='/productos' element={<ProductosList/>}/><Route path='/cuenta-clientes' element={<CuentaCorrienteList/>}/><Route path='/cuenta-proveedores' element={<CuentaCorrienteProveedores/>}/><Route path='/detalle/:proveedorId' element={<Detalle/>}/><Route path='/informe' element={<Listado/>}/></Routes></BrowserRouter>);`;
+const bundle = await build({stdin:{contents:entry,loader:'tsx',resolveDir:repo},write:false,bundle:true,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(b){
+ b.onResolve({filter:/^@\/hooks\/(useComercio|useClientes|useProveedores|useCompras|useCuentaCorriente|useProductos|useComercioParametrizacion|use-toast|useAfipConfig|useGastosEgresos|useCheques)$/},()=>({path:'hooks',namespace:'fixture'}));
+ b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:hooks,loader:'js',resolveDir:repo}));
+ b.onResolve({filter:/^@\/utils\/cuentaCorrientePdf$/},()=>({path:'pdf',namespace:'fixture-pdf'}));
+ b.onLoad({filter:/.*/,namespace:'fixture-pdf'},()=>({contents:'export const buildCuentaCorrientePdfFile=async(resumen,movimientos,options)=>{window.reports.push({resumen,movimientos,options});return new File(["fixture"],"prueba.pdf",{type:"application/pdf"});};export const buildListadoCuentaCorrientePdfFile=async()=>new File(["fixture"],"listado.pdf",{type:"application/pdf"});export const buildResumenesCuentaCorrientePdfFile=async(resumenes,options)=>{window.massReports.push({resumenes,options});return new File(["fixture"],"resumenes.pdf",{type:"application/pdf"});};',loader:'js'}));
+ b.onResolve({filter:/(ClienteForm|ProveedorForm|ProductoForm|AjusteStockDialog|productoEtiquetasPdf)$/},()=>({path:'forms',namespace:'fixture-forms'}));
+ b.onLoad({filter:/.*/,namespace:'fixture-forms'},()=>({contents:'export const ClienteForm=()=>null;export const ProveedorForm=()=>null;export const ProductoForm=()=>null;export const AjusteStockDialog=()=>null;export const buildProductoEtiquetasPdfFile=()=>{};export const buildProductosEtiquetasPdfFile=()=>{};',loader:'js'}));
+ b.onResolve({filter:/^@\//},args=>{for(const ext of ['.tsx','.ts','.js']){try{return {path:require.resolve(path.join(repo,'src',args.path.slice(2))+ext)}}catch{}}throw Error(args.path)});
+}}]});
+const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/app.js'?'application/javascript':req.url==='/app.css'?'text/css':'text/html;charset=utf-8');res.end(req.url==='/app.js'?bundle.outputFiles[0].text:req.url==='/app.css'?css:'<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><body><div id="root"></div><script src="/app.js"></script></body></html>')});
+let browser,socket;
+try{
+ const profile=mkdtempSync(path.join(privateDir,'ui-browser-'));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
+ browser=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-first-run','--disable-background-networking','--disable-extensions','--disable-gpu','--user-data-dir='+profile,'--remote-debugging-port=0','about:blank'],{windowsHide:true,stdio:['ignore','ignore','pipe']});
+ const url=await new Promise((resolve,reject)=>{let s='';const timer=setTimeout(()=>reject(Error('Chrome timeout')),15000);browser.once('error',reject);browser.stderr.on('data',chunk=>{s+=chunk;const m=s.match(/DevTools listening on (ws:\/\/\S+)/);if(m){clearTimeout(timer);resolve(m[1])}})});
+ socket=new WebSocket(url);await new Promise((r,j)=>{socket.once('open',r);socket.once('error',j)});let seq=0;const pending=new Map();
+ socket.on('message',raw=>{const m=JSON.parse(String(raw));const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result)}});
+ const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>reject(Error(method)),12000);pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}))});
+ const {targetId}=await send('Target.createTarget',{url:'about:blank'});const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});await send('Runtime.enable',{},sessionId);await send('Page.enable',{},sessionId);
+ const evalJS=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},sessionId);if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value};
+ const wait=async expr=>{const end=Date.now()+8000;while(Date.now()<end){if(await evalJS('Boolean('+expr+')'))return;await new Promise(r=>setTimeout(r,40))}throw Error(expr+'\n'+await evalJS('document.body.textContent'))};
+ const click=async text=>{const rect=await evalJS(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}&&!b.closest('[hidden]'));if(!b)throw Error('Boton ausente');if(b.getAttribute('role')!=='tab'){b.click();return null;}b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);if(rect){await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...rect},sessionId);await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...rect},sessionId);}await new Promise(r=>setTimeout(r,100))};
+ const navigate=async url=>{await send('Page.navigate',{url:origin+url},sessionId);await wait('document.querySelector("table")')};
+ const fill=async(selector,value)=>{await evalJS(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));})()`);await new Promise(r=>setTimeout(r,60))};
+ await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false},sessionId);
+ for(const route of ['/clientes','/proveedores','/productos','/cuenta-clientes','/cuenta-proveedores']){
+  await navigate(route);assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),12,route);
+  await click('Siguiente');await wait('document.body.textContent.includes("Página 2 de 5")');assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),12);
+  await fill('input[placeholder^="Buscar"]','Nombre 053');await wait('document.body.textContent.includes("Página 1 de 1")');assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),1,'Filtro '+route);
+  await navigate(route);await evalJS('document.querySelector("[id$=page-size]").click()');await wait('document.querySelector("[role=option]")');await evalJS('[...document.querySelectorAll("[role=option]")].find(el=>el.textContent.trim()==="24").click()');await wait('document.querySelectorAll("tbody tr").length===24');
+  await navigate(route);assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),24,'Preferencia '+route);
+  for(const width of [390,1440]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640},sessionId);assert.equal(await evalJS('document.documentElement.scrollWidth<=document.documentElement.clientWidth+1'),true,'Responsive '+route+' '+width)}
+ }
+ await navigate('/clientes');assert.equal(await evalJS('document.body.textContent.includes("Cuenta online")'),false);await navigate('/clientes?online=true');assert.equal(await evalJS('document.body.textContent.includes("Cuenta online")'),true);
+ await navigate('/cuenta-clientes');await click('Todos los Movimientos');await wait('document.querySelector("nav")?.getAttribute("aria-label")==="Paginación de movimientos"');assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),12);
+ await navigate('/cuenta-proveedores');await click('Todos los movimientos');await wait('document.querySelector("nav")?.getAttribute("aria-label")==="Paginación de movimientos"');assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),12);
+ await navigate('/detalle/p0');assert.equal(await evalJS('document.querySelectorAll("tbody tr").length'),3);assert.equal(await evalJS('document.body.textContent.includes("171.000,00")'),true);assert.equal(await evalJS('document.body.textContent.includes("Comprobante 0007 - 124576") && document.body.textContent.includes("Pago: 839") && !document.body.textContent.includes("Historico Access")'),true);
+ assert.equal(await evalJS('getComputedStyle(document.querySelector("[class*=max-h-]")).maxHeight'), '540px');
+ await evalJS('document.getElementById("historico-proveedor").click()');await wait('document.getElementById("desde-proveedor")');await fill('#desde-proveedor','');await fill('#hasta-proveedor','');await wait('document.querySelectorAll("tbody tr").length===4');
+ await fill('#desde-proveedor','2026-12-31');await fill('#hasta-proveedor','2026-01-01');assert.equal(await evalJS('document.body.textContent.includes("La fecha desde no puede ser posterior")'),true);
+ await evalJS('document.getElementById("historico-proveedor").click()');await click('Registrar pago');await click('Seleccionar comprobantes');await wait('document.body.textContent.includes("Saldo histórico del proveedor")');await evalJS('[...document.querySelectorAll("[role=dialog]")].at(-1).querySelector("[role=checkbox]").click()');await click('Aplicar selección');
+ await fill('[role=dialog] input[type=number]','100');await click('Agregar');await click('Confirmar pago');await wait('window.calls.length===1');assert.deepEqual(await evalJS('window.calls[0].documentos'),[{saldo_historico:true}]);assert.equal(await evalJS('window.calls[0].pagos[0].monto'),100);
+ const capture=await send('Page.captureScreenshot',{format:'png'},sessionId);writeFileSync(path.join(privateDir,'cuenta-proveedor-ui.png'),Buffer.from(capture.data,'base64'));
+ await navigate('/informe');await click('Reporte');await wait('window.reports.length===1');assert.equal(await evalJS('window.reports[0].options.saldoInicial'),171000);assert.equal(await evalJS('window.reports[0].movimientos.length'),2);assert.equal(await evalJS('window.reports[0].resumen.saldo_actual'),171500);assert.equal(await evalJS('window.reports[0].options.fechaDesde.endsWith("-01")'),true);
+ await click('Impresión masiva de resúmenes');await wait('document.getElementById("resumenes-fecha-corte")');assert.equal(await evalJS('document.querySelectorAll("[role=dialog] tbody tr").length'),51);
+ await evalJS('document.getElementById("resumenes-tipo-saldo").click()');await wait('document.querySelector("[role=option]")');await evalJS('[...document.querySelectorAll("[role=option]")].find(el=>el.textContent==="Saldo acreedor").click()');await wait('document.querySelectorAll("[role=dialog] tbody tr").length===1');
+ await evalJS('document.getElementById("resumenes-tipo-saldo").click()');await wait('document.querySelector("[role=option]")');await evalJS('[...document.querySelectorAll("[role=option]")].find(el=>el.textContent.startsWith("Todos (")).click()');await wait('document.querySelectorAll("[role=dialog] tbody tr").length===53');
+ await evalJS('document.getElementById("resumenes-algunos").click()');await wait('[...document.querySelectorAll("[role=dialog] button")].find(b=>b.textContent.includes("Generar e imprimir"))?.disabled');
+ await fill('[role=dialog] input[placeholder^="Buscar"]','Nombre 001');await wait('document.querySelectorAll("[role=dialog] tbody tr").length===1');await evalJS('document.querySelector("[role=dialog] tbody [role=checkbox]").click()');
+ await fill('#resumenes-fecha-corte','2026-08-31');
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true},sessionId);assert.equal(await evalJS('document.documentElement.scrollWidth<=document.documentElement.clientWidth+1'),true,'Modal masivo responsive');
+ await click('Generar e imprimir resúmenes');await wait('window.massReports.length===1');assert.equal(await evalJS('window.massReports[0].resumenes.length'),1);assert.equal(await evalJS('window.massReports[0].resumenes[0].resumen.cliente_id'),'p0');assert.equal(await evalJS('window.massReports[0].options.fechaCorte'),'2026-08-31');assert.equal(await evalJS('window.massReports[0].resumenes[0].fechaDesde'),'2026-09-01');
+ console.log('OK impresion masiva: todos/deudores/acreedores/saldo cero, seleccion manual, busqueda, corte, modal movil y payload PDF');
+ console.log('OK cinco grillas: paginas, filtro, tamaño persistido y responsive; tienda online; pestañas de movimientos; conceptos, corte mensual, rango e imputacion a saldo historico');
+}finally{socket?.close();browser?.kill();await new Promise(r=>server.close(r))}

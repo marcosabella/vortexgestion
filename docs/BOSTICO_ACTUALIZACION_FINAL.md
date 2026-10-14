@@ -1,6 +1,6 @@
 # Continuidad: actualización final de Bostico
 
-Última actualización de esta nota: 26/09/2026.
+Última actualización de esta nota: 14/10/2026.
 
 ## Identificación
 
@@ -69,4 +69,35 @@ Ambas fueron aplicadas y verificadas en producción. No volver a ejecutarlas com
 
 ## Frase sugerida para retomar
 
-> Leé `docs/BOSTICO_ACTUALIZACION_FINAL.md`. Bostico ya cerró el sistema de escritorio y quiero simular la actualización incremental con la nueva base ubicada en: [RUTA]. No apliques cambios en producción hasta mostrarme la comparación.
+> Leé `docs/BOSTICO_ACTUALIZACION_FINAL.md`. Bostico ya cerró el sistema de escritorio y quiero simular la actualización incremental con la nueva base ubicada en: D:\BOSTICO 2026\BDsiagro.mdb. No apliques cambios en producción hasta mostrarme la comparación.
+
+
+## Actualización incremental aplicada el 14/10/2026
+
+El usuario confirmó el cierre del escritorio, revisó el delta y autorizó expresamente su aplicación a producción sólo para `carlosbostico@hotmail.com`.
+
+- Base final: `D:\BOSTICO 2026\BDsiagro.mdb`; SHA-256 `0616560fc2f7e4625a691b1f830cc0da8ddfe75c97a3ac0c7ea28485d122dc63`.
+- Lote completado: `8c14d604-5043-55df-8172-0cf489581454`; aplicado a las 04:47:31 UTC.
+- Se incorporaron 101 ventas, 61 cobranzas, 321 productos y 3 clientes; se ajustaron cuatro stocks finales sin volver a descontar ventas históricas.
+- Por la última decisión del usuario, venta 7210 según la nueva base: cinco artículos y $138.000,02; conserva su UUID, tres detalles originales y un único débito actualizado.
+- 43 compras y 10 pagos a proveedores se agregaron a archivo histórico, manteniendo el criterio anterior.
+- Se conservaron correcciones de CUIT, notas de crédito/débito, Recibos X, CAE existentes, cheques, presupuestos y registros ausentes en origen. No hubo eliminaciones.
+- Verificación directa posterior: 1.806 operaciones y todos sus campos coinciden con el plan, 798 fuentes de línea base, cero diferencias por cliente en cuenta corriente; saldo agregado $18.906.889,17.
+- Informe completo: `docs/BOSTICO_PREPARACION_INCREMENTAL.md`. Copia congelada, snapshot previo, SQL, auditoría y resultado productivo en `private-backups/bostico-incremental-20261013/`, excluidos de Git.
+
+No repetir el importador completo ni usar el corte original para reinsertar estas operaciones. Para otra actualización, considerar las fuentes de línea base de los lotes incrementales completados. No se ejecutó la reversión; requiere autorización separada y rechaza modificaciones o dependencias posteriores.
+
+
+## Numeración de comprobantes ARCA — 14/10/2026
+
+Se corrigieron en producción 6.045 comprobantes con CAE usando `CaeXventa.idVentaAfip`, manteniendo `idVenta` como ID de origen de Access en los mapas. La venta 7327 de Gustavo Daniel Garay ahora muestra 0006 - 00005398. CAE, importes y cuenta corriente quedaron intactos. Lote: `1ba4a86f-6d9d-4ca6-8e21-e6427cf2cf50`.
+
+Seis históricos (origen 18, 190, 69, 670, 210 y 1954) requieren identificar su punto de venta: repiten el número fiscal dentro del mismo tipo y el origen no aporta ese dato. No inferir el punto 6 para todos ellos. Ver el detalle y las colisiones visuales pendientes en `docs/BOSTICO_PREPARACION_INCREMENTAL.md`.
+
+En próximos deltas tomar la numeración fiscal del registro CAE; no restaurar el ID interno como número visible. La auditoría y evidencia privada están en `private-backups/bostico-incremental-20261013/resultado-numeracion-arca.json`.
+
+## Cuenta corriente de proveedores — 14/10/2026
+
+El usuario solicitó migrar los históricos de proveedores. Se aplicó el lote `cdd15285-9d35-4e98-9427-0b568d387a31`: 3.014 movimientos, saldo neto $11.862.237,61 y cero diferencias por proveedor y campos. Seis registros de importe cero permanecen archivados; 12 pagos negativos se incorporaron como débitos por reversión. Se creó un proveedor histórico eliminado #2 para conservar una deuda de $100.
+
+Este resultado reemplaza el estado previo de cero movimientos operativos de proveedores. No repetir el lote ni el importador completo. Ver `docs/BOSTICO_CUENTA_CORRIENTE_PROVEEDORES.md` para controles, evidencia y limitaciones de imputación y publicación del frontend.

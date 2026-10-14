@@ -10,13 +10,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProveedores, useDeleteProveedor, type Proveedor } from '@/hooks/useProveedores';
 import { ProveedorForm } from './ProveedorForm';
+import { useTablePagination } from '@/hooks/useTablePagination';
+import { TablePaginationControls } from './TablePaginationControls';
 
 export function ProveedoresList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const { data: proveedores = [], isLoading } = useProveedores();
+  const { data: proveedores = [], isLoading, error } = useProveedores();
   const deleteProveedor = useDeleteProveedor();
 
   const filteredProveedores = proveedores.filter(proveedor =>
@@ -25,6 +27,8 @@ export function ProveedoresList() {
     proveedor.razon_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     proveedor.cuit.includes(searchTerm)
   );
+
+  const pagination = useTablePagination(filteredProveedores, 'proveedores-registros-por-pagina', searchTerm);
 
   const handleEdit = (proveedor: Proveedor) => {
     setSelectedProveedor(proveedor);
@@ -46,6 +50,7 @@ export function ProveedoresList() {
       : `${proveedor.nombre} ${proveedor.apellido || ''}`.trim();
   };
 
+  if (error) return <p role="alert" className="text-destructive">No se pudieron cargar los proveedores. Volvé a cargar el listado.</p>;
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -115,7 +120,7 @@ export function ProveedoresList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProveedores.map((proveedor) => (
+                {pagination.items.map((proveedor) => (
                   <TableRow key={proveedor.id}>
                     <TableCell className="font-medium">
                       {getProveedorNombre(proveedor)}
@@ -191,6 +196,7 @@ export function ProveedoresList() {
           </CardContent>
         </Card>
       )}
+      <TablePaginationControls id="proveedores" label="proveedores" pagination={pagination} />
     </div>
   );
 }

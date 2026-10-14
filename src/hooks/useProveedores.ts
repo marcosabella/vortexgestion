@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useComercio } from '@/hooks/useComercio';
+import { fetchMasterRecords } from '@/utils/fetchMasterRecords';
 
 export interface Proveedor {
   id?: string;
@@ -28,15 +29,14 @@ export function useProveedores(proveedorId?: string) {
   return useQuery({
     queryKey: ['proveedores', comercioId, proveedorId], enabled: Boolean(comercioId),
     queryFn: async () => {
-      let query = supabase
+      return fetchMasterRecords<Proveedor>((from, to) => {
+        let query = supabase
         .from('proveedores')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('comercio_id', comercioId);
       if (proveedorId) query = query.eq('id', proveedorId);
-      const { data, error } = await query.order('nombre', { ascending: true });
-      
-      if (error) throw error;
-      return data as Proveedor[];
+        return query.order('nombre', { ascending: true }).order('id', { ascending: true }).range(from, to);
+      });
     },
   });
 }

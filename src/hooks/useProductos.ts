@@ -4,6 +4,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { Producto } from "@/types/producto";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
+import { fetchMasterRecords } from "@/utils/fetchMasterRecords";
 
 type ProductoInsert = Database["public"]["Tables"]["productos"]["Insert"];
 type ProductoUpdate = Database["public"]["Tables"]["productos"]["Update"];
@@ -40,7 +41,7 @@ export const useProductos = () => {
     queryKey: ["productos", comercioId],
     enabled: Boolean(comercioId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchMasterRecords<Producto>((from, to) => supabase
         .from("productos")
         .select(`
           *,
@@ -48,12 +49,11 @@ export const useProductos = () => {
           marca:marcas(nombre),
           rubro:rubros(nombre),
           subrubro:subrubros(nombre)
-        `)
+        `, { count: 'exact' })
         .eq("comercio_id", comercioId!)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as Producto[];
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to));
     },
   });
 

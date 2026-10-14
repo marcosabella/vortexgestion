@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
-import { type ChequePropioPago, type FacturaProveedor, type PagoProveedorBorrador, useCompras } from "@/hooks/useCompras";
+import { type ChequePropioPago, type DocumentoPagoProveedor, type FacturaProveedor, type PagoProveedorBorrador, useCompras } from "@/hooks/useCompras";
+import { saldoHistoricoProveedor } from "@/utils/cuentaProveedorHistorica";
 import { useGastosEgresos } from "@/hooks/useGastosEgresos";
 import { useCheques } from "@/hooks/useCheques";
 import { useComercio } from "@/hooks/useComercio";
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 type PaymentRow = PagoProveedorBorrador & { localId: string; detail: string };
-type DocumentOption = { value: string; type: "Factura" | "Gasto / egreso"; title: string; detail?: string; date: string; balance: number };
+type DocumentOption = { value: string; type: "Factura" | "Gasto / egreso" | "Saldo histórico"; title: string; detail?: string; date: string; balance: number };
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; providerId: string };
 
 const money = (value: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
@@ -26,7 +27,7 @@ const methodLabels: Record<PaymentRow["tipo"], string> = { contado: "Efectivo", 
 const emptyOwnCheque = (name?: string | null, cuit?: string | null): ChequePropioPago => ({ numero_cheque: "", banco_emisor: "", fecha_emision: today(), fecha_vencimiento: today(), emisor_nombre: name || "", emisor_cuit: cuit || "", observaciones: "" });
 
 export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: Props) {
-  const { movimientos = [], facturas = [], registrarPagosMultiDocumento } = useCompras({ proveedorId: providerId, cargarCompras: false });
+  const { movimientos = [], facturas = [], registrarPagosMultiDocumento, isLoading, error } = useCompras({ proveedorId: providerId, cargarCompras: false });
   const { data: gastosData } = useGastosEgresos(undefined, undefined, providerId);
   const { cheques: chequesData } = useCheques();
   const { comercio } = useComercio();
@@ -49,7 +50,9 @@ export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: 
   const cheques = Array.isArray(chequesData) ? chequesData : [];
   const invoiceBalance = (invoice: FacturaProveedor) => roundMoney((Array.isArray(invoice.movimientos) ? invoice.movimientos : []).reduce((sum, movement) => sum + (movement.tipo === "deuda" ? Number(movement.monto) : -Number(movement.monto)), 0));
   const expenseBalance = (expenseId: string) => roundMoney(movimientos.filter((movement) => movement.gasto_egreso_id === expenseId).reduce((sum, movement) => sum + (movement.tipo === "deuda" ? Number(movement.monto) : -Number(movement.monto)), 0));
-  const documents: DocumentOption[] = [
+  const historicalBalance = saldoHistoricoProveedor(movimientos.filter((movement) => movement.proveedor_id === providerId));
+  const documents: DocumentOption[] = isLoading || error ? [] : [
+    ...(historicalBalance > 0 ? [{ value: "historical", type: "Saldo histórico" as const, title: "Saldo histórico del proveedor", date: movimientos.find((movement) => !movement.factura_id && !movement.gasto_egreso_id)?.fecha || today(), balance: historicalBalance }] : []),
     ...facturas.filter((item) => item.proveedor_id === providerId && invoiceBalance(item) > 0).map((item) => ({ value: `invoice:${item.id}`, type: "Factura" as const, title: item.numero_comprobante, date: item.fecha, balance: invoiceBalance(item) })),
     ...gastos.filter((item) => item.proveedor_id === providerId && item.medio_pago === "cuenta_corriente" && expenseBalance(item.id) > 0).map((item) => ({ value: `expense:${item.id}`, type: "Gasto / egreso" as const, title: item.numero_comprobante || "Sin comprobante", detail: item.concepto, date: item.fecha, balance: expenseBalance(item.id) })),
   ];
@@ -100,7 +103,7 @@ export function PagoProveedorMultipleDialog({ open, onOpenChange, providerId }: 
   };
   const submit = () => registrarPagosMultiDocumento.mutate({
     proveedorId: providerId, fecha: date, observaciones: notes,
-    documentos: selectedDocuments.map((item) => item.value.startsWith("invoice:") ? { factura_id: item.value.slice(8) } : { gasto_id: item.value.slice(8) }),
+    documentos: selectedDocuments.map((item): DocumentoPagoProveedor => item.value === "historical" ? { saldo_historico: true } : item.value.startsWith("invoice:") ? { factura_id: item.value.slice(8) } : { gasto_id: item.value.slice(8) }),
     pagos: rows.map(({ localId: _localId, detail: _detail, ...row }) => ({ ...row, monto: roundMoney(row.monto) })),
   }, { onSuccess: () => onOpenChange(false) });
 

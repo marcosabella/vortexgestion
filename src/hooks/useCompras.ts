@@ -10,6 +10,7 @@ type Db = {
   ) => {
     select: (
       columns: string,
+      options?: { count: "exact" },
     ) => SelectQuery;
   };
   rpc: (
@@ -17,18 +18,14 @@ type Db = {
     args: Record<string, unknown>,
   ) => Promise<{ error: Error | null }>;
 };
-type SelectQuery = {
+type SelectQuery = PromiseLike<{ data: unknown; error: Error | null; count?: number | null }> & {
       eq: (column: string, value: unknown) => SelectQuery;
       order: (
         column: string,
         options: { ascending: boolean },
-      ) => Promise<{ data: unknown; error: Error | null }>;
-      gt: (column: string, value: number) => {
-        order: (
-          column: string,
-          options: { ascending: boolean },
-        ) => Promise<{ data: unknown; error: Error | null }>;
-      };
+      ) => SelectQuery;
+      gt: (column: string, value: number) => SelectQuery;
+      range: (from: number, to: number) => SelectQuery;
 };
 const db = supabase as unknown as Db;
 
@@ -129,7 +126,8 @@ export type PagoProveedorBorrador = {
 };
 export type DocumentoPagoProveedor =
   | { factura_id: string }
-  | { gasto_id: string };
+  | { gasto_id: string }
+  | { saldo_historico: true };
 export type FacturaProveedor = {
   id: string;
   compra_id: string;
@@ -154,7 +152,7 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
   const { toast } = useToast();
   const comercioId = comercio?.id;
   const comprasQuery = useQuery({
-    queryKey: ["compras", comercioId],
+    queryKey: ["compras", comercioId, proveedorId || null],
     enabled: Boolean(comercioId && cargarCompras),
     queryFn: async () => {
       let query = db.from("compras").select(
@@ -167,7 +165,7 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
     },
   });
   const facturasQuery = useQuery({
-    queryKey: ["compras-facturas", comercioId],
+    queryKey: ["compras-facturas", comercioId, proveedorId || null],
     enabled: Boolean(comercioId && cargarFacturas),
     queryFn: async () => {
       let query = db.from("compras_facturas").select(
@@ -180,20 +178,39 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
     },
   });
   const movimientosQuery = useQuery({
-    queryKey: ["cuenta-proveedores", comercioId],
+    queryKey: ["cuenta-proveedores", comercioId, proveedorId || null],
     enabled: !!comercioId,
     queryFn: async () => {
-      let query = db.from("cuenta_corriente_proveedores")
-        .select(
-          "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), factura:compras_facturas(numero_comprobante,fecha_vencimiento,compra_id), gasto:gastos_egresos(concepto,numero_comprobante), cheque:cheques!cuenta_corriente_proveedores_cheque_id_fkey(numero_cheque,banco_emisor,monto,tipo_cheque)",
-        ).eq("comercio_id", comercioId);
-      if (proveedorId) query = query.eq("proveedor_id", proveedorId);
-      const { data, error } = await query
-        .order("fecha", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
-      if (error) throw error;
-      return (data || []) as MovimientoProveedor[];
+      const movimientos: MovimientoProveedor[] = [];
+      const pageSize = 500;
+      let total: number | undefined;
+      for (let offset = 0; total === undefined || offset < total; offset += pageSize) {
+        let query = db.from("cuenta_corriente_proveedores")
+          .select(
+            "*, proveedor:proveedores(nombre,apellido,razon_social,cuit), factura:compras_facturas(numero_comprobante,fecha_vencimiento,compra_id), gasto:gastos_egresos(concepto,numero_comprobante), cheque:cheques!cuenta_corriente_proveedores_cheque_id_fkey(numero_cheque,banco_emisor,monto,tipo_cheque)",
+            { count: "exact" },
+          ).eq("comercio_id", comercioId);
+        if (proveedorId) query = query.eq("proveedor_id", proveedorId);
+        const { data, error, count } = await query
+          .order("fecha", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        if (count == null || (total !== undefined && total !== count)) {
+          throw new Error("La cuenta corriente cambió durante la consulta. Volvé a cargarla.");
+        }
+        total = count;
+        const page = (data || []) as MovimientoProveedor[];
+        if (page.length !== Math.min(pageSize, total - offset)) {
+          throw new Error("No se pudieron cargar todos los movimientos de proveedores.");
+        }
+        movimientos.push(...page);
+      }
+      if (new Set(movimientos.map((movement) => movement.id)).size !== movimientos.length) {
+        throw new Error("La cuenta corriente cambió durante la consulta. Volvé a cargarla.");
+      }
+      return movimientos;
     },
   });
   const refresh = () => {
@@ -555,7 +572,7 @@ export function useCompras({ proveedorId, cargarCompras = true, cargarFacturas =
         pagos: PagoProveedorBorrador[];
       },
     ) => {
-      const { error } = await db.rpc("registrar_pagos_proveedor_multi_documento", {
+      const { error } = await db.rpc("registrar_pagos_proveedor_multi_documento_v2", {
         p_proveedor_id: proveedorId,
         p_fecha: fecha,
         p_observaciones: observaciones || null,

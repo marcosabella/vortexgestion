@@ -11,16 +11,19 @@ import { useComercio } from '@/hooks/useComercio';
 import { useCuentaCorriente } from '@/hooks/useCuentaCorriente';
 import { useToast } from '@/hooks/use-toast';
 import { buildCuentaCorrientePdfFile, buildListadoCuentaCorrientePdfFile } from '@/utils/cuentaCorrientePdf';
+import { inicioMesCuentaCliente, periodoCuentaCliente } from '@/utils/cuentaClientePeriodo';
+import { ResumenesCuentaClienteDialog } from '@/components/ResumenesCuentaClienteDialog';
 
 const ListadoCuentaCorriente = () => {
-  const { useResumenCuentaCorriente, movimientos, isLoading: isLoadingMovimientos } = useCuentaCorriente();
-  const { data: resumen = [], isLoading } = useResumenCuentaCorriente();
+  const { useResumenCuentaCorriente, movimientos, isLoading: isLoadingMovimientos, error: movimientosError } = useCuentaCorriente();
+  const { data: resumen = [], isLoading, error: resumenError } = useResumenCuentaCorriente();
   const { comercio } = useComercio();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [resumenesOpen, setResumenesOpen] = useState(false);
 
   const clientesConSaldo = useMemo(() => {
     return resumen.filter((cliente) => Math.round(cliente.saldo_actual * 100) !== 0);
@@ -68,10 +71,24 @@ const ListadoCuentaCorriente = () => {
     const cliente = filteredClientes.find((item) => item.cliente_id === clienteId);
     if (!cliente) return;
 
+    const desde = fechaDesde || inicioMesCuentaCliente();
+    if (fechaHasta && desde > fechaHasta) {
+      toast({ title: 'Período inválido', description: 'La fecha desde no puede ser posterior a la fecha hasta.', variant: 'destructive' });
+      return;
+    }
+    const periodo = periodoCuentaCliente(movimientos.filter((movimiento) => movimiento.cliente_id === clienteId), desde, fechaHasta);
+    const resumenPeriodo = {
+      ...cliente,
+      total_debitos: periodo.totalDebitos,
+      total_creditos: periodo.totalCreditos,
+      saldo_actual: periodo.saldoFinal,
+      ultimo_movimiento: periodo.movimientos.at(-1)?.fecha_movimiento || cliente.ultimo_movimiento,
+    };
+
     const file = await buildCuentaCorrientePdfFile(
-      cliente,
-      movimientos.filter((movimiento) => movimiento.cliente_id === clienteId),
-      { comercio }
+      resumenPeriodo,
+      periodo.movimientos,
+      { comercio, saldoInicial: periodo.saldoAnterior, fechaDesde: desde, fechaHasta: fechaHasta || undefined }
     );
     const url = URL.createObjectURL(file);
     const pdfWindow = window.open(url, '_blank');
@@ -134,6 +151,7 @@ const ListadoCuentaCorriente = () => {
     }).format(amount);
   };
 
+  if (movimientosError || resumenError) return <p role="alert" className="p-6 text-destructive">No se pudo cargar la cuenta corriente. Volvé a cargar el listado antes de imprimir.</p>;
   if (isLoading || isLoadingMovimientos) {
     return (
       <div className="p-6">
@@ -248,10 +266,11 @@ const ListadoCuentaCorriente = () => {
                   Mostrando {filteredClientes.length} de {clientesConSaldo.length} clientes
                 </CardDescription>
               </div>
+              <div className="flex flex-wrap gap-2"><Button type="button" variant="print" onClick={() => setResumenesOpen(true)}><Printer className="h-4 w-4 mr-2" />Impresión masiva de resúmenes</Button>
               <Button type="button" variant="print" onClick={handlePrintList}>
                 <Printer className="h-4 w-4 mr-2" />
                 Imprimir listado
-              </Button>
+              </Button></div>
             </div>
           </CardHeader>
           <CardContent>
@@ -311,6 +330,7 @@ const ListadoCuentaCorriente = () => {
             </div>
           </CardContent>
         </Card>
+        {resumenesOpen && <ResumenesCuentaClienteDialog key={comercio?.id} movimientos={movimientos} onOpenChange={setResumenesOpen} />}
       </div>
     </div>
   );
