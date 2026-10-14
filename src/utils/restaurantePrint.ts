@@ -1,3 +1,4 @@
+import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { FormatoComprobante } from "@/config/parametrizacion";
 import type { Comercio } from "@/types/comercio";
 import type { ComandaRestaurante, ItemRestaurante, PedidoRestaurante, ResumenRestaurante } from "@/types/restaurante";
@@ -41,8 +42,8 @@ function documento({ comercio, formato, titulo, numero, letra, creado, copia, co
     </style></head><body><div class="factura-container sin-cae restaurante-documento">
       <div class="copy-indicator">${escape(copia)}</div>
       <div class="header"><div class="header-left">
-        ${comercio?.logo_url?.trim() ? `<img class="comercio-logo" src="${escape(comercio.logo_url)}" alt="${escape(comercio.nombre_comercio)}">` : `<div class="comercio-nombre">${escape(comercio?.nombre_comercio || "Restaurante")}</div>`}
-        <div class="comercio-datos">${domicilio ? `<div class="info-line">${escape(domicilio)}</div>` : ""}${comercio?.situacion_afip ? `<div class="info-line">${escape(comercio.situacion_afip)}</div>` : ""}${comercio?.telefono ? `<div class="info-line">Teléfono: ${escape(comercio.telefono)}</div>` : ""}</div>
+        ${identidadComercioHtml(comercio, "Restaurante")}
+        <div class="comercio-datos">${domicilio ? `<div class="info-line">${escape(domicilio)}</div>` : ""}${telefonoComercioHtml(comercio)}${comercio?.situacion_afip ? `<div class="info-line">${escape(comercio.situacion_afip)}</div>` : ""}</div>
       </div><div class="header-center"><div class="tipo-letra">${escape(letra)}</div><div class="tipo-codigo">NO FISCAL</div></div>
       <div class="header-right"><div class="factura-titulo">${escape(titulo)}</div><div class="factura-info">
         <div class="numero-line"><strong><span class="presupuesto-numero">${escape(numero)}</span></strong></div>

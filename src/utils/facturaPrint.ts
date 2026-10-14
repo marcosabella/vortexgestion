@@ -6,6 +6,7 @@ import { FormatoComprobante } from "@/config/parametrizacion";
 import type { TallerOrden } from "@/types/taller";
 import { ESTADOS_TALLER } from "@/types/taller";
 import { datosFiscalesVenta } from "@/utils/emisorFiscal";
+import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 
 export type TipoDocumentoImpresion = "venta" | "presupuesto" | "orden_taller";
 export type DatosOrdenImpresion = { orden: TallerOrden; responsable: string };
@@ -74,7 +75,6 @@ const sanitizeFilename = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
-const getLogoUrl = (comercio?: Comercio | null) => comercio?.logo_url?.trim() || "";
 
 export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
   * {
@@ -158,6 +158,16 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
     object-fit: contain;
     object-position: center;
     width: auto;
+  }
+
+  .comercio-identidad-completa .comercio-logo {
+    height: 60px;
+    margin-bottom: 6px;
+  }
+
+  .comercio-identidad-completa .comercio-nombre {
+    font-size: 14px;
+    overflow-wrap: anywhere;
   }
 
   .info-line {
@@ -410,6 +420,8 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
     .header-right { order: 3; }
     .comercio-nombre { font-size: 13px; margin-bottom: 1mm; }
     .comercio-logo { height: 18mm; margin-bottom: 1mm; max-width: 48mm; }
+    .comercio-identidad-completa .comercio-logo { height: 16mm; }
+    .comercio-identidad-completa .comercio-nombre { font-size: 10px; }
     .comercio-datos { font-size: 8px; }
     .tipo-letra { border: 1px solid #000; font-size: 18px; margin: 1mm auto; padding: 1mm; }
     .tipo-codigo { font-size: 7px; }
@@ -528,7 +540,6 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   const comercioCondicionIva = isPrintableComercioValue(comercio?.situacion_afip)
     ? comercio?.situacion_afip
     : "Responsable Inscripto";
-  const logoUrl = getLogoUrl(comercio);
 
   const rows = venta.venta_items?.length
     ? venta.venta_items
@@ -565,13 +576,10 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
 
       <div class="header">
         <div class="header-left">
-          ${
-            logoUrl
-              ? `<img class="comercio-logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(comercio?.nombre_comercio || "Logo del comercio")}" />`
-              : `<div class="comercio-nombre">${escapeHtml(comercio?.nombre_comercio || "COMERCIO")}</div>`
-          }
+          ${identidadComercioHtml(comercio)}
           <div class="comercio-datos">
             ${comercioDireccion ? `<div class="info-line">${escapeHtml(comercioDireccion)}</div>` : ""}
+            ${telefonoComercioHtml(comercio)}
             <div class="info-line">${escapeHtml(comercioCondicionIva)}</div>
           </div>
         </div>

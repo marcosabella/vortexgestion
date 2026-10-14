@@ -62,7 +62,7 @@ for(const formato of ['a4','58mm']){
   }
   assert.match(cuenta,/DETALLE DE CUENTA · NO VÁLIDO COMO FACTURA/);assert.match(cuenta,/Cobrado:/);assert.match(cuenta,/Saldo:/);assert.match(cuenta,/Servicio de delivery/);
   assert.match(comanda,/REIMPRESIÓN · COMANDA/);assert.match(comanda,/Sin sal/);assert.doesNotMatch(comanda,/Total:|Cobrado:|Saldo:/);
-  const sinLogo=restauranteCuentaHtml(state,state.pedidos[0],{...comercioPrint,logo_url:''},formato);assert.match(sinLogo,/class="comercio-nombre">Comercio &amp; prueba/);
+  const sinLogo=restauranteCuentaHtml(state,state.pedidos[0],{...comercioPrint,logo_url:''},formato);assert.match(sinLogo,/class="comercio-nombre"[^>]*>Comercio &amp; prueba/);
   console.log('OK cuenta y comanda con encabezado y estilos compartidos: '+formato);
 }
 const cartaCancelada=structuredClone(state);cartaCancelada.items[0].estado='cancelada';

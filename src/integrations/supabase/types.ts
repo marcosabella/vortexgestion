@@ -2155,6 +2155,7 @@ export type Database = {
           ingresos_brutos: string | null
           localidad: string
           logo_url: string | null
+          mostrar_razon_social_con_logo: boolean
           nombre_comercio: string
           numero: string
           provincia: string
@@ -2173,6 +2174,7 @@ export type Database = {
           ingresos_brutos?: string | null
           localidad: string
           logo_url?: string | null
+          mostrar_razon_social_con_logo?: boolean
           nombre_comercio: string
           numero: string
           provincia: string
@@ -2191,6 +2193,7 @@ export type Database = {
           ingresos_brutos?: string | null
           localidad?: string
           logo_url?: string | null
+          mostrar_razon_social_con_logo?: boolean
           nombre_comercio?: string
           numero?: string
           provincia?: string

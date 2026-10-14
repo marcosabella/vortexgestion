@@ -87,6 +87,7 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
     comercio?.nombre_comercio || "COMERCIO",
     comercio?.cuit ? `CUIT: ${comercio.cuit}` : "",
     comercioDireccion ? `Domicilio: ${comercioDireccion}` : "",
+    comercio?.telefono?.trim() ? `Telefono: ${comercio.telefono.trim()}` : "",
     "",
     `${tipoComprobante} ${venta.tipo_comprobante === "recibo_x"
       ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante)

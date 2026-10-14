@@ -1,3 +1,4 @@
+import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { Comercio } from "@/types/comercio";
 import type {
   RemitoDistribucion,
@@ -37,17 +38,9 @@ export function buildRemitosDistribucionPrintHtml(
       ["CLIENTE", "REPARTIDOR"].map((copia) =>
         `<div class="factura-container sin-cae remito">
       <div class="copy-indicator">EJEMPLAR ${copia}</div><div class="header">
-      <div class="header-left">${
-          comercio.logo_url?.trim()
-            ? `<img class="comercio-logo" src="${
-              html(comercio.logo_url)
-            }" alt="${html(comercio.nombre_comercio)}" />`
-            : `<div class="comercio-nombre">${
-              html(comercio.nombre_comercio)
-            }</div>`
-        }<div class="comercio-datos"><div class="info-line">${
+      <div class="header-left">${identidadComercioHtml(comercio)}<div class="comercio-datos"><div class="info-line">${
           html(domicilio)
-        }</div><div class="info-line">${
+        }</div>${telefonoComercioHtml(comercio)}<div class="info-line">${
           html(comercio.situacion_afip)
         }</div></div></div>
       <div class="header-center"><div class="tipo-letra">${

@@ -1,3 +1,4 @@
+import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { Comercio } from "@/types/comercio";
 import type { FormatoComprobante } from "@/config/parametrizacion";
 import type {
@@ -90,18 +91,9 @@ export function buildHojaRepartoPrintHtml(
       <div class="copy-indicator">ORIGINAL</div>
       <div class="header">
         <div class="header-left">
-          ${
-    comercio.logo_url?.trim()
-      ? `<img class="comercio-logo" src="${
-        escapeHtml(comercio.logo_url)
-      }" alt="${escapeHtml(comercio.nombre_comercio)}" />`
-      : `<div class="comercio-nombre">${
-        escapeHtml(comercio.nombre_comercio)
-      }</div>`
-  }
-          <div class="comercio-datos">${
+          ${identidadComercioHtml(comercio)}<div class="comercio-datos">${
     direccion ? `<div class="info-line">${escapeHtml(direccion)}</div>` : ""
-  }<div class="info-line">${escapeHtml(comercio.situacion_afip)}</div></div>
+  }${telefonoComercioHtml(comercio)}<div class="info-line">${escapeHtml(comercio.situacion_afip)}</div></div>
         </div>
         <div class="header-center"><div class="tipo-letra">HR</div><div class="tipo-codigo">NO FISCAL</div></div>
         <div class="header-right"><div class="factura-titulo">HOJA DE REPARTO</div><div class="factura-info">

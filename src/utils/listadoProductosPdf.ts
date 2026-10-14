@@ -1,3 +1,4 @@
+import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
 import { ProductoReporte } from "@/hooks/useProductosReport";
@@ -138,17 +139,17 @@ const opImage = (name: string, x: number, yTop: number, width: number, height: n
 const drawComercioIdentity = (comercio?: Comercio | null, logoImage?: PdfImage | null) => {
   if (logoImage) {
     const boxWidth = 150;
-    const boxHeight = 35;
+    const boxHeight = comercio?.mostrar_razon_social_con_logo ? 27 : 35;
     const scale = Math.min(boxWidth / logoImage.width, boxHeight / logoImage.height);
     const width = logoImage.width * scale;
     const height = logoImage.height * scale;
     const x = 34 + (boxWidth - width) / 2;
     const yTop = 49 + (boxHeight - height) / 2;
 
-    return [opImage("Logo", x, yTop, width, height)];
+    return [opImage("Logo", x, yTop, width, height), ...(comercio?.mostrar_razon_social_con_logo ? [opText(comercio.nombre_comercio || "COMERCIO", 34, 86, tamanoNombreComercioPdf(comercio.nombre_comercio || "COMERCIO", 296, 11), "F2", "left")] : [])];
   }
 
-  return [opText(comercio?.nombre_comercio || "COMERCIO", 34, 57, 15.5, "F2", "left", 220)];
+  return [opText(comercio?.nombre_comercio || "COMERCIO", 34, 57, tamanoNombreComercioPdf(comercio?.nombre_comercio || "COMERCIO", 296, 15.5), "F2", "left")];
 };
 
 const getComercioDireccionLineas = (comercio?: Comercio | null) => ({
@@ -176,8 +177,9 @@ const drawHeader = (
     opLine(594, 28, 594, 142),
     opLine(347, 28, 347, 142),
     ...drawComercioIdentity(comercio, logoImage),
-    comercioDireccion.calle && opText(comercioDireccion.calle, 34, 110, 8.5, "F1", "left", 296),
-    comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, 124, 8.5, "F1", "left", 296),
+    comercioDireccion.calle && opText(comercioDireccion.calle, 34, telefonoComercio(comercio) ? 96 : 110, 8.5, "F1", "left", 296),
+    comercioDireccion.localidad && opText(comercioDireccion.localidad, 34, telefonoComercio(comercio) ? 110 : 124, 8.5, "F1", "left", 296),
+    telefonoComercio(comercio) && opText(`Telefono: ${telefonoComercio(comercio)}`, 34, 124, 8.5, "F1", "left", 296),
     opText(comercio?.situacion_afip || "Condicion frente a ARCA no informada", 34, 136, 8.5, "F1", "left", 296),
     opText("REPORTE DE PRODUCTOS", 363, 56, 14.5, "F2", "left", 206),
     opText("Fecha de Emision:", 363, 82, 8.5, "F2"),

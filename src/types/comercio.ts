@@ -13,6 +13,7 @@ export interface Comercio {
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
+  mostrar_razon_social_con_logo?: boolean;
   fecha_ingreso_sistema?: string | null;
   membresia_vigente_hasta?: string | null;
   created_at?: string;
@@ -42,6 +43,7 @@ export interface ComercioFormData {
   ingresos_brutos?: string;
   fecha_inicio_actividad: string;
   logo_url?: string;
+  mostrar_razon_social_con_logo?: boolean;
   fecha_ingreso_sistema?: string;
   membresia_vigente_hasta?: string;
 }

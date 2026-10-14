@@ -5,6 +5,7 @@ import * as z from "zod";
 import { ImagePlus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ const formSchema = z.object({
   ingresos_brutos: z.string().optional(),
   fecha_inicio_actividad: z.string().min(1, "La fecha de inicio es requerida"),
   logo_url: z.string().optional(),
+  mostrar_razon_social_con_logo: z.boolean().default(false),
 });
 
 interface ComercioFormProps {
@@ -63,6 +65,7 @@ export const ComercioForm = ({ initialData, comercioId, onSubmit, isLoading }: C
       ingresos_brutos: "",
       fecha_inicio_actividad: "",
       logo_url: "",
+      mostrar_razon_social_con_logo: false,
     },
   });
   const logoUrl = watch("logo_url");
@@ -224,6 +227,10 @@ export const ComercioForm = ({ initialData, comercioId, onSubmit, isLoading }: C
 
             <div className="space-y-3 md:col-span-2">
               <Label>Logo del comercio</Label>
+              <div className="flex items-center gap-3">
+                <Switch id="mostrar-razon-social-logo" checked={watch("mostrar_razon_social_con_logo") === true} onCheckedChange={(value) => setValue("mostrar_razon_social_con_logo", value, { shouldDirty: true })} />
+                <Label htmlFor="mostrar-razon-social-logo">Mostrar razón social junto al logo en comprobantes y reportes</Label>
+              </div>
               <div className="flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center">
                 <div className="flex h-24 w-40 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/20">
                   {logoUrl ? (
