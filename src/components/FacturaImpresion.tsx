@@ -12,6 +12,7 @@ import type { Comercio } from "@/types/comercio";
 import type { AfipConfig } from "@/types/afip";
 import type { FormatoComprobante } from "@/config/parametrizacion";
 import { printHtml } from "@/utils/documentoPrint";
+import { datosFiscalesVenta } from "@/utils/emisorFiscal";
 
 interface FacturaImpresionProps {
   venta: Venta;
@@ -39,8 +40,9 @@ export const FacturaImpresion = ({
   const { data: parametrizacion } = useComercioParametrizacion();
   const { toast } = useToast();
   const [openingAction, setOpeningAction] = useState<"print" | "pdf" | null>(null);
-  const comercioDocumento = comercioOverride !== undefined ? comercioOverride : comercio;
-  const afipConfigDocumento = afipConfigOverride !== undefined ? afipConfigOverride : afipConfig;
+  const fiscal = datosFiscalesVenta(venta, comercioOverride !== undefined ? comercioOverride : comercio, afipConfigOverride !== undefined ? afipConfigOverride : afipConfig);
+  const comercioDocumento = fiscal.comercio;
+  const afipConfigDocumento = fiscal.afipConfig;
   const formatoDocumento = formatoOverride ?? parametrizacion.impresion.formato_comprobante;
 
   const openFactura = async (action: "print" | "pdf") => {

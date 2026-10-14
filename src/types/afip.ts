@@ -1,4 +1,5 @@
 export interface AfipConfig {
+  tiene_certificados?: boolean;
   id?: string;
   comercio_id?: string | null;
   punto_venta: number;

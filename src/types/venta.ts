@@ -35,6 +35,9 @@ export interface PagoVenta {
 }
 
 export interface Venta {
+  emisor_fiscal_id?: string | null;
+  emisor_snapshot?: import("@/types/emisorFiscal").EmisorFiscalSnapshot | null;
+  punto_venta?: number | null;
   taller_vehiculo?: { patente: string; marca: string; modelo: string; anio: number | null; kilometraje: number } | null;
   id?: string;
   comercio_id?: string;

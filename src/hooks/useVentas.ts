@@ -5,6 +5,7 @@ import { PagoVenta, Venta, VentaItem } from "@/types/venta";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import { useAfipConfig } from "@/hooks/useAfipConfig";
+import { rpcEmisorFiscal } from "@/hooks/useEmisoresFiscales";
 import { isLegacyDeletedClient, isLegacyDeletedClientName } from "@/utils/legacyVisibility";
 
 type VentaNueva = Omit<Venta, "id" | "created_at" | "updated_at">;
@@ -89,7 +90,7 @@ export const useVentas = () => {
   const queryClient = useQueryClient();
   const { comercio } = useComercio();
   const comercioId = comercio?.id;
-  const afipConfig = useAfipConfig();
+  const afipConfig = useAfipConfig(null);
 
   const {
     data: ventas = [],
@@ -177,7 +178,7 @@ export const useVentas = () => {
       }
 
       if (!comercio?.id) throw new Error("Seleccione un comercio antes de registrar la venta.");
-      const puntoVentaConfigurado = afipConfig.data?.punto_venta;
+      const puntoVentaConfigurado = venta.emisor_fiscal_id ? venta.punto_venta : afipConfig.data?.punto_venta;
       const puntoVenta =
         typeof puntoVentaConfigurado === "number" && Number.isInteger(puntoVentaConfigurado) && puntoVentaConfigurado > 0
           ? puntoVentaConfigurado
@@ -241,7 +242,9 @@ export const useVentas = () => {
         p_porcentaje_recargo: Number(venta.porcentaje_recargo || 0),
         p_monto_recargo: Number(venta.monto_recargo || 0),
       };
-      const { data: ventaData, error: ventaError } = numeroManual
+      const { data: ventaData, error: ventaError } = venta.emisor_fiscal_id
+        ? await rpcEmisorFiscal<Venta>("registrar_venta_emisor_transaccional", { ...rpcArgs, p_emisor_fiscal_id: venta.emisor_fiscal_id, p_numero_comprobante: numeroManual || null })
+        : numeroManual
         ? await supabase.rpc("registrar_venta_manual_transaccional", {
             ...rpcArgs,
             p_numero_comprobante: numeroManual,

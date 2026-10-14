@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -33,6 +34,8 @@ import { useProductos } from "@/hooks/useProductos"
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion"
 import { useComercio } from "@/hooks/useComercio"
 import { useAfipConfig } from "@/hooks/useAfipConfig"
+import { useEmisoresFiscales, rpcEmisorFiscal } from "@/hooks/useEmisoresFiscales"
+import { emisorFiscalLabel, datosFiscalesVenta } from "@/utils/emisorFiscal"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { useAuth } from "@/contexts/AuthContext"
 import { useQuery } from "@tanstack/react-query"
@@ -152,13 +155,17 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const { createPresupuesto, updatePresupuesto } = usePresupuestos()
   const { comercio } = useComercio()
   const { user } = useAuth()
-  const afipConfigQuery = useAfipConfig()
+  const { data: parametrizacion } = useComercioParametrizacion()
+  const multipleCuit = parametrizacion.funciones.multiples_cuit && modo !== "presupuesto"
+  const [emisorFiscalId, setEmisorFiscalId] = useState(venta?.emisor_fiscal_id || "")
+  const emisoresQuery = useEmisoresFiscales(multipleCuit)
+  const emisorSeleccionado = emisoresQuery.data?.find((e) => e.id === emisorFiscalId && e.activo)
+  const afipConfigQuery = useAfipConfig(modo === "presupuesto" ? null : venta ? venta.emisor_fiscal_id || null : emisorFiscalId || undefined)
   const afipConfig = afipConfigQuery.data
   const esPresupuesto = modo === "presupuesto"
   const nombreDocumento = esPresupuesto ? "presupuesto" : "venta"
   const { data: clientes = [] } = useClientes()
   const { productos } = useProductos()
-  const { data: parametrizacion } = useComercioParametrizacion()
   const permiteItemsManuales = esPresupuesto || parametrizacion.funciones.venta_items_manuales
   const permiteAjustes = parametrizacion.funciones.descuentos_recargos
   const permiteNumeracionManual = !esPresupuesto && !venta && parametrizacion.funciones.ingreso_manual_numero_comprobante
@@ -175,11 +182,12 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
       const ventaWhatsApp = ventaCompleta as unknown as Venta
       let qrDataUrl = ""
-      if (ventaWhatsApp.cae?.trim() && afipConfig) {
+      const fiscal = datosFiscalesVenta(ventaWhatsApp, comercio, afipConfig)
+      if (ventaWhatsApp.cae?.trim() && fiscal.afipConfig && fiscal.comercio) {
         qrDataUrl = await generarQRAfip({
           fecha: ventaWhatsApp.fecha_venta,
-          cuit: comercio.cuit,
-          puntoVenta: afipConfig.punto_venta,
+          cuit: fiscal.comercio.cuit,
+          puntoVenta: fiscal.afipConfig.punto_venta,
           tipoComprobante: ventaWhatsApp.tipo_comprobante,
           numeroComprobante: ventaWhatsApp.numero_comprobante,
           importe: ventaWhatsApp.total,
@@ -233,6 +241,16 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [numeroComprobanteEditado, setNumeroComprobanteEditado] = useState(false)
   const usaNumeracionManual = permiteNumeracionManual && numeroComprobanteEditado
   const idempotencyKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    setEmisorFiscalId(venta?.emisor_fiscal_id || "")
+    idempotencyKeyRef.current = null
+  }, [comercio?.id, venta?.id, venta?.emisor_fiscal_id])
+  useEffect(() => {
+    if (!venta && multipleCuit && !emisorFiscalId) {
+      const predeterminado = emisoresQuery.data?.find((e) => e.activo && e.predeterminado)
+      if (predeterminado) setEmisorFiscalId(predeterminado.id)
+    }
+  }, [venta, multipleCuit, emisorFiscalId, emisoresQuery.data])
   const mercadoPagoData = mercadoPagoStatus.data || {}
   const mercadoPagoCajas = mercadoPagoData.cajas || []
   const mercadoPagoHabilitado = !esPresupuesto && !venta
@@ -338,9 +356,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const puedePrevisualizarNumero =
     !venta &&
     !esPresupuesto &&
-    Boolean(comercio?.id && user?.id && watchTipoComprobante)
+    Boolean(comercio?.id && user?.id && watchTipoComprobante && (!multipleCuit || emisorSeleccionado))
   const numeroPreview = useQuery({
-    queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null],
+    queryKey: ["ventas", comercio?.id ?? null, "numero-preview", watchTipoComprobante, puntoVenta ?? null, multipleCuit ? emisorFiscalId : null],
     enabled: puedePrevisualizarNumero,
     queryFn: async () => {
       if (!comercio?.id || !user?.id || !watchTipoComprobante) {
@@ -359,7 +377,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         throw new Error("No tiene permisos para consultar la numeración.")
       }
 
-      const { data, error } = await supabase.rpc("previsualizar_numero_venta", {
+      const { data, error } = multipleCuit
+        ? await rpcEmisorFiscal<string>("previsualizar_numero_venta_emisor", { p_comercio_id: comercio.id, p_emisor_fiscal_id: emisorFiscalId, p_tipo_comprobante: watchTipoComprobante })
+        : await supabase.rpc("previsualizar_numero_venta", {
         p_comercio_id: comercio.id,
         p_tipo_comprobante: watchTipoComprobante,
         p_punto_venta: puntoVenta,
@@ -742,6 +762,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
   const onSubmit = async (data: VentaFormData) => {
     if (isCreating || isUpdating) return
+    if (multipleCuit && !venta && !emisorSeleccionado) {
+      toast({ title: "Seleccione un emisor fiscal activo", description: emisoresQuery.error?.message || "Configurá el CUIT y su punto de venta antes de guardar.", variant: "destructive" })
+      return
+    }
     if (usaNumeracionManual && !numeroComprobanteManualValido(data.numero_comprobante)) {
       form.setError("numero_comprobante", {
         message: "Ingrese un número válido con formato 0000 - 00000000.",
@@ -797,6 +821,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       const totalIvaFinal = roundMoney(totalFinal - subtotalFinal)
 
       const ventaData: Omit<Venta, "id" | "created_at" | "updated_at"> = {
+        ...(multipleCuit ? { emisor_fiscal_id: emisorFiscalId, punto_venta: puntoVenta } : {}),
         numero_comprobante: normalizeNumeroComprobante(data.numero_comprobante),
         fecha_venta: new Date(data.fecha_venta).toISOString(),
         tipo_pago: pagosVenta[0].tipo_pago, // Por compatibilidad, usar el primer método de pago
@@ -898,6 +923,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       <CardContent className={showTitle ? undefined : "pt-6"}>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {multipleCuit && <div className="space-y-2 rounded-lg border p-4"><Label htmlFor="venta-emisor-fiscal">Facturar con</Label><Select value={emisorFiscalId} disabled={Boolean(venta?.id) || Boolean(ventaMercadoPagoPendienteId)} onValueChange={(value) => { setEmisorFiscalId(value); setNumeroComprobanteEditado(false); idempotencyKeyRef.current = null; }}><SelectTrigger id="venta-emisor-fiscal"><SelectValue placeholder="Seleccionar razón social / CUIT" /></SelectTrigger><SelectContent>{(emisoresQuery.data || []).filter((e) => e.activo).map((e) => <SelectItem key={e.id} value={e.id}>{emisorFiscalLabel(e)} · PV {String(e.punto_venta).padStart(4,"0")}</SelectItem>)}</SelectContent></Select>{emisoresQuery.error && <p role="alert" className="text-sm text-destructive">{emisoresQuery.error.message}</p>}{!emisoresQuery.isLoading && !emisoresQuery.error && !emisorSeleccionado && <p className="text-sm text-muted-foreground">Configurá y seleccioná un emisor fiscal antes de guardar la venta.</p>}</div>}
             
             {/* Datos principales */}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(10.5rem,0.85fr)_minmax(11rem,1fr)_minmax(10.5rem,0.85fr)_minmax(22rem,2.3fr)]">

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
+import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -457,7 +458,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { tipoComprobante, comercioId } = await req.json();
+    const { tipoComprobante, comercioId, emisorFiscalId } = await req.json();
     const authorizedComercioId = await getAuthorizedComercioId(req, supabase, comercioId);
 
     if (!tipoComprobante) {
@@ -467,19 +468,7 @@ Deno.serve(async (req) => {
     console.log('=== INICIO CONSULTA ULTIMO COMPROBANTE ===');
     console.log('Tipo comprobante:', tipoComprobante);
 
-    // Obtener configuración AFIP activa
-    const { data: afipConfig, error: configError } = await supabase
-      .from('afip_config')
-      .select('*')
-      .eq('activo', true)
-      .eq('comercio_id', authorizedComercioId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (configError || !afipConfig) {
-      throw new Error('No hay configuración AFIP activa');
-    }
+    const afipConfig = await resolverConfiguracionFiscal(supabase, authorizedComercioId, { emisorId: emisorFiscalId });
 
     console.log('Config AFIP encontrada, ambiente:', afipConfig.ambiente);
     console.log('Punto de venta:', afipConfig.punto_venta);

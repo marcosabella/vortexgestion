@@ -2,13 +2,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { AfipConfig, AfipConfigInsert, AfipConfigUpdate } from '@/types/afip';
+import { useComercio } from '@/hooks/useComercio';
+import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
+import { useEmisoresFiscales } from '@/hooks/useEmisoresFiscales';
+import { configEmisorFiscal } from '@/utils/emisorFiscal';
 
-export function useAfipConfig() {
-  const comercioId = localStorage.getItem('selectedComercioId');
+export function useAfipConfig(emisorId?: string | null) {
+  const { comercio } = useComercio();
+  const comercioId = comercio?.id;
+  const { data: parametros } = useComercioParametrizacion();
+  const multi = parametros.funciones.multiples_cuit;
+  const usarEmisor = emisorId !== null && (multi || Boolean(emisorId));
+  const emisores = useEmisoresFiscales(usarEmisor);
 
-  return useQuery({
+  const legacy = useQuery({
     queryKey: ['afip-config', comercioId],
-    enabled: Boolean(comercioId),
+    enabled: Boolean(comercioId) && !usarEmisor,
     queryFn: async () => {
       if (!comercioId) {
         return null;
@@ -26,6 +35,9 @@ export function useAfipConfig() {
       return data as AfipConfig | null;
     },
   });
+  if (!usarEmisor) return legacy;
+  const selected = emisores.data?.find((e) => e.activo && (emisorId ? e.id === emisorId : e.predeterminado));
+  return { ...emisores, data: selected ? configEmisorFiscal(selected) : null };
 }
 
 export function useCreateAfipConfig() {

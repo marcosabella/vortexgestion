@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
+import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
 import { CaeRechazado, camposAutorizacionCae, validarComprobanteRecuperado } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
@@ -595,7 +596,7 @@ Deno.serve(async (req) => {
 
     const { data: ventaPre, error: ventaPreError } = await supabase
       .from('ventas')
-      .select('id, comercio_id')
+      .select('id, comercio_id, emisor_fiscal_id, emisor_snapshot')
       .eq('id', ventaId)
       .single();
 
@@ -606,19 +607,7 @@ Deno.serve(async (req) => {
     await assertUserCanAccessComercio(supabase, userId, ventaPre.comercio_id);
     comercioIdForError = ventaPre.comercio_id;
 
-    // Obtener configuración AFIP activa
-    const { data: afipConfig, error: configError } = await supabase
-      .from('afip_config')
-      .select('*')
-      .eq('activo', true)
-      .eq('comercio_id', ventaPre.comercio_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (configError || !afipConfig) {
-      throw new Error('No hay configuración AFIP activa. Configure AFIP primero.');
-    }
+    const afipConfig = await resolverConfiguracionFiscal(supabase, ventaPre.comercio_id, { emisorId: ventaPre.emisor_fiscal_id, snapshot: ventaPre.emisor_snapshot, ventaLegacy: !ventaPre.emisor_fiscal_id });
 
     // Validar que los certificados estén cargados
     if (!afipConfig.certificado_crt || !afipConfig.certificado_key) {
@@ -798,7 +787,7 @@ Deno.serve(async (req) => {
     if (intentoPrevio) {
       const detallePrevio = intentoPrevio.solicitud?.FeDetReq?.FECAEDetRequest;
       if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
-          || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
+          || intentoPrevio.punto_venta !== afipConfig.punto_venta || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
           || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA'].some(campo =>
             String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {
         throw new Error('La venta cambio desde la solicitud fiscal anterior. Revise el comprobante autorizado antes de continuar.');

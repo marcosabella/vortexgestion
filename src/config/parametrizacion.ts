@@ -25,6 +25,7 @@ export type ModuloSistema =
   | "utilidades";
 
 export type FuncionSistema =
+  | "multiples_cuit"
   | "venta_items_manuales"
   | "ingreso_manual_numero_comprobante"
   | "descuentos_recargos"
@@ -86,6 +87,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
 ];
 
 export const FUNCIONES_SISTEMA: Array<{ key: FuncionSistema; label: string; description: string }> = [
+  { key: "multiples_cuit", label: "Múltiples CUIT", description: "Permite facturar con distintos emisores fiscales del mismo comercio. Las cuentas corrientes permanecen unificadas." },
   { key: "venta_items_manuales", label: "Items manuales en ventas", description: "Permite agregar conceptos sin producto asociado." },
   { key: "ingreso_manual_numero_comprobante", label: "Numeración manual de comprobantes", description: "Permite editar el número automático respetando el formato 0000 - 00000000." },
   { key: "descuentos_recargos", label: "Descuentos y recargos", description: "Habilita ajustes por item y sobre el total de la venta." },
@@ -123,6 +125,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
       {} as Record<FuncionSistema, boolean>,
     ),
     ingreso_manual_numero_comprobante: false,
+    multiples_cuit: false,
     publicacion_tienda_online: false,
     descripcion_enriquecida_productos: false,
     talles_colores_productos: false,

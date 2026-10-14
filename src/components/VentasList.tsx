@@ -30,6 +30,8 @@ import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
 import { useMercadoPago } from "@/hooks/useMercadoPago";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmisoresFiscales } from "@/hooks/useEmisoresFiscales";
+import { datosFiscalesVenta } from "@/utils/emisorFiscal";
 
 const automaticWhatsAppEnabled = import.meta.env.VITE_WHATSAPP_API_ENABLED === "true";
 const ventasPageSizes = [12, 24, 48, 96];
@@ -53,19 +55,28 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
   const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
   const { comercio, isLoading: comercioLoading } = useComercio();
-  const { data: afipConfig, isLoading: afipLoading } = useAfipConfig();
+  const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
+  const { data: afipConfig, isLoading: afipLoading } = useAfipConfig(selectedVenta?.emisor_fiscal_id || null);
   const { data: parametrizacion } = useComercioParametrizacion();
+  const multipleCuit = parametrizacion.funciones.multiples_cuit;
+  const emisoresQuery = useEmisoresFiscales(multipleCuit || Boolean(selectedVenta?.emisor_fiscal_id));
+  const [cuitFilter, setCuitFilter] = useState("todos");
+  const cuitOptions = new Map<string, string>();
+  const cuitLegacy = comercio?.cuit?.replace(/\D/g, "") || "";
+  if (cuitLegacy) cuitOptions.set(cuitLegacy, comercio?.nombre_comercio || "Emisor anterior");
+  for (const e of emisoresQuery.data || []) cuitOptions.set(e.cuit_emisor, e.razon_social);
+  for (const v of ventas) if (v.emisor_snapshot) cuitOptions.set(v.emisor_snapshot.cuit_emisor,v.emisor_snapshot.razon_social);
+  useEffect(() => { setCuitFilter("todos"); }, [comercio?.id, multipleCuit]);
   const apiHabilitada = automaticWhatsAppEnabled && parametrizacion.modulos.whatsapp;
   const { data: whatsappConexion } = useWhatsAppConexion(comercio?.id, apiHabilitada);
-  const hasAfipCertificates = Boolean(
-    afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()
-  );
   const { toast } = useToast();
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago();
   const { data: isAppAdmin = false } = useIsAppAdmin();
   const { comerciosQuery } = useAdminComercios(isAppAdmin);
   const { crearNotificacion } = useAdminNotificaciones(isAppAdmin);
-  const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
+  const hasAfipCertificates = selectedVenta?.emisor_fiscal_id
+    ? Boolean(emisoresQuery.data?.some((e) => e.id === selectedVenta.emisor_fiscal_id && e.activo && e.tiene_certificados))
+    : Boolean(afipConfig?.tiene_certificados || (afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()));
   const [showDetails, setShowDetails] = useState(Boolean(detalleId));
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
@@ -130,7 +141,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, pageSize, comercio?.id]);
+  }, [searchTerm, pageSize, comercio?.id, cuitFilter]);
 
   useEffect(() => {
     const ventaId = detalleId || searchParams.get("detalle");
@@ -239,6 +250,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
   };
 
   const filteredVentas = ventas
+    .filter((venta) => !multipleCuit || cuitFilter === "todos" || (venta.emisor_snapshot?.cuit_emisor || cuitLegacy) === cuitFilter)
     .filter(venta =>
       (venta.numero_comprobante.toLowerCase().includes(searchTerm.toLowerCase()) ||
         mostrarNumeroComprobante(venta).toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -382,11 +394,12 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
     queryFn: async () => {
       const venta = selectedVenta!;
       let qrDataUrl = "";
-      if (venta.cae?.trim() && comercio && afipConfig) {
+      const fiscal = datosFiscalesVenta(venta, comercio, afipConfig);
+      if (venta.cae?.trim() && fiscal.comercio && fiscal.afipConfig) {
         qrDataUrl = await generarQRAfip({
           fecha: venta.fecha_venta,
-          cuit: comercio.cuit,
-          puntoVenta: afipConfig.punto_venta,
+          cuit: fiscal.comercio.cuit,
+          puntoVenta: fiscal.afipConfig.punto_venta,
           tipoComprobante: venta.tipo_comprobante,
           numeroComprobante: venta.numero_comprobante,
           importe: getVentaTotalFinal(venta),
@@ -487,6 +500,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                 className="pl-8"
               />
             </div>
+            {multipleCuit && <div className="mt-3 flex flex-wrap items-center gap-3"><Label htmlFor="ventas-cuit-emisor">CUIT emisor</Label><Select value={cuitFilter} onValueChange={setCuitFilter}><SelectTrigger id="ventas-cuit-emisor" className="w-full sm:w-96"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Todos</SelectItem>{Array.from(cuitOptions).map(([cuit,nombre]) => <SelectItem key={cuit} value={cuit}>{nombre} — {cuit}</SelectItem>)}</SelectContent></Select></div>}
           </div>
 
           <div className="rounded-md border">
@@ -496,6 +510,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                   <TableHead className="w-px whitespace-nowrap">Fecha</TableHead>
                   <TableHead className="w-px whitespace-nowrap px-2" title="Número de comprobante">N° Comp.</TableHead>
                   <TableHead className="w-full min-w-[220px]">Cliente</TableHead>
+                  {multipleCuit && <TableHead>Emisor</TableHead>}
                   <TableHead className="w-px whitespace-nowrap px-2">Tipo Pago</TableHead>
                   <TableHead className="w-px whitespace-nowrap px-2">Comprobante</TableHead>
                   <TableHead className="w-px whitespace-nowrap px-2">Total</TableHead>
@@ -516,6 +531,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                         {venta.cliente_nombre || "Consumidor Final"}
                       </div>
                     </TableCell>
+                    {multipleCuit && <TableCell className="whitespace-nowrap">{venta.emisor_snapshot?.razon_social || "—"}<p className="text-xs text-muted-foreground">{venta.emisor_snapshot?.cuit_emisor || ""}</p></TableCell>}
                     <TableCell className="w-px whitespace-nowrap px-2">
                       <Badge className="whitespace-nowrap" variant={getTipoPagoBadgeVariant((venta.pagos_venta?.length || 0) > 1 ? "mixto" : venta.tipo_pago)}>
                         {getVentaTipoPagoLabel(venta)}

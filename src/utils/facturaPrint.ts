@@ -5,6 +5,7 @@ import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, g
 import { FormatoComprobante } from "@/config/parametrizacion";
 import type { TallerOrden } from "@/types/taller";
 import { ESTADOS_TALLER } from "@/types/taller";
+import { datosFiscalesVenta } from "@/utils/emisorFiscal";
 
 export type TipoDocumentoImpresion = "venta" | "presupuesto" | "orden_taller";
 export type DatosOrdenImpresion = { orden: TallerOrden; responsable: string };
@@ -486,6 +487,7 @@ const getTipoPagoLabel = (venta: Venta) => {
 };
 
 export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl = "", documentType = "venta", ordenTaller }: FacturaPrintOptions) => {
+  if (documentType === "venta") { const fiscal = datosFiscalesVenta(venta, comercio, afipConfig); comercio = fiscal.comercio; afipConfig = fiscal.afipConfig; }
   const isPresupuesto = documentType === "presupuesto";
   const isOrden = documentType === "orden_taller";
   const hasCae = !isPresupuesto && !isOrden && Boolean(venta.cae?.trim());

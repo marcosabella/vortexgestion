@@ -1,0 +1,83 @@
+// Migraciones reales en PostgreSQL temporal. Nunca se conecta a Supabase.
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+
+const tempRoot=realpathSync(os.tmpdir()), cluster=mkdtempSync(path.join(tempRoot,'vortex-multi-cuit-test-')), dataDir=path.join(cluster,'data');
+const pgBin=process.env.PG_BIN||'C:/Program Files/PostgreSQL/17/bin';
+const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));
+const command=(name,args,input)=>{const r=spawnSync(path.join(pgBin,name+(process.platform==='win32'?'.exe':'')),args,{input,encoding:'utf8',windowsHide:true,env:{...process.env,PGCLIENTENCODING:'UTF8'},stdio:name==='pg_ctl'?'ignore':'pipe',timeout:30000});if(r.error)throw r.error;if(r.status!==0)throw Error(r.stderr||r.stdout||name+' failed');return r.stdout;};
+const sql=input=>command('psql',['-X','-qAt','-h','127.0.0.1','-p',String(port),'-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],input);
+const migration=name=>readFileSync('supabase/migrations/'+name,'utf8').replaceAll('\r\n','\n');
+const tenant='10000000-0000-0000-0000-000000000001',foreignTenant='10000000-0000-0000-0000-000000000002',client='20000000-0000-0000-0000-000000000001';
+const product='40000000-0000-0000-0000-000000000001',foreignProduct='40000000-0000-0000-0000-000000000002';
+const quote=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb";
+const assertSQL=(expression,label)=>sql(`SELECT test_assert((${expression}), '${label}');`);
+const fails=(statement,error)=>sql(`SET app.test_comercio='${tenant}';SET app.test_admin='on';SELECT test_expect_error($stmt$${statement}$stmt$, '${error}');`);
+let started=false;
+try {
+ command('initdb',['-D',dataDir,'-U','postgres','-A','trust','--encoding=UTF8','--no-locale']);
+ command('pg_ctl',['-D',dataDir,'-l',path.join(cluster,'postgres.log'),'-o',`-h 127.0.0.1 -p ${port}`,'-w','start']);started=true;
+ // Reutiliza el esquema de pruebas existente de ventas, sin sus reparaciones históricas.
+ const fixture=readFileSync('scripts/test-edicion-venta.mjs','utf8').replaceAll('\r\n','\n');
+ const fixtureStart=fixture.indexOf('  sql(`')+7,fixtureEnd=fixture.indexOf('\n  `);',fixtureStart);
+ const fixtureSQL=fixture.slice(fixtureStart,fixtureEnd).replaceAll('${client}',client).replaceAll('${tenant}',tenant).replaceAll('${foreignTenant}',foreignTenant).replaceAll('${product}',product).replaceAll('${foreignProduct}',foreignProduct);
+ sql(fixtureSQL);
+ sql(`ALTER TABLE ventas ADD COLUMN idempotency_key uuid, ADD COLUMN created_at timestamptz DEFAULT now();
+ CREATE TABLE comercio_parametrizacion(comercio_id uuid PRIMARY KEY REFERENCES comercio(id),parametros jsonb);
+ CREATE TABLE afip_cae_intentos(venta_id uuid);
+ CREATE TABLE ventas_numeradores(comercio_id uuid,tipo_comprobante tipo_comprobante,punto_venta integer,ultimo_numero bigint DEFAULT 0,updated_at timestamptz DEFAULT now(),PRIMARY KEY(comercio_id,tipo_comprobante,punto_venta));
+ CREATE FUNCTION user_belongs_to_comercio(p_id uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT p_id = nullif(current_setting('app.test_comercio',true),'')::uuid $$;
+ INSERT INTO comercio VALUES('${tenant}'),('${foreignTenant}');INSERT INTO clientes VALUES('${client}','${tenant}',NULL);
+ INSERT INTO productos VALUES('${product}','${tenant}',10);
+ INSERT INTO comercio_parametrizacion VALUES('${tenant}','{"funciones":{"multiples_cuit":true,"ingreso_manual_numero_comprobante":true}}'),('${foreignTenant}','{"funciones":{"multiples_cuit":true}}');
+ CREATE UNIQUE INDEX ventas_idempotency_key_unica ON ventas(comercio_id,idempotency_key) WHERE idempotency_key IS NOT NULL;`);
+ const numbering=migration('20260907150000_ventas_transaccionales_numeracion.sql');
+ sql(numbering.slice(numbering.indexOf('CREATE OR REPLACE FUNCTION public.ventas_punto_venta_canonico'),numbering.indexOf('-- Preflight:')));
+ sql(numbering.slice(numbering.indexOf('CREATE UNIQUE INDEX ventas_numeracion_canonica_unica'),numbering.indexOf('CREATE UNIQUE INDEX ventas_idempotency_key_unica')));
+ sql(numbering.slice(numbering.indexOf('CREATE OR REPLACE FUNCTION public.sincronizar_numeracion_venta()'),numbering.indexOf('-- Conserva exactamente el comportamiento previo')));
+ sql(migration('20260916180000_ventas_desde_orden_permiten_stock_negativo.sql'));
+ sql(`CREATE TRIGGER stock_insert AFTER INSERT ON venta_items FOR EACH ROW EXECUTE FUNCTION apply_venta_item_stock();`);
+ sql(migration('20261014130000_emisores_fiscales_estructura.sql'));
+ sql(migration('20261014131000_emisores_fiscales_ventas.sql'));
+ const asUser=`SET app.test_comercio='${tenant}';SET app.test_admin='on';SET ROLE authenticated;`;
+ const save=data=>`guardar_emisor_fiscal('${tenant}',${quote(data)})`;
+ const first={razon_social:'Emisor uno',cuit_emisor:'20111111112',punto_venta:1,ambiente:'homologacion',situacion_afip:'Responsable Inscripto',activo:true,predeterminado:true,certificado_crt:'-----BEGIN CERTIFICATE-----\nprueba\n-----END CERTIFICATE-----',certificado_key:'-----BEGIN PRIVATE KEY-----\nprueba\n-----END PRIVATE KEY-----'};
+ const e1=sql(`${asUser} SELECT ${save(first)};`).trim();
+ const e2=sql(`${asUser} SELECT ${save({...first,razon_social:'Emisor dos',cuit_emisor:'20222222223',predeterminado:false})};`).trim();
+ assert.equal(JSON.parse(sql(`${asUser} SELECT listar_emisores_fiscales('${tenant}');`)).length,2);
+ const publicMetadata=sql(`${asUser} SELECT listar_emisores_fiscales('${tenant}');`);
+ assert.ok(!publicMetadata.includes('PRIVATE KEY')&&!publicMetadata.includes('certificado_key'));
+ assert.equal(sql(`${asUser} SELECT listar_emisores_fiscales('${tenant}') @> '[{"tiene_certificados":true}]';`).trim(),'t');
+ fails(`${asUser} SELECT listar_emisores_fiscales('${foreignTenant}');`,'emisores_no_autorizado');
+ // test_expect_error ejecuta como postgres: el contexto de tenant/rol se cambia dentro del bloque.
+ sql(`SET app.test_comercio='${tenant}';SET app.test_admin='on';`);
+ fails(`SET ROLE authenticated;SELECT certificado_key FROM emisores_fiscales;`,'permission denied');
+ console.log('OK emisores: alta, lista sin claves, certificados privados y aislamiento por comercio');
+ const items=[{producto_id:product,cantidad:1,precio_unitario:100,porcentaje_iva:0,afecta_stock:true}];
+ const sale=(emisor,key,manual=null,selectedClient=client)=>`SELECT (public.registrar_venta_emisor_transaccional('${tenant}','recibo_x',1,'${selectedClient}','Cliente','ARS','cta_cte',${quote(items)},'[]','${key}','${emisor}','2026-10-14',NULL,0,0,0,0,${manual?"'"+manual+"'":'NULL'})).id;`;
+ const key1='60000000-0000-0000-0000-000000000001',key2='60000000-0000-0000-0000-000000000002';
+ const sale1=sql(asUser+sale(e1,key1)).trim(),sale2=sql(asUser+sale(e2,key2)).trim();
+ assert.notEqual(sale1,sale2);
+ assert.equal(sql(asUser+sale(e1,key1)).trim(),sale1);
+ assertSQL(`SELECT count(*)=2 AND min(numero_comprobante)='0001-00000001' AND max(numero_comprobante)='0001-00000001' FROM ventas`,'independent numbers');
+ assertSQL(`SELECT sum(monto)=200 AND count(DISTINCT cliente_id)=1 FROM cuenta_corriente`,'unified account');
+ assertSQL(`SELECT stock=8 FROM productos WHERE id='${product}'`,'stock once per sale');
+ assertSQL(`SELECT emisor_snapshot->>'cuit_emisor'='20111111112' AND NOT(emisor_snapshot ? 'certificado_key') FROM ventas WHERE id='${sale1}'`,'immutable public snapshot');
+ assert.equal(sql(`${asUser} SELECT previsualizar_numero_venta_emisor('${tenant}','${e1}','recibo_x');`).trim(),'0001-00000002');
+ fails(`SET ROLE authenticated;SELECT guardar_emisor_fiscal('${tenant}',${quote({...first,id:e1,cuit_emisor:'20333333334'})});`,'emisor_identidad_inmutable');
+ fails(`UPDATE ventas SET emisor_fiscal_id='${e2}' WHERE id='${sale1}';`,'emisor_venta_inmutable');
+ fails(`UPDATE ventas SET numero_comprobante='0002-00000001',punto_venta=2 WHERE id='${sale1}';`,'emisor_punto_venta_invalido');
+ fails(`SET ROLE authenticated;${sale(e1,'60000000-0000-0000-0000-000000000003','0001-00000001')}`,'ventas_numero_manual_duplicado');
+ fails(`SET app.test_comercio='${foreignTenant}';SET ROLE authenticated;${sale(e1,'60000000-0000-0000-0000-000000000004')}`,'ventas_no_disponible');
+ sql(`SET app.test_comercio='${tenant}';SET app.test_admin='off';`);
+ fails(`SET app.test_admin='off';SET ROLE authenticated;SELECT ${save(first)};`,'emisores_no_autorizado');
+ console.log('OK ventas: numeración independiente, reintento idempotente, stock, cuenta corriente unificada, identidad inmutable, duplicados y permisos');
+} finally {
+ if(started)command('pg_ctl',['-D',dataDir,'-m','immediate','-w','stop']);
+ const resolved=realpathSync(cluster);if(!resolved.startsWith(tempRoot+path.sep)||!path.basename(resolved).startsWith('vortex-multi-cuit-test-'))throw Error('Ruta temporal no segura');
+ rmSync(resolved,{recursive:true,force:true});
+}

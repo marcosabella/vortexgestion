@@ -28,6 +28,8 @@ import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, Trash2, X } from
 import { toast } from 'sonner';
 import { extractCertificateExpirationDate } from '@/utils/certificate';
 import { useComercio } from '@/hooks/useComercio';
+import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
+import { EmisoresFiscalesConfig } from '@/components/EmisoresFiscalesConfig';
 
 const Afip = () => {
   const { data: config, isLoading } = useAfipConfig();
@@ -810,4 +812,7 @@ const Afip = () => {
   );
 };
 
-export default Afip;
+export default function AfipPage() {
+  const { data: parametros } = useComercioParametrizacion();
+  return parametros.funciones.multiples_cuit ? <EmisoresFiscalesConfig /> : <Afip />;
+}

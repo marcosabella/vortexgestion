@@ -1,5 +1,6 @@
 // VERSION: 2026-09-30-v7 - Constancia de inscripcion ARCA
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { parseConstanciaInscripcion, soapFaultMessage } from './padron.ts';
 
@@ -567,15 +568,7 @@ Deno.serve(async (req) => {
     console.log('=== INICIO CONSULTA PADRON ===');
     console.log('CUIT a consultar:', cuitLimpio);
 
-    // Obtener configuración AFIP
-    const { data: afipConfig } = await supabase
-      .from('afip_config')
-      .select('*')
-      .eq('activo', true)
-      .eq('comercio_id', authorizedComercioId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const afipConfig = await resolverConfiguracionFiscal(supabase, authorizedComercioId, { permitirPredeterminado: true }).catch(() => null);
 
     let errorOficial = '';
 

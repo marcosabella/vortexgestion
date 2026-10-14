@@ -29,6 +29,7 @@ export const useNombreReceptorArca = (comercioId: string | undefined, cuit: stri
 interface ConsultarUltimoComprobanteParams {
   tipoComprobante: string;
   comercioId: string;
+  emisorFiscalId?: string;
 }
 
 interface ConsultarUltimoComprobanteResponse {
@@ -43,7 +44,7 @@ interface ConsultarUltimoComprobanteResponse {
 
 export const useConsultarUltimoComprobante = () => {
   return useMutation({
-    mutationFn: async ({ tipoComprobante, comercioId }: ConsultarUltimoComprobanteParams) => {
+    mutationFn: async ({ tipoComprobante, comercioId, emisorFiscalId }: ConsultarUltimoComprobanteParams) => {
       if (!comercioId) {
         throw new Error('Debe seleccionar un comercio para consultar');
       }
@@ -51,7 +52,7 @@ export const useConsultarUltimoComprobante = () => {
       const { data, error } = await supabase.functions.invoke<ConsultarUltimoComprobanteResponse>(
         'consultar-ultimo-comprobante',
         {
-          body: { tipoComprobante, comercioId },
+          body: { tipoComprobante, comercioId, emisorFiscalId },
         }
       );
 
