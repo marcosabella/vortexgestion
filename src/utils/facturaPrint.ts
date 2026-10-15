@@ -7,6 +7,7 @@ import type { TallerOrden } from "@/types/taller";
 import { ESTADOS_TALLER } from "@/types/taller";
 import { datosFiscalesVenta } from "@/utils/emisorFiscal";
 import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
+import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 
 export type TipoDocumentoImpresion = "venta" | "presupuesto" | "orden_taller";
 export type DatosOrdenImpresion = { orden: TallerOrden; responsable: string };
@@ -104,6 +105,10 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
   .factura-container.sin-cae {
     padding-bottom: 72px;
   }
+
+  .comprobante-documento { margin: 0 auto; max-width: 800px; }
+  .comprobante-documento .factura-container { min-height: 1060px; }
+  .comprobante-marca { break-before: avoid; color: #555; font-size: 8px; line-height: 12px; margin-top: 4px; text-align: center; }
 
   .copy-indicator {
     font-size: 12px;
@@ -407,6 +412,7 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
     .factura-container {
       min-height: calc(297mm - 16mm);
     }
+    .comprobante-documento .factura-container { min-height: calc(297mm - 22mm); }
   }
 
   ${formato === "58mm" ? `
@@ -448,7 +454,10 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
     .arca-caption { font-size: 6px; margin: auto; }
     .disclaimer-full { border-top: 1px dashed #000; font-size: 6px; padding: 2mm 0; position: static; }
     .page-number { display: none; }
-    @media print { body { padding: 0; width: 54mm; } .factura-container { min-height: 0; } }
+    .comprobante-documento { max-width: none; width: 54mm; }
+    .comprobante-documento .factura-container { min-height: 0; }
+    .comprobante-marca { font-size: 6px; line-height: 1.3; margin-top: 1mm; }
+    @media print { body { padding: 0; width: 54mm; } .factura-container { min-height: 0; } .comprobante-documento .factura-container { min-height: 0; } }
   ` : ""}
 `;
 
@@ -571,6 +580,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
     : "";
 
   return `
+    ${documentType === "venta" ? '<div class="comprobante-documento">' : ""}
     <div class="factura-container ${hasCae ? "con-cae" : "sin-cae"} ${isOrden ? "orden-taller" : ""}">
       <div class="copy-indicator">ORIGINAL</div>
 
@@ -745,6 +755,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
       }
       ${isOrden ? '<div class="orden-pie cliente-section"><div class="cliente-row full"><div>Firma / conformidad del cliente: __________________________</div></div><div class="cliente-row full"><div>Orden de trabajo no fiscal. El comprobante de venta se emite por separado.</div></div></div>' : '<div class="page-number">Pag. 1/1</div>'}
     </div>
+    ${documentType === "venta" ? `<div class="comprobante-marca">${escapeHtml(LEYENDA_SISTEMA)}</div></div>` : ""}
   `;
 };
 

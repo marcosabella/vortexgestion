@@ -1,4 +1,5 @@
 import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
+import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format } from "date-fns";
 import { buildCajaResumen, CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
 import { Comercio } from "@/types/comercio";
@@ -553,8 +554,8 @@ const drawTable = <TRow extends Record<string, string>>(
 };
 
 const drawFooter = () => [
-  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Listado de Caja", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText(LEYENDA_SISTEMA, 18, PAGE_HEIGHT - 29, 6.15, "F3", "left", 166),
+  opText("Listado de Caja", LAYOUT_WIDTH / 2, PAGE_HEIGHT - 29, 7.15, "F3", "center", 228),
 ];
 
 const createPageContent = (

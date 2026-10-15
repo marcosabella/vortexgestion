@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import type { Json } from "@/integrations/supabase/types";
 import { isLegacyDeletedClient } from "@/utils/legacyVisibility";
+import type { ReciboPagoCliente } from "@/types/recibo-pago-cliente";
 
 export type ChequeClientePago = {
   numero_cheque: string;
@@ -102,12 +103,12 @@ export const useCuentaCorriente = () => {
   };
 
   // Get account summary by client
-  const useResumenCuentaCorriente = () => {
+  const useResumenCuentaCorriente = (incluirSaldados = false) => {
     return useQuery({
-      queryKey: ["cuenta-corriente", comercioId, "resumen"],
+      queryKey: ["cuenta-corriente", comercioId, "resumen", incluirSaldados],
       enabled: Boolean(comercioId),
       queryFn: async () => {
-        const movimientos = await fetchAllPages((from, to) =>
+        const [movimientos, clientes] = await Promise.all([fetchAllPages((from, to) =>
           supabase
             .from("cuenta_corriente")
             .select(`
@@ -121,10 +122,19 @@ export const useCuentaCorriente = () => {
             .eq("comercio_id", comercioId!)
             .order("id", { ascending: true })
             .range(from, to)
-        );
+        ), incluirSaldados ? fetchAllPages((from, to) => supabase.from("clientes")
+          .select("id,nombre,apellido,cuit,telefono")
+          .eq("comercio_id", comercioId!).order("id", { ascending: true }).range(from, to)) : Promise.resolve([])]);
 
         // Group by cliente_id and calculate totals
         const resumenMap = new Map<string, CuentaCorrienteResumen>();
+        clientes.filter((cliente) => !isLegacyDeletedClient(cliente)).forEach((cliente) => {
+          resumenMap.set(cliente.id, {
+            cliente_id: cliente.id, cliente_nombre: cliente.nombre || "", cliente_apellido: cliente.apellido || "",
+            cliente_cuit: cliente.cuit || "", cliente_telefono: cliente.telefono || "",
+            total_debitos: 0, total_creditos: 0, saldo_actual: 0,
+          });
+        });
         
         movimientos.forEach((mov) => {
           const key = mov.cliente_id;
@@ -151,13 +161,13 @@ export const useCuentaCorriente = () => {
           resumen.saldo_actual = resumen.total_debitos - resumen.total_creditos;
           
           // Update last movement date if newer
-          if (new Date(mov.fecha_movimiento) > new Date(resumen.ultimo_movimiento)) {
+          if (!resumen.ultimo_movimiento || new Date(mov.fecha_movimiento) > new Date(resumen.ultimo_movimiento)) {
             resumen.ultimo_movimiento = mov.fecha_movimiento;
           }
         });
 
         return Array.from(resumenMap.values()).filter(
-          (item) => Math.round(item.saldo_actual * 100) !== 0 && !isLegacyDeletedClient({ nombre: item.cliente_nombre }),
+          (item) => (incluirSaldados || Math.round(item.saldo_actual * 100) !== 0) && !isLegacyDeletedClient({ nombre: item.cliente_nombre }),
         ) as CuentaCorrienteResumen[];
       },
     });
@@ -177,6 +187,7 @@ export const useCuentaCorriente = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["recibos-pago-cliente"] });
       toast({
         title: "Éxito",
         description: "Movimiento registrado correctamente",
@@ -199,6 +210,7 @@ export const useCuentaCorriente = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["recibos-pago-cliente"] });
       toast({
         title: "Éxito",
         description: "Movimiento eliminado correctamente",
@@ -249,6 +261,7 @@ export const useCuentaCorriente = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["recibos-pago-cliente"] });
       queryClient.invalidateQueries({ queryKey: ["ventas"] });
       queryClient.invalidateQueries({ queryKey: ["presupuestos"] });
       toast({
@@ -272,25 +285,30 @@ export const useCuentaCorriente = () => {
       fecha,
       observaciones,
       pagos,
+      solicitudId,
     }: {
       clienteId: string;
       ventaIds: string[];
       fecha: string;
       observaciones?: string;
       pagos: PagoClienteBorrador[];
+      solicitudId: string;
     }) => {
       if (!comercioId) throw new Error("Seleccioná un comercio antes de registrar el pago.");
-      const { error } = await supabase.rpc("registrar_pagos_cliente_multi_documento", {
+      const { data, error } = await supabase.rpc("registrar_cobro_cliente_con_recibo", {
         p_cliente_id: clienteId,
         p_venta_ids: ventaIds,
         p_fecha: fecha,
         p_observaciones: observaciones || null,
         p_pagos: pagos as unknown as Json,
+        p_solicitud_id: solicitudId,
       });
       if (error) throw error;
+      return data as unknown as ReciboPagoCliente;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["recibos-pago-cliente"] });
       queryClient.invalidateQueries({ queryKey: ["cheques"] });
       toast({
         title: "Pago registrado",
@@ -298,7 +316,11 @@ export const useCuentaCorriente = () => {
       });
     },
     onError: (error: Error) => {
-      const description = error.message.includes("pagos_cliente_superan_saldo")
+      const description = error.message.includes("schema cache") || error.message.includes("registrar_cobro_cliente_con_recibo")
+        ? "El servidor debe actualizarse para emitir recibos. El pago no se registró."
+        : error.message.includes("solicitud_recibo_datos_distintos")
+          ? "Este intento ya fue registrado con otros datos. Cerrá y volvé a abrir el formulario para iniciar un nuevo pago."
+          : error.message.includes("pagos_cliente_superan_saldo")
         ? "Los pagos ingresados superan el saldo pendiente."
         : error.message.includes("comprobante_cliente_sin_saldo")
           ? "Uno de los comprobantes seleccionados ya no tiene saldo pendiente."
@@ -318,6 +340,7 @@ export const useCuentaCorriente = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cuenta-corriente"] });
+      queryClient.invalidateQueries({ queryKey: ["recibos-pago-cliente"] });
       queryClient.invalidateQueries({ queryKey: ["cheques"] });
       toast({ title: "Pago eliminado", description: "La cuenta corriente y la cartera de cheques fueron actualizadas." });
     },

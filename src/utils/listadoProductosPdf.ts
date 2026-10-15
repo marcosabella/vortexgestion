@@ -1,4 +1,5 @@
 import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
+import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
 import { ProductoReporte } from "@/hooks/useProductosReport";
@@ -335,8 +336,8 @@ const drawTable = <TRow extends PrintableRow>(
 };
 
 const drawFooter = () => [
-  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Reporte de Productos", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText(LEYENDA_SISTEMA, 18, PAGE_HEIGHT - 29, 6.15, "F3", "left", 166),
+  opText("Reporte de Productos", LAYOUT_WIDTH / 2, PAGE_HEIGHT - 29, 7.15, "F3", "center", 228),
 ];
 
 const createPageContent = (

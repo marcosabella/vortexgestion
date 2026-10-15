@@ -65,7 +65,7 @@ export const buildFacturaWhatsAppPdfFile = async (options: FacturaWhatsAppPdfOpt
     await waitForImages(frameDocument);
     await frameDocument.fonts?.ready;
 
-    const facturaElement = frameDocument.querySelector<HTMLElement>(".factura-container");
+    const facturaElement = frameDocument.querySelector<HTMLElement>(".comprobante-documento, .factura-container");
 
     if (!facturaElement) {
       throw new Error("No se encontro el comprobante para exportar");

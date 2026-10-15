@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { type ChequeClientePago, type PagoClienteBorrador, useCuentaCorriente } from "@/hooks/useCuentaCorriente";
 import type { CuentaCorriente } from "@/types/cuenta-corriente";
+import type { ReciboPagoCliente } from "@/types/recibo-pago-cliente";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +22,8 @@ type Props = {
   clienteNombre: string;
   clienteCuit?: string;
   movimientos: CuentaCorriente[];
+  onRecibo: (recibo: ReciboPagoCliente) => void;
+  initialPayment?: { tipo: PaymentRow["tipo"]; monto: number; fecha: string; observaciones?: string };
 };
 
 const money = (value: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
@@ -49,9 +52,16 @@ export function PagoClienteMultipleDialog({
   clienteNombre,
   clienteCuit,
   movimientos,
+  onRecibo,
+  initialPayment,
 }: Props) {
   const { registrarPagosMixtos } = useCuentaCorriente();
   const { toast } = useToast();
+  const [solicitudId] = useState(() => crypto.randomUUID());
+  const initialAmount = initialPayment?.monto || 0;
+  const initialMethod = initialPayment?.tipo || "contado";
+  const initialDate = initialPayment?.fecha || today();
+  const initialNotes = initialPayment?.observaciones || "";
   const [documentIds, setDocumentIds] = useState<string[]>([]);
   const [draftDocumentIds, setDraftDocumentIds] = useState<string[]>([]);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -108,14 +118,14 @@ export function PagoClienteMultipleDialog({
     setDocumentOpen(false);
     setDocumentSearch("");
     setRows([]);
-    setMethod("contado");
-    setAmount(0);
-    setDate(today());
-    setNotes("");
+    setMethod(initialMethod);
+    setAmount(initialAmount);
+    setDate(initialDate);
+    setNotes(initialNotes);
     setChequeOpen(false);
     setChequeAmount(0);
     setCheque(emptyCheque(clienteNombre, clienteCuit));
-  }, [clienteId, clienteCuit, clienteNombre, open]);
+  }, [clienteId, clienteCuit, clienteNombre, open, initialMethod, initialAmount, initialDate, initialNotes]);
 
   const openDocumentSelector = () => {
     setDraftDocumentIds(documentIds);
@@ -169,12 +179,13 @@ export function PagoClienteMultipleDialog({
   const submit = () => {
     if (!selectionValid || rows.length === 0 || assigned > debt || !date || registrarPagosMixtos.isPending) return;
     registrarPagosMixtos.mutate({
+      solicitudId,
       clienteId,
       ventaIds: documentIds,
       fecha: date,
       observaciones: notes,
       pagos: rows.map(({ localId: _localId, detail: _detail, ...row }) => row),
-    }, { onSuccess: () => onOpenChange(false) });
+    }, { onSuccess: (recibo) => { onRecibo(recibo); onOpenChange(false); } });
   };
 
   return <>

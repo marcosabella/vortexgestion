@@ -16,9 +16,9 @@ import { useTarjetas } from "@/hooks/useTarjetas";
 import { useTarjetaCuotas } from "@/hooks/useTarjetaCuotas";
 import { CONCEPTOS_MOVIMIENTO } from "@/types/cuenta-corriente";
 import { format } from "date-fns";
-import { ChequeDialogForm } from "@/components/ChequeDialogForm";
-import { supabase } from "@/integrations/supabase/client";
-import { toast as sonnerToast } from "sonner";
+import { PagoClienteMultipleDialog } from "@/components/PagoClienteMultipleDialog";
+import { ReciboPagoClienteDialog } from "@/components/ReciboPagoClienteDialog";
+import type { ReciboPagoCliente } from "@/types/recibo-pago-cliente";
 
 const movimientoSchema = z.object({
   cliente_id: z.string().min(1, "Cliente es requerido"),
@@ -37,7 +37,7 @@ interface CuentaCorrienteFormProps {
 }
 
 export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorrienteFormProps) => {
-  const { createMovimiento, isCreating } = useCuentaCorriente();
+  const { createMovimiento, isCreating, useMovimientosByCliente } = useCuentaCorriente();
   const clientesQuery = useClientes();
   
   const clientes = clientesQuery.data || [];
@@ -46,8 +46,8 @@ export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorri
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<{ id: string; nombre: string; apellido: string } | null>(null);
   const [selectedTarjetaId, setSelectedTarjetaId] = useState<string>("");
-  const [chequeDialogOpen, setChequeDialogOpen] = useState(false);
-  const [pendingMovimientoData, setPendingMovimientoData] = useState<z.infer<typeof movimientoSchema> | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [recibo, setRecibo] = useState<ReciboPagoCliente | null>(null);
   
   const { tarjetas } = useTarjetas();
   const { tarjetaCuotas } = useTarjetaCuotas(selectedTarjetaId);
@@ -74,84 +74,23 @@ export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorri
     },
   });
 
+  const clienteId = form.watch("cliente_id");
+  const movimientosQuery = useMovimientosByCliente(clienteId || null);
   const onSubmit = (values: z.infer<typeof movimientoSchema>) => {
-    // Si el concepto es pago con cheque, mostrar diálogo de cheque primero
-    if (values.concepto === 'pago_cheque') {
-      setPendingMovimientoData(values);
-      setChequeDialogOpen(true);
+    if (values.tipo_movimiento === "credito" && values.concepto.startsWith("pago_")) {
+      setPaymentOpen(true);
       return;
     }
-
-    procesarMovimiento(values);
-  };
-
-  const handleChequeSubmit = async (chequeData: any) => {
-    if (!pendingMovimientoData) return;
-
-    try {
-      // Crear el cheque primero
-      const chequeCompleto = {
-        ...chequeData,
-        cliente_id: pendingMovimientoData.cliente_id,
-        estado: 'en_cartera' as const,
-      };
-
-      const { data: chequeCreado, error: chequeError } = await supabase
-        .from('cheques')
-        .insert([chequeCompleto])
-        .select()
-        .single();
-
-      if (chequeError) throw chequeError;
-
-      setChequeDialogOpen(false);
-      
-      // Procesar el movimiento con referencia al cheque
-      await procesarMovimiento(pendingMovimientoData, chequeCreado.id);
-      
-      setPendingMovimientoData(null);
-    } catch (error) {
-      sonnerToast.error("Error al registrar el cheque");
-    }
-  };
-
-  const procesarMovimiento = async (values: z.infer<typeof movimientoSchema>, chequeId?: string) => {
-    const movimientoData: any = {
+    createMovimiento({
       cliente_id: values.cliente_id,
       tipo_movimiento: values.tipo_movimiento,
       monto: values.monto,
       concepto: values.concepto,
       fecha_movimiento: new Date(values.fecha_movimiento).toISOString(),
       observaciones: values.observaciones,
-    };
-    
-    // Add card-specific fields if payment is with card
-    if (values.concepto === "pago_tarjeta" && values.tarjeta_id) {
-      movimientoData.tarjeta_id = values.tarjeta_id;
-      movimientoData.cuotas = values.cuotas || 1;
-    }
-
-    // Si hay cheque, agregar referencia
-    if (chequeId) {
-      const { data: movCreado, error } = await supabase
-        .from('cuenta_corriente')
-        .insert([movimientoData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Actualizar el cheque con el cuenta_corriente_id
-      await supabase
-        .from('cheques')
-        .update({ cuenta_corriente_id: movCreado.id })
-        .eq('id', chequeId);
-
-      sonnerToast.success("Movimiento y cheque registrados exitosamente");
-      onSuccess();
-    } else {
-      createMovimiento(movimientoData, { onSuccess });
-    }
+      tarjeta_id: values.tarjeta_id || undefined,
+      cuotas: values.cuotas,
+    }, { onSuccess });
   };
 
   return (
@@ -420,13 +359,8 @@ export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorri
           </form>
         </Form>
 
-        <ChequeDialogForm
-          open={chequeDialogOpen}
-          onOpenChange={setChequeDialogOpen}
-          onSubmit={handleChequeSubmit}
-          monto={form.watch('monto')}
-          clienteId={form.watch('cliente_id')}
-        />
+        {paymentOpen && <PagoClienteMultipleDialog open onOpenChange={setPaymentOpen} clienteId={clienteId} clienteNombre={selectedClient ? selectedClient.nombre + " " + selectedClient.apellido : "Cliente"} movimientos={movimientosQuery.data || []} onRecibo={setRecibo} initialPayment={{ monto: form.getValues("monto"), tipo: ({ pago_efectivo: "contado", pago_transferencia: "transferencia", pago_tarjeta: "tarjeta", pago_cheque: "cheque" } as const)[form.getValues("concepto")] || "contado", fecha: form.getValues("fecha_movimiento").slice(0,10), observaciones: form.getValues("observaciones") }} />}
+        {recibo && <ReciboPagoClienteDialog recibo={recibo} onClose={() => { setRecibo(null); onSuccess(); }} />}
       </CardContent>
     </Card>
   );

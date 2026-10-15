@@ -14,6 +14,19 @@ export type Database = {
   }
   public: {
     Tables: {
+      recibos_pago_cliente: {
+        Row: {
+          id: string; comercio_id: string; cliente_id: string; numero: number;
+          solicitud_id: string; solicitud: Json; fecha: string; creado_en: string; importe: number;
+          moneda: string; saldo_anterior: number; saldo_posterior: number;
+          cliente_snapshot: Json; comercio_snapshot: Json; pagos: Json;
+          documentos: Json; movimiento_ids: string[]; observaciones: string | null;
+          anulado_en: string | null;
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       afip_config: {
         Row: {
           activo: boolean | null
@@ -4679,6 +4692,11 @@ export type Database = {
       }
     }
     Functions: {
+      registrar_cobro_cliente_con_recibo: {
+        Args: { p_cliente_id: string; p_venta_ids: string[]; p_fecha: string;
+          p_observaciones: string | null; p_pagos: Json; p_solicitud_id: string }
+        Returns: Json
+      }
       actualizar_venta_transaccional: {
         Args: {
           p_comercio_id: string

@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { build } from 'esbuild';
 import WebSocket from 'ws';
-const repo=process.cwd(),require=createRequire(import.meta.url),out=path.resolve('tmp/pdfs/comprobantes-encabezados');mkdirSync(out,{recursive:true});
+const repo=process.cwd(),require=createRequire(import.meta.url),out=process.env.COMPROBANTES_QA_DIR || path.resolve('tmp/pdfs/comprobantes-encabezados');mkdirSync(out,{recursive:true});
 const entry=`
 import {buildFacturaPrintHtml} from '@/utils/facturaPrint';
 import {buildListadoProductosPdfFile} from '@/utils/listadoProductosPdf';
@@ -32,7 +32,7 @@ assert(!parsed(identidadComercioHtml({...comercio,mostrar_razon_social_con_logo:
 assert(parsed(identidadComercioHtml({...comercio,logo_url:''})).querySelector('.comercio-nombre'),'Nombre sin logo');
 assert(!telefonoComercioHtml({...comercio,telefono:'   '}),'Sin teléfono no hay línea');
 const hostile=parsed(telefonoComercioHtml({...comercio,telefono:'123 <script>alert(1)</script>'}));assert(!hostile.querySelector('script'),'Texto escapado');
-window.htmls={factura:buildFacturaPrintHtml({venta,comercio}),presupuesto:buildFacturaPrintHtml({venta:{...venta,numero_comprobante:'P-000001'},comercio,documentType:'presupuesto'}),ticket:buildFacturaPrintHtml({venta,comercio,formato:'58mm'})};
+window.htmls={factura:buildFacturaPrintHtml({venta,comercio}),factura_cae:buildFacturaPrintHtml({venta:{...venta,tipo_comprobante:'factura_c',cae:'12345678901234',cae_vencimiento:'2026-10-24'},comercio}),presupuesto:buildFacturaPrintHtml({venta:{...venta,numero_comprobante:'P-000001'},comercio,documentType:'presupuesto'}),ticket:buildFacturaPrintHtml({venta,comercio,formato:'58mm'})};
 const reparto={id:'reparto',nombre:'Reparto de prueba',fecha:'2026-10-14',estado:'planificado'},data={paradas:[],eventos:[],pedidos:[],items:[],remitos:[],cobros:[],usuarios:[]};
 const orden={fecha_orden:'2026-10-14',estado:'pendiente',extintores:[],productos:[],cliente:{nombre:'Cliente',apellido:'Prueba'}};
 const extra=[buildHojaRepartoPrintHtml(data,reparto,comercio),buildHojaRutaPrintHtml(data,reparto,comercio),buildOrdenTrabajoPrintHtml(orden,comercio),buildRemitosDistribucionPrintHtml([{id:'remito',numero:1,fecha:'2026-10-14',cliente_nombre:'Cliente prueba'}],[],comercio)];
@@ -65,7 +65,11 @@ await send('Page.navigate',{url:origin+'/html/'+name},sessionId);await new Promi
 assert.ok(await evaluate('document.querySelector(".header-left")?.textContent.includes("0358 1234567")'),name);
 assert.ok(await evaluate('(()=>{const el=document.querySelector(".comercio-nombre");return el.textContent==="BOSTICO Y BARTOLOME SOCIEDAD SIMPLE" && getComputedStyle(el).whiteSpace==="nowrap" && el.scrollWidth<=el.clientWidth+1;})()'),name+' nombre completo en una línea');
 const pdf=await send('Page.printToPDF',{printBackground:true,preferCSSPageSize:true},sessionId);pdfs.set(name,Buffer.from(pdf.data,'base64'));writeFileSync(path.join(out,name+'.pdf'),pdfs.get(name));
-const shot=await send('Page.captureScreenshot',{format:'png'},sessionId);writeFileSync(path.join(out,name+'-html.png'),Buffer.from(shot.data,'base64'));
+if(name.startsWith('factura')){
+assert.ok(await evaluate('(()=>{const frame=document.querySelector(".factura-container"),brand=document.querySelector(".comprobante-marca");if(!brand)return false;const f=frame.getBoundingClientRect(),b=brand.getBoundingClientRect();return !brand.closest(".factura-container") && b.top>=f.bottom && Math.abs((b.left+b.width/2)-(f.left+f.width/2))<1 && brand.textContent==="VORTEX GESTION - Marcos Abella (03583) - 15430176";})()'),name+' leyenda centrada debajo del recuadro');
+assert.equal(Number(pdfs.get(name).toString('latin1').match(/\/Count\s+(\d+)/)?.[1]),1,name+' conserva una pagina A4');
+}
+const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:1200,height:1200,scale:1}},sessionId);writeFileSync(path.join(out,name+'-html.png'),Buffer.from(shot.data,'base64'));
 }
 for(const name of ['productos','reporte','caja','cuenta']){await send('Page.navigate',{url:origin+'/pdf/'+name+'#zoom=100'},sessionId);await new Promise(r=>setTimeout(r,900));const shot=await send('Page.captureScreenshot',{format:'png'},sessionId);writeFileSync(path.join(out,name+'-pdf.png'),Buffer.from(shot.data,'base64'));}
 console.log('OK: siete PDF ficticios y capturas; logo más razón social, teléfono, opción desactivada, sin logo, sin teléfono y texto escapado. '+out);

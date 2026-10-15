@@ -1,8 +1,14 @@
 import { useMemo, useState } from "react";
-import { FileDown, MessageCircle, Plus, Printer, Trash2 } from "lucide-react";
+import { Eye, FileDown, MessageCircle, Plus, Printer, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { PagoClienteMultipleDialog } from "@/components/PagoClienteMultipleDialog";
+import { ReciboPagoClienteDialog } from "@/components/ReciboPagoClienteDialog";
+import { VentasList } from "@/components/VentasList";
+import { useRecibosPagoCliente } from "@/hooks/useRecibosPagoCliente";
+import type { ReciboPagoCliente } from "@/types/recibo-pago-cliente";
+import type { CuentaCorriente } from "@/types/cuenta-corriente";
+import { buildReciboPagoHistorico, esPagoCliente } from "@/utils/reciboPagoHistorico";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,15 +65,29 @@ export default function CuentaCorrienteClienteDetalle() {
     deleteVentaFromCuenta,
     eliminarPagoCliente,
   } = useCuentaCorriente();
-  const resumenQuery = useResumenCuentaCorriente();
+  const resumenQuery = useResumenCuentaCorriente(true);
   const movimientosQuery = useMovimientosByCliente(clienteId || null);
   const [filtrarPeriodo, setFiltrarPeriodo] = useState(false);
   const [fechaDesde, setFechaDesde] = useState(currentMonthStart);
   const [fechaHasta, setFechaHasta] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [recibo, setRecibo] = useState<ReciboPagoCliente | null>(null);
+  const [ventaImpresion, setVentaImpresion] = useState<string | null>(null);
+  const recibosQuery = useRecibosPagoCliente(clienteId);
+  const recibosPorMovimiento = new Map((recibosQuery.data || []).flatMap((r) => r.movimiento_ids.map((id) => [id, r] as const)));
 
   const resumen = resumenQuery.data?.find((item) => item.cliente_id === clienteId);
   const movimientos = useMemo(() => movimientosQuery.data || [], [movimientosQuery.data]);
+  const verRecibo = (movimiento: CuentaCorriente) => {
+    const guardado = recibosPorMovimiento.get(movimiento.id);
+    if (guardado) { setRecibo(guardado); return; }
+    if (!comercio || recibosQuery.isLoading || recibosQuery.error) return;
+    try {
+      setRecibo(buildReciboPagoHistorico(movimiento, movimientos, comercio));
+    } catch (error) {
+      toast({ title: "No se pudo recuperar el pago", description: error instanceof Error ? error.message : "Intentá nuevamente.", variant: "destructive" });
+    }
+  };
   const fechaDesdeAplicada = filtrarPeriodo ? fechaDesde : currentMonthStart();
   const fechaHastaAplicada = filtrarPeriodo ? fechaHasta : "";
   const rangoInvalido = filtrarPeriodo && Boolean(fechaDesde && fechaHasta && fechaDesde > fechaHasta);
@@ -197,12 +217,15 @@ export default function CuentaCorrienteClienteDetalle() {
           const concepto = movimiento.venta_id && movimiento.venta?.numero_comprobante
             ? `Venta: ${formatNumeroComprobante(movimiento.venta.numero_comprobante, afipConfig?.punto_venta, movimiento.venta.tipo_comprobante)}`
             : presentation.concepto;
-          return <TableRow key={movimiento.id}><TableCell>{format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy")}</TableCell><TableCell><Badge variant={movimiento.tipo_movimiento === "debito" ? "destructive" : "default"}>{movimiento.tipo_movimiento === "debito" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell className="whitespace-nowrap">{concepto}</TableCell><TableCell className="text-right font-semibold text-red-600">{movimiento.tipo_movimiento === "debito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className="text-right font-semibold text-green-600">{movimiento.tipo_movimiento === "credito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className={`text-right font-medium ${saldoAcumulado > 0 ? "text-red-600" : saldoAcumulado < 0 ? "text-green-600" : ""}`}>{money(saldoAcumulado)}</TableCell><TableCell>{presentation.observaciones}</TableCell><TableCell className="text-right">{movimiento.venta_id && movimiento.tipo_movimiento === "debito" ? <Button variant="destructive" size="icon" className="h-7 w-7" disabled={Boolean(movimiento.venta?.cae?.trim())} title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : "Eliminar venta"} onClick={() => { if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) deleteVentaFromCuenta(movimiento.venta_id!); }}><Trash2 className="h-3.5 w-3.5" /></Button> : <Button variant="destructive" size="icon" className="h-7 w-7" title={movimiento.tipo_movimiento === "credito" ? "Eliminar pago" : "Eliminar movimiento"} onClick={() => { if (confirm(movimiento.tipo_movimiento === "credito" ? (movimiento.cheque_id ? "¿Eliminar este pago? Se revertirán todas las imputaciones del mismo cheque y se quitará de cartera si todavía está disponible." : "¿Eliminar este pago?") : "¿Eliminar este movimiento?")) { if (movimiento.tipo_movimiento === "credito") eliminarPagoCliente.mutate(movimiento.id); else deleteMovimiento(movimiento.id); } }}><Trash2 className="h-3.5 w-3.5" /></Button>}</TableCell></TableRow>;
+          return <TableRow key={movimiento.id}><TableCell>{format(new Date(movimiento.fecha_movimiento), "dd/MM/yyyy")}</TableCell><TableCell><Badge variant={movimiento.tipo_movimiento === "debito" ? "destructive" : "default"}>{movimiento.tipo_movimiento === "debito" ? "Débito" : "Crédito"}</Badge></TableCell><TableCell className="whitespace-nowrap">{concepto}</TableCell><TableCell className="text-right font-semibold text-red-600">{movimiento.tipo_movimiento === "debito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className="text-right font-semibold text-green-600">{movimiento.tipo_movimiento === "credito" ? money(movimiento.monto) : "—"}</TableCell><TableCell className={`text-right font-medium ${saldoAcumulado > 0 ? "text-red-600" : saldoAcumulado < 0 ? "text-green-600" : ""}`}>{money(saldoAcumulado)}</TableCell><TableCell>{presentation.observaciones}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-1">{movimiento.venta_id && movimiento.tipo_movimiento === "debito" && <Button variant="outline" size="icon" className="h-7 w-7" title="Ver detalle de venta" aria-label="Ver detalle de venta" onClick={() => setVentaImpresion(movimiento.venta_id!)}><Eye className="h-3.5 w-3.5" /></Button>}{(recibosPorMovimiento.has(movimiento.id) || esPagoCliente(movimiento)) && <Button variant="outline" size="icon" className="h-7 w-7" title="Ver detalle del recibo de pago" aria-label="Ver detalle del recibo de pago" disabled={!recibosPorMovimiento.has(movimiento.id) && (!comercio || recibosQuery.isLoading || Boolean(recibosQuery.error))} onClick={() => verRecibo(movimiento)}><Eye className="h-3.5 w-3.5" /></Button>}{movimiento.venta_id && movimiento.tipo_movimiento === "debito" ? <Button variant="destructive" size="icon" className="h-7 w-7" disabled={Boolean(movimiento.venta?.cae?.trim())} title={movimiento.venta?.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : "Eliminar venta"} onClick={() => { if (confirm("¿Eliminar toda la venta? Esto eliminará la venta y todos sus movimientos asociados.")) deleteVentaFromCuenta(movimiento.venta_id!); }}><Trash2 className="h-3.5 w-3.5" /></Button> : <Button variant="destructive" size="icon" className="h-7 w-7" title={movimiento.tipo_movimiento === "credito" ? "Eliminar pago" : "Eliminar movimiento"} onClick={() => { if (confirm(movimiento.tipo_movimiento === "credito" ? (movimiento.cheque_id ? "¿Eliminar este pago? Se revertirán todas las imputaciones del mismo cheque y se quitará de cartera si todavía está disponible." : "¿Eliminar este pago?") : "¿Eliminar este movimiento?")) { if (movimiento.tipo_movimiento === "credito") eliminarPagoCliente.mutate(movimiento.id); else deleteMovimiento(movimiento.id); } }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div></TableCell></TableRow>;
         })}
         {!rangoInvalido && detallePeriodo.movimientosConSaldo.length === 0 && <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">No hay movimientos en el período seleccionado.</TableCell></TableRow>}
       </TableBody></Table></div>
     </CardContent></Card>
 
-    {paymentOpen && <PagoClienteMultipleDialog open onOpenChange={setPaymentOpen} clienteId={clienteId} clienteNombre={clientName} clienteCuit={resumen.cliente_cuit} movimientos={movimientos} />}
+    {recibosQuery.error && <p className="text-sm text-destructive">No se pudieron cargar los recibos de los pagos. <Button variant="link" onClick={() => recibosQuery.refetch()}>Reintentar</Button></p>}
+    {paymentOpen && <PagoClienteMultipleDialog open onOpenChange={setPaymentOpen} onRecibo={setRecibo} clienteId={clienteId} clienteNombre={clientName} clienteCuit={resumen.cliente_cuit} movimientos={movimientos} />}
+    {recibo && <ReciboPagoClienteDialog key={recibo.id} recibo={recibosQuery.data?.find((r) => r.id === recibo.id) || recibo} onClose={() => setRecibo(null)} />}
+    {ventaImpresion && <VentasList detalleId={ventaImpresion} onCerrarDetalle={() => setVentaImpresion(null)} />}
   </div>;
 }

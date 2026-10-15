@@ -1,4 +1,5 @@
 import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
+import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format, subDays } from "date-fns";
 import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { Comercio } from "@/types/comercio";
@@ -390,8 +391,8 @@ const drawSummary = (resumen: CuentaCorrienteResumen, tableBottom: number, isLas
 };
 
 const drawFooter = () => [
-  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Resumen de Cuenta Corriente", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText(LEYENDA_SISTEMA, 18, PAGE_HEIGHT - 29, 6.15, "F3", "left", 166),
+  opText("Resumen de Cuenta Corriente", LAYOUT_WIDTH / 2, PAGE_HEIGHT - 29, 7.15, "F3", "center", 228),
 ];
 
 const createPageContent = (
@@ -500,8 +501,8 @@ const drawListadoTable = <TRow extends Record<string, string>>(
 };
 
 const drawListadoFooter = () => [
-  opText("Sistema de Ventas Web", 214, PAGE_HEIGHT - 29, 7.15, "F3"),
-  opText("Listado de Cuenta Corriente", 331, PAGE_HEIGHT - 29, 7.15, "F3"),
+  opText(LEYENDA_SISTEMA, 18, PAGE_HEIGHT - 29, 6.15, "F3", "left", 166),
+  opText("Listado de Cuenta Corriente", LAYOUT_WIDTH / 2, PAGE_HEIGHT - 29, 7.15, "F3", "center", 228),
 ];
 
 const createListadoPageContent = (
