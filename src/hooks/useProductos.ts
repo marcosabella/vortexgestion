@@ -5,6 +5,7 @@ import { Producto } from "@/types/producto";
 import { useToast } from "@/hooks/use-toast";
 import { useComercio } from "@/hooks/useComercio";
 import { fetchMasterRecords } from "@/utils/fetchMasterRecords";
+import { esCodigoProductoDuplicado, mensajeCodigoProductoDuplicado } from "@/utils/productoErrors";
 
 type ProductoInsert = Database["public"]["Tables"]["productos"]["Insert"];
 type ProductoUpdate = Database["public"]["Tables"]["productos"]["Update"];
@@ -79,7 +80,10 @@ export const useProductos = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (esCodigoProductoDuplicado(error)) throw new Error(mensajeCodigoProductoDuplicado(payload.cod_producto));
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -122,7 +126,10 @@ export const useProductos = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (esCodigoProductoDuplicado(error)) throw new Error(mensajeCodigoProductoDuplicado(payload.cod_producto || ""));
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {

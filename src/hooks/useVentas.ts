@@ -46,6 +46,15 @@ const getRpcErrorMessage = (error: unknown) => {
   if (message.includes("Stock insuficiente")) {
     return "Stock insuficiente para el producto seleccionado.";
   }
+  if (message.includes("ventas_stock_variantes_desajustado")) {
+    return "El stock por talle/color no coincide con el stock de Gestión. Revisá la distribución por variantes antes de vender; el stock total no fue modificado.";
+  }
+  if (message.includes("ventas_variante_requerida")) {
+    return "Seleccioná el talle y color del producto antes de guardar la venta.";
+  }
+  if (message.includes("ventas_variante_no_disponible")) {
+    return "El talle/color seleccionado no pertenece al producto o comercio de la venta.";
+  }
   if (message.includes("venta_items_stock_coherente") || message.includes("ventas_item_invalido")) {
     return "Revise los ítems: los conceptos manuales no afectan stock y los productos requieren cantidades enteras.";
   }
@@ -200,6 +209,7 @@ export const useVentas = () => {
 
         return {
           ...(productoId ? { producto_id: productoId } : { descripcion_manual: descripcionManual }),
+          ...(productoId && item.producto_variante_id ? { producto_variante_id: item.producto_variante_id } : {}),
           ...(item.codigo_manual?.trim() ? { codigo_manual: item.codigo_manual.trim() } : {}),
           cantidad: Number(item.cantidad),
           precio_unitario: Number(item.precio_unitario),

@@ -8,13 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import type { TallerOrden, TallerTecnico, TallerVehiculo, TallerItem } from '@/types/taller';
-import { useClientes } from '@/hooks/useClientes';
 import { useProveedores } from '@/hooks/useProveedores';
 import { useProductos } from '@/hooks/useProductos';
 import { tallerJson, useTallerVariantes, useTallerMarcasModelos } from '@/hooks/useTaller';
 import { TallerCatalogoBuscador } from './TallerCatalogoBuscador';
 import { TallerRepuestoBuscador } from './TallerRepuestoBuscador';
 import { TallerVehiculoBuscador } from './TallerVehiculoBuscador';
+import { TallerClienteBuscador } from './TallerClienteBuscador';
 import { itemTallerSchema, vehiculoSchema } from '@/utils/taller';
 import { TallerCampo, tallerSelectClass, type TallerData } from './TallerUI';
 
@@ -28,7 +28,6 @@ export function VehiculoForm({ data, vehiculo, onClose }: { data: TallerData; ve
   const catalogo = useTallerMarcasModelos(data.comercioId);
   const [marcaId, setMarcaId] = useState(vehiculo?.marca_id || '');
   const [modeloId, setModeloId] = useState(vehiculo?.modelo_id || '');
-  const { data: clientes = [], isLoading, error } = useClientes();
   const form = useForm<z.input<typeof vehiculoSchema>>({ resolver: zodResolver(vehiculoSchema), defaultValues: { cliente_id: vehiculo?.cliente_id || '', patente: vehiculo?.patente || '', marca: vehiculo?.marca || '', modelo: vehiculo?.modelo || '', kilometraje: vehiculo?.kilometraje || 0 } });
   const [anio, setAnio] = useState(vehiculo?.anio?.toString() || '');
   const [vin, setVin] = useState(vehiculo?.vin || '');
@@ -37,8 +36,7 @@ export function VehiculoForm({ data, vehiculo, onClose }: { data: TallerData; ve
     if (!marcaId || !modeloId) { toast.error('Seleccioná la marca y el modelo desde el catálogo.'); return; }
     try { await data.run({ name: 'taller_guardar_catalogo', args: { p_comercio_id: data.comercioId!, p_tipo: 'vehiculo', p_id: vehiculo?.id || null, p_datos: tallerJson({ ...values, marca_id: marcaId, modelo_id: modeloId, anio, vin, observaciones, activo: vehiculo?.activo ?? true }) } }); onClose(); } catch { /* La mutación muestra el error. */ }
   })}>
-    <TallerCampo label="Cliente / titular"><select className={tallerSelectClass} {...form.register('cliente_id')} disabled={isLoading}><option value="">Seleccionar cliente</option>{clientes.map(cliente => <option key={cliente.id} value={cliente.id}>{cliente.nombre} {cliente.apellido} · {cliente.cuit}</option>)}</select></TallerCampo>
-    {error && <p role="alert" className="text-sm text-destructive">No se pudieron cargar los clientes.</p>}
+    <TallerCampo label="Cliente / titular"><TallerClienteBuscador clienteId={form.watch('cliente_id')} disabled={data.isPending} onSelect={cliente => form.setValue('cliente_id', cliente.id!, { shouldDirty: true, shouldValidate: true })} /></TallerCampo>
     <div className="grid gap-4 sm:grid-cols-2">
       <TallerCampo label="Patente"><Input {...form.register('patente')} placeholder="AB123CD" /></TallerCampo>
       <TallerCampo label="Kilometraje actual"><Input type="number" min="0" step="1" {...form.register('kilometraje', { valueAsNumber: true })} /></TallerCampo>

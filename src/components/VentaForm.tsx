@@ -215,6 +215,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   const [selectedProducto, setSelectedProducto] = useState<{ id: string; cod_producto: string; descripcion: string; precio_venta: number; porcentaje_iva: number; stock: number } | null>(null)
   const [variantesProducto, setVariantesProducto] = useState<Array<{ id: string; stock: number; color?: string; talle?: string }>>([])
   const [selectedVarianteId, setSelectedVarianteId] = useState("")
+  const [estadoVariantes, setEstadoVariantes] = useState<"idle" | "cargando" | "listo" | "error">("idle")
+  const variantesRequest = useRef(0)
   const [itemDescripcion, setItemDescripcion] = useState("")
   const [itemCantidad, setItemCantidad] = useState<number>(1)
   const [itemPrecioUnitario, setItemPrecioUnitario] = useState<number>(0)
@@ -581,6 +583,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
 
   // Función para agregar producto
   const limpiarItemActual = () => {
+    variantesRequest.current++
+    setEstadoVariantes("idle")
     setSelectedProductoId("")
     setSelectedProducto(null)
     setVariantesProducto([])
@@ -596,6 +600,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   }
 
   const seleccionarProducto = (producto: typeof productos[number]) => {
+    const request = ++variantesRequest.current
+    setEstadoVariantes("cargando")
     setSelectedProductoId(producto.id)
     setSelectedProducto({
       id: producto.id,
@@ -611,9 +617,17 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     setSelectedVarianteId("")
     setVariantesProducto([])
     void (async () => {
-      const { data, error } = await (supabase as any).from("producto_variantes").select("id, stock, producto_colores(nombre), producto_talles(nombre)").eq("producto_id", producto.id).order("created_at")
-      if (error) { toast({ title: "No se pudieron cargar las variantes", description: error.message, variant: "destructive" }); return }
-      setVariantesProducto((data || []).map((variante: any) => ({ id: variante.id, stock: Number(variante.stock), color: variante.producto_colores?.nombre, talle: variante.producto_talles?.nombre })))
+      try {
+        const { data, error } = await (supabase as any).from("producto_variantes").select("id, stock, producto_colores(nombre), producto_talles(nombre)").eq("producto_id", producto.id).order("created_at")
+        if (request !== variantesRequest.current) return
+        if (error) throw error
+        setVariantesProducto((data || []).map((variante: any) => ({ id: variante.id, stock: Number(variante.stock), color: variante.producto_colores?.nombre, talle: variante.producto_talles?.nombre })))
+        setEstadoVariantes("listo")
+      } catch (error) {
+        if (request !== variantesRequest.current) return
+        setEstadoVariantes("error")
+        toast({ title: "No se pudieron cargar las variantes", description: error instanceof Error ? error.message : "Volvé a seleccionar el producto para reintentar.", variant: "destructive" })
+      }
     })()
     setProductSearchOpen(false)
     setProductSearchTerm("")
@@ -657,6 +671,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     }
 
     if (selectedProductoId) {
+      if (estadoVariantes !== "listo") {
+        toast({ title: "Verificar talle y color", description: estadoVariantes === "error" ? "Volvé a seleccionar el producto para consultar sus variantes." : "Esperá a que termine la consulta de variantes antes de agregar el producto.", variant: "destructive" })
+        return
+      }
       const producto = productos.find(p => p.id === selectedProductoId)
       if (!producto) return
 
@@ -1159,6 +1177,10 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                           onChange={(e) => {
                             setItemDescripcion(e.target.value)
                             if (selectedProductoId) {
+                              variantesRequest.current++
+                              setEstadoVariantes("idle")
+                              setVariantesProducto([])
+                              setSelectedVarianteId("")
                               setSelectedProductoId("")
                               setSelectedProducto(null)
                             }
@@ -1241,6 +1263,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                           Codigo: {selectedProducto.cod_producto} | Stock: {selectedProducto.stock}
                         </p>
                       )}
+                      {selectedProducto && estadoVariantes === "cargando" && <p role="status" className="mt-1 text-xs text-muted-foreground">Consultando talles y colores...</p>}
+                      {selectedProducto && estadoVariantes === "error" && <p role="alert" className="mt-1 text-xs text-destructive">Volvé a seleccionar el producto para verificar sus talles y colores.</p>}
                       {variantesProducto.length > 0 && (
                         <div className="mt-2">
                           <label className="text-xs font-medium">Color / talle *</label>

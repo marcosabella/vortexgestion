@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Producto } from "@/types/producto";
 import { ProductDescriptionEditor } from "@/components/ProductDescriptionEditor";
 import { sanitizeProductDescription } from "@/utils/productDescription";
+import { mensajeCodigoProductoDuplicado } from "@/utils/productoErrors";
 import { useComercio } from "@/hooks/useComercio";
 import { AtributoProducto, ProductoVariante, useProductoAtributos } from "@/hooks/useProductoAtributos";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -80,7 +81,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isValidating, isSubmitting },
     reset,
   } = useForm<Producto>({
     defaultValues: producto || {
@@ -370,7 +371,20 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
               <Label htmlFor="cod_producto">Código Producto *</Label>
               <Input
                 id="cod_producto"
-                {...register("cod_producto", { required: "El código es requerido" })}
+                {...register("cod_producto", {
+                  required: "El código es requerido",
+                  validate: async (codigo) => {
+                    if (!comercio?.id) return "Seleccioná un comercio antes de guardar el producto.";
+                    let consulta = supabase.from("productos")
+                      .select("id")
+                      .eq("comercio_id", comercio.id)
+                      .eq("cod_producto", codigo);
+                    if (producto?.id) consulta = consulta.neq("id", producto.id);
+                    const { data, error } = await consulta.limit(1);
+                    if (error) return "No se pudo verificar el código del producto. Intentá nuevamente.";
+                    return !data?.length || mensajeCodigoProductoDuplicado(codigo);
+                  },
+                })}
                 placeholder="Código del producto"
               />
               {errors.cod_producto && (
@@ -710,7 +724,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
             <Button 
               type="submit" 
               variant="success"
-              disabled={isCreating || isUpdating || isUploadingImages}
+              disabled={isCreating || isUpdating || isUploadingImages || isValidating || isSubmitting}
             >
               {isUploadingImages ? "Cargando imagenes..." : `${producto ? "Actualizar" : "Crear"} Producto`}
             </Button>

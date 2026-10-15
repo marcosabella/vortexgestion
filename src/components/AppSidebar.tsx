@@ -143,6 +143,7 @@ const listadosItems: MenuItem[] = [
 
 const adminItems: MenuItem[] = [
   { title: "Comercios", url: "/admin", icon: Shield },
+  { title: "Incidentes", url: "/admin/incidentes", icon: Activity },
   { title: "Notificaciones administrativas", url: "/admin/notificaciones", icon: Bell },
   { title: "Migraciones", url: "/admin/migraciones", icon: Database },
 ];
@@ -374,9 +375,9 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent className="bg-sidebar">
-        <div className="border-b border-sidebar-border p-4">
+        <div className="shrink-0 border-b border-sidebar-border p-4">
           <h2
-            className={`truncate font-bold text-sidebar-foreground ${collapsed ? "hidden" : "text-lg"}`}
+            className={`min-w-0 whitespace-normal break-words text-center font-bold leading-snug text-sidebar-foreground ${collapsed ? "hidden" : "text-lg"}`}
             title={comercioName}
           >
             {!collapsed && comercioName}

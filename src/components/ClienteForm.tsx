@@ -1,4 +1,5 @@
 import { useForm } from 'react-hook-form';
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -50,10 +51,12 @@ type ClienteFormData = z.infer<typeof clienteSchema>;
 interface ClienteFormProps {
   cliente?: Cliente;
   onSuccess?: () => void;
+  onSaved?: (cliente: Cliente) => void;
+  onPendingChange?: (pending: boolean) => void;
   showTitle?: boolean;
 }
 
-export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFormProps) {
+export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, showTitle = true }: ClienteFormProps) {
   const createCliente = useCreateCliente();
   const updateCliente = useUpdateCliente();
   const { consultarCuit, isLoading: isLoadingArca } = useConsultarArca();
@@ -64,7 +67,9 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
     setValue,
     watch,
     getValues,
-    formState: { errors },
+    setError,
+    clearErrors,
+    formState: { errors, isSubmitting },
   } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
     defaultValues: cliente ? {
@@ -101,6 +106,9 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
       ingresos_brutos: '',
     },
   });
+
+  const isSaving = createCliente.isPending || updateCliente.isPending || isSubmitting;
+  useEffect(() => { onPendingChange?.(isSaving); }, [isSaving, onPendingChange]);
 
   const watchedTipoPersona = watch('tipo_persona');
 
@@ -143,6 +151,7 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
   };
 
   const onSubmit = async (data: ClienteFormData) => {
+    clearErrors('root.server');
     try {
       const clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'> = {
         nombre: data.nombre,
@@ -162,14 +171,14 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
         ingresos_brutos: data.ingresos_brutos || null,
       };
 
-      if (cliente?.id) {
-        await updateCliente.mutateAsync({ id: cliente.id, ...clienteData });
-      } else {
-        await createCliente.mutateAsync(clienteData);
-      }
+      const savedCliente = cliente?.id
+        ? await updateCliente.mutateAsync({ id: cliente.id, ...clienteData })
+        : await createCliente.mutateAsync(clienteData);
+      onSaved?.({ ...savedCliente, tipo_persona: clienteData.tipo_persona });
       onSuccess?.();
     } catch (error) {
       console.error('Error al guardar cliente:', error);
+      setError('root.server', { message: `No se pudo guardar el cliente: ${error instanceof Error ? error.message : (error as { message?: string })?.message || 'Intentá nuevamente.'}` });
     }
   };
 
@@ -427,13 +436,14 @@ export function ClienteForm({ cliente, onSuccess, showTitle = true }: ClienteFor
           </div>
 
           {/* Botones */}
+          {errors.root?.server?.message && <p role="alert" className="text-sm text-destructive">{errors.root.server.message}</p>}
           <div className="flex justify-end space-x-4 pt-6">
             <Button
               type="submit"
               variant="success"
-              disabled={createCliente.isPending || updateCliente.isPending}
+              disabled={isSaving}
             >
-              {createCliente.isPending || updateCliente.isPending
+              {isSaving
                 ? 'Guardando...'
                 : cliente
                 ? 'Actualizar Cliente'

@@ -54,6 +54,9 @@ import AdminComercios from "./pages/AdminComercios";
 import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
+import AdminIncidentes from "./pages/AdminIncidentes";
+import { IncidentesMonitor } from "@/components/IncidentesMonitor";
+import { crearCachesIncidentes } from "@/utils/incidentesQuery";
 import Notificaciones from "./pages/Notificaciones";
 import Seguridad from "./pages/Seguridad";
 import PedidosOnline from "./pages/PedidosOnline";
@@ -98,7 +101,7 @@ import CuentaCorrienteProveedores from "./pages/CuentaCorrienteProveedores";
 import CuentaCorrienteProveedorDetalle from "./pages/CuentaCorrienteProveedorDetalle";
 import CuentaCorrienteClienteDetalle from "./pages/CuentaCorrienteClienteDetalle";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient(crearCachesIncidentes());
 
 function MembershipReminder({ comercio }: { comercio: ComercioDatos | null }) {
   const [open, setOpen] = useState(false);
@@ -223,6 +226,7 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider>
+      <IncidentesMonitor />
       <div className="min-h-screen flex w-full">
         {!terminalRestaurante && <AppSidebar />}
         <div className="flex min-w-0 flex-1 flex-col">
@@ -295,6 +299,7 @@ function AuthenticatedLayout() {
               <Route path="/admin" element={<AdminComercios />} />
               <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
               <Route path="/admin/migraciones" element={<AdminMigraciones />} />
+              <Route path="/admin/incidentes" element={<AdminIncidentes />} />
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />

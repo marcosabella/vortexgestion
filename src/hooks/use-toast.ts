@@ -1,4 +1,5 @@
 import * as React from "react"
+import { registrarIncidente } from "@/utils/incidentes"
 
 import type {
   ToastActionElement,
@@ -140,6 +141,10 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
+  if (props.variant === "destructive") {
+    const mensaje = [props.title, props.description].filter((value): value is string => typeof value === "string").join(": ")
+    if (mensaje) registrarIncidente(mensaje, "aviso")
+  }
   const id = genId()
 
   const update = (props: ToasterToast) =>
