@@ -37,7 +37,7 @@ interface CuentaCorrienteFormProps {
 }
 
 export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorrienteFormProps) => {
-  const { createMovimiento, isCreating, useMovimientosByCliente } = useCuentaCorriente();
+  const { createMovimiento, isCreating, useMovimientosByCliente } = useCuentaCorriente({ cargarMovimientos: false });
   const clientesQuery = useClientes();
   
   const clientes = clientesQuery.data || [];

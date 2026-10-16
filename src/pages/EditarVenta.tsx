@@ -6,7 +6,7 @@ import { useVentas } from "@/hooks/useVentas";
 const EditarVenta = () => {
   const navigate = useNavigate();
   const { ventaId } = useParams<{ ventaId: string }>();
-  const { ventas, isLoading } = useVentas();
+  const { ventas, isLoading } = useVentas({ ventaId });
   const venta = ventas.find((venta) => venta.id === ventaId);
 
   if (isLoading) {

@@ -94,7 +94,7 @@ const assertVentaSinCAE = async (ventaId: string, comercioId: string) => {
   }
 };
 
-export const useVentas = () => {
+export const useVentas = ({ ventaId }: { ventaId?: string } = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio();
@@ -106,10 +106,11 @@ export const useVentas = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["ventas", comercioId],
+    queryKey: ["ventas", comercioId, ventaId ?? "todas"],
+    staleTime: 15_000,
     enabled: Boolean(comercioId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ventas")
         .select(`
           *,
@@ -130,9 +131,11 @@ export const useVentas = () => {
         .eq("comercio_id", comercioId!)
         .order("fecha_venta", { ascending: false })
         .order("created_at", { ascending: false });
+      if (ventaId) query = query.eq("id", ventaId);
+      const { data, error } = await query;
 
       if (error) throw error;
-      return (data as any[]).filter((venta) =>
+      return (data as unknown as Venta[]).filter((venta) =>
         !isLegacyDeletedClient(venta.cliente) && !isLegacyDeletedClientName(venta.cliente_nombre)
       );
     },
@@ -350,7 +353,7 @@ export const useVentas = () => {
       if (cuentaError) throw cuentaError;
 
       // Delete related cash movements so the sale does not become a manual movement
-      const { error: cajaError } = await (supabase as any)
+      const { error: cajaError } = await supabase
         .from("caja_movimientos")
         .delete()
         .eq("venta_id", id);
@@ -359,7 +362,7 @@ export const useVentas = () => {
 
       // Las operaciones QR pertenecen a la venta. Deben eliminarse antes porque
       // su restriccion exige conservar una venta o un pedido asociado.
-      const { error: mercadoPagoError } = await (supabase as any)
+      const { error: mercadoPagoError } = await supabase
         .from("mercadopago_operaciones")
         .delete()
         .eq("venta_id", id);
@@ -421,9 +424,9 @@ export const useObtenerCAE = () => {
       if (error) {
         console.error('Error al invocar función:', error);
         let errorMessage = error.message || 'Error al obtener CAE';
-        const context = (error as any).context;
+        const context: unknown = error.context;
 
-        if (context && typeof context.json === "function") {
+        if (context instanceof Response) {
           try {
             const errorBody = await context.json();
             errorMessage = errorBody?.error || errorMessage;

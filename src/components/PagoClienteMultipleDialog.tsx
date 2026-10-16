@@ -55,7 +55,7 @@ export function PagoClienteMultipleDialog({
   onRecibo,
   initialPayment,
 }: Props) {
-  const { registrarPagosMixtos } = useCuentaCorriente();
+  const { registrarPagosMixtos } = useCuentaCorriente({ cargarMovimientos: false });
   const { toast } = useToast();
   const [solicitudId] = useState(() => crypto.randomUUID());
   const initialAmount = initialPayment?.monto || 0;

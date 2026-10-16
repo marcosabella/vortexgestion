@@ -50,7 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       isLoading,
       signOut: async () => {
-        await supabase.auth.signOut();
+        // Cada equipo mantiene su propia sesion; salir aqui no revoca las otras.
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error) throw error;
       },
     }),
     [isLoading, session],

@@ -51,7 +51,7 @@ interface VentasListProps {
 }
 
 export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {}) => {
-  const { ventas, isLoading, deleteVenta } = useVentas();
+  const { ventas, isLoading, deleteVenta } = useVentas({ ventaId: detalleId });
   const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
   const { comercio, isLoading: comercioLoading } = useComercio();

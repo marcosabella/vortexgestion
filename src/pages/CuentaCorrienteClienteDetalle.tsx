@@ -64,8 +64,8 @@ export default function CuentaCorrienteClienteDetalle() {
     deleteMovimiento,
     deleteVentaFromCuenta,
     eliminarPagoCliente,
-  } = useCuentaCorriente();
-  const resumenQuery = useResumenCuentaCorriente(true);
+  } = useCuentaCorriente({ cargarMovimientos: false });
+  const resumenQuery = useResumenCuentaCorriente(true, clienteId);
   const movimientosQuery = useMovimientosByCliente(clienteId || null);
   const [filtrarPeriodo, setFiltrarPeriodo] = useState(false);
   const [fechaDesde, setFechaDesde] = useState(currentMonthStart);

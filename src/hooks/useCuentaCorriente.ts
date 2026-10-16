@@ -43,7 +43,7 @@ const fetchAllPages = async <T,>(
   return rows;
 };
 
-export const useCuentaCorriente = () => {
+export const useCuentaCorriente = ({ cargarMovimientos = true } = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio();
@@ -56,7 +56,7 @@ export const useCuentaCorriente = () => {
     error,
   } = useQuery({
     queryKey: ["cuenta-corriente", comercioId],
-    enabled: Boolean(comercioId),
+    enabled: Boolean(comercioId) && cargarMovimientos,
     queryFn: async () => {
       const rows = await fetchAllPages<CuentaCorriente>((from, to) =>
         supabase
@@ -103,13 +103,13 @@ export const useCuentaCorriente = () => {
   };
 
   // Get account summary by client
-  const useResumenCuentaCorriente = (incluirSaldados = false) => {
+  const useResumenCuentaCorriente = (incluirSaldados = false, clienteId?: string) => {
     return useQuery({
-      queryKey: ["cuenta-corriente", comercioId, "resumen", incluirSaldados],
+      queryKey: ["cuenta-corriente", comercioId, "resumen", incluirSaldados, clienteId],
       enabled: Boolean(comercioId),
       queryFn: async () => {
-        const [movimientos, clientes] = await Promise.all([fetchAllPages((from, to) =>
-          supabase
+        const [movimientos, clientes] = await Promise.all([fetchAllPages((from, to) => {
+          let query = supabase
             .from("cuenta_corriente")
             .select(`
               id,
@@ -121,10 +121,16 @@ export const useCuentaCorriente = () => {
             `)
             .eq("comercio_id", comercioId!)
             .order("id", { ascending: true })
-            .range(from, to)
-        ), incluirSaldados ? fetchAllPages((from, to) => supabase.from("clientes")
-          .select("id,nombre,apellido,cuit,telefono")
-          .eq("comercio_id", comercioId!).order("id", { ascending: true }).range(from, to)) : Promise.resolve([])]);
+            .range(from, to);
+          if (clienteId) query = query.eq("cliente_id", clienteId);
+          return query;
+        }), incluirSaldados ? fetchAllPages((from, to) => {
+          let query = supabase.from("clientes")
+            .select("id,nombre,apellido,cuit,telefono")
+            .eq("comercio_id", comercioId!).order("id", { ascending: true }).range(from, to);
+          if (clienteId) query = query.eq("id", clienteId);
+          return query;
+        }) : Promise.resolve([])]);
 
         // Group by cliente_id and calculate totals
         const resumenMap = new Map<string, CuentaCorrienteResumen>();
