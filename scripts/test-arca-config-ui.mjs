@@ -1,0 +1,56 @@
+﻿import assert from 'node:assert/strict';
+import path from 'node:path';
+import { existsSync } from 'node:fs';
+import Module from 'node:module';
+import { build } from 'esbuild';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+// Local rendering with fictional tenants/issuers; never calls Supabase or ARCA.
+const repo=process.cwd();
+const fixture=`
+export const calls=[];
+export const handlers=[];
+export const issuer={id:'issuer-2',comercio_id:'tenant',cuit_emisor:'20222222223',razon_social:'Segundo emisor',punto_venta:7,ambiente:'produccion',situacion_afip:'Responsable Inscripto',domicilio:'Calle',localidad:'Ciudad',provincia:'Provincia',ingresos_brutos:'123',fecha_inicio_actividad:null,activo:true,predeterminado:true,certificado_vencimiento:'2030-01-01',tiene_certificados:true};
+const mutation={isPending:false,mutate:()=>{},mutateAsync:async()=>issuer.id};
+export const useGuardarEmisorFiscal=()=>mutation;
+export const useClaveEmisorFiscal=id=>({data:id?'-----BEGIN PRIVATE KEY-----\\nKEY-'+id+'\\n-----END PRIVATE KEY-----':null,isFetching:false,error:null});
+export const useCertificadoEmisorFiscal=id=>({data:id?'-----BEGIN CERTIFICATE-----\\nCERT-'+id+'\\n-----END CERTIFICATE-----':null,isFetching:false,error:null});
+export const useCreateAfipConfig=()=>mutation;
+export const useUpdateAfipConfig=()=>mutation;
+export const useConsultarUltimoComprobante=()=>({...mutation,reset:()=>{},mutate:args=>calls.push(args)});
+export const useNombreReceptorArca=()=>({});
+export const useComercio=()=>({comercio:{id:'tenant'}});
+export const useEmisoresFiscales=()=>({data:[issuer,{...issuer,id:'issuer-1',cuit_emisor:'20111111112',punto_venta:1,predeterminado:false}]});
+`;
+const result=await build({stdin:{contents:`export {ArcaConfig} from './src/components/ArcaConfig';export {EmisoresFiscalesConfig} from './src/components/EmisoresFiscalesConfig';export * from 'test-fixture';`,resolveDir:repo,loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic',plugins:[{name:'fixtures',setup(b){
+  b.onResolve({filter:/^react(?:\/.*)?$/},args=>({path:args.path,external:true}));
+  b.onResolve({filter:/^test-fixture$|^@\/hooks\/(useAfipConfig|useEmisoresFiscales|useConsultarUltimoComprobante|useComercio)$/},()=>({path:'hooks',namespace:'fixture'}));
+  b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js'}));
+  b.onResolve({filter:/^@\/components\/ui\/(tabs|button)$/},args=>({path:args.path,namespace:'ui'}));
+  b.onLoad({filter:/.*/,namespace:'ui'},args=>({loader:'jsx',contents:args.path.endsWith('/tabs')?`import React from 'react';export const Tabs=({children})=><div>{children}</div>;export const TabsList=Tabs;export const TabsContent=Tabs;export const TabsTrigger=({children})=><span>{children}</span>;`:`import React from 'react';import {handlers} from 'test-fixture';export const buttonVariants=()=>'';export const Button=({children,onClick,type='button',disabled})=>{handlers.push({children,onClick,disabled});return <button type={type} disabled={disabled}>{children}</button>};`}));
+  b.onResolve({filter:/^@\//},args=>{const base=path.join(repo,'src',args.path.slice(2));return {path:['','.tsx','.ts'].map(ext=>base+ext).find(p=>existsSync(p))};});
+}}]});
+const compiled=new Module(path.join(repo,'scripts','.arca-render.cjs'));compiled.filename=path.join(repo,'scripts','.arca-render.cjs');compiled.paths=Module._nodeModulePaths(path.join(repo,'scripts'));compiled._compile(result.outputFiles[0].text,compiled.filename);
+const {ArcaConfig,EmisoresFiscalesConfig,issuer,calls,handlers}=compiled.exports;
+const render=props=>{handlers.length=0;return renderToStaticMarkup(React.createElement(ArcaConfig,props));};
+const config={id:issuer.id,comercio_id:'tenant',punto_venta:7,cuit_emisor:issuer.cuit_emisor,ambiente:'produccion',activo:true,tiene_certificados:true,certificado_vencimiento:'2030-01-01'};
+let html=render({config,emisor:issuer,multiple:true});
+for(const label of ['Certificados','ltimo comprobante','Punto de Venta','CUIT Emisor','Consultar','Segundo emisor','guardados para este emisor'])assert.ok(html.includes(label),label);
+assert.match(html,/CERT-issuer-2/);
+assert.match(html,/KEY-issuer-2/);
+assert.doesNotMatch(html,/KEY-issuer-1/);
+assert.match(html,/<textarea[^>]*aria-label="Clave privada guardada del emisor"[^>]*readonly/);
+assert.match(html,/id="puntoVenta"[^>]*value="7"/);
+assert.doesNotMatch(html,/<input[^>]*id="(?:cuitEmisor|puntoVenta)"[^>]*disabled/);
+const consult=handlers.find(h=>h.onClick&&JSON.stringify(h.children).includes('Consultar'));
+assert.ok(consult,'Query action available using saved credential metadata');consult.onClick();
+assert.deepEqual(calls.pop(),{tipoComprobante:'factura_b',comercioId:'tenant',emisorFiscalId:issuer.id});
+html=render({config:{...config,certificado_crt:'saved-crt',certificado_key:'saved-key'}});
+handlers.find(h=>h.onClick&&JSON.stringify(h.children).includes('Consultar')).onClick();
+assert.equal(calls.pop().emisorFiscalId,undefined,'Single CUIT keeps legacy query');
+html=render({config:{...config,activo:false},emisor:{...issuer,activo:false},multiple:true});
+assert.ok(!handlers.some(h=>h.onClick&&JSON.stringify(h.children).includes('Consultar')),'Inactive issuer cannot query');
+html=render({config:null,multiple:true});assert.doesNotMatch(html,/KEY-issuer/);assert.match(html,/Razon social/);assert.match(html,/Guardar/);
+html=renderToStaticMarkup(React.createElement(EmisoresFiscalesConfig));assert.match(html,/CUIT a configurar/);assert.match(html,/Agregar emisor/);assert.match(html,/Segundo emisor/);
+console.log('OK ARCA UI: shared panels, editable CUIT/PV, saved credentials, exact selected issuer query, legacy query, inactive/new issuer and selector.');

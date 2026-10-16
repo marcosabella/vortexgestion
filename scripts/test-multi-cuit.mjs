@@ -76,6 +76,43 @@ try {
  sql(`SET app.test_comercio='${tenant}';SET app.test_admin='off';`);
  fails(`SET app.test_admin='off';SET ROLE authenticated;SELECT ${save(first)};`,'emisores_no_autorizado');
  console.log('OK ventas: numeración independiente, reintento idempotente, stock, cuenta corriente unificada, identidad inmutable, duplicados y permisos');
+ // ARCA configuration editing: local migration, no remote services.
+ sql(migration('20261016123000_arca_edicion_emisores.sql'));
+ sql(migration('20261016130000_arca_consultar_certificado_emisor.sql'));
+ assert.equal(sql(asUser+"SELECT consultar_certificado_emisor_fiscal('"+tenant+"','"+e1+"');").trim().replaceAll('\r\n','\n'),first.certificado_crt);
+ fails("SET app.test_admin='off';SET ROLE authenticated;SELECT consultar_certificado_emisor_fiscal('"+tenant+"','"+e1+"');",'emisores_no_autorizado');
+ fails("SET ROLE authenticated;SELECT consultar_certificado_emisor_fiscal('"+tenant+"','00000000-0000-0000-0000-000000000000');",'emisor_fiscal_no_disponible');
+ fails("SET app.test_comercio='"+foreignTenant+"';SET ROLE authenticated;SELECT consultar_certificado_emisor_fiscal('"+foreignTenant+"','"+e1+"');",'emisor_fiscal_no_disponible');
+ fails("SET ROLE anon;SELECT consultar_certificado_emisor_fiscal('"+tenant+"','"+e1+"');",'permission denied');
+ sql(migration('20261016133000_arca_consultar_clave_emisor.sql'));
+ assert.equal(sql(asUser+"SELECT consultar_clave_emisor_fiscal('"+tenant+"','"+e1+"');").trim().replaceAll('\r\n','\n'),first.certificado_key);
+ fails("SET app.test_admin='off';SET ROLE authenticated;SELECT consultar_clave_emisor_fiscal('"+tenant+"','"+e1+"');",'emisores_no_autorizado');
+ fails("SET ROLE authenticated;SELECT consultar_clave_emisor_fiscal('"+foreignTenant+"','"+e1+"');",'emisores_no_autorizado');
+ fails("SET app.test_comercio='"+foreignTenant+"';SET ROLE authenticated;SELECT consultar_clave_emisor_fiscal('"+foreignTenant+"','"+e1+"');",'emisor_fiscal_no_disponible');
+ fails("SET ROLE authenticated;SELECT consultar_clave_emisor_fiscal('"+tenant+"','00000000-0000-0000-0000-000000000000');",'emisor_fiscal_no_disponible');
+ fails("SET ROLE anon;SELECT consultar_clave_emisor_fiscal('"+tenant+"','"+e1+"');",'permission denied');
+ assert.ok(!sql(asUser+"SELECT listar_emisores_fiscales('"+tenant+"');").includes('PRIVATE KEY'),'General issuer list still excludes private keys');
+ const snapshotsBefore=sql('SELECT jsonb_agg(emisor_snapshot ORDER BY id) FROM ventas;');
+ const unused=sql(asUser+'SELECT '+save({...first,cuit_emisor:'20444444445',predeterminado:false})+';').trim();
+ const edited=sql(asUser+'SELECT '+save({...first,id:unused,cuit_emisor:'20555555556',punto_venta:9,predeterminado:false})+';').trim();
+ assert.equal(edited,unused,'Unused issuer can be edited in place');
+ assert.equal(sql(asUser+"SELECT listar_emisores_fiscales('"+tenant+"') @> '[{\"id\":\""+unused+"\",\"cuit_emisor\":\"20555555556\",\"punto_venta\":9,\"tiene_certificados\":true}]';").trim(),'t');
+ // A point-of-sale change on an issuer with sales keeps its former credentials available.
+ const revised=sql(asUser+'SELECT '+save({...first,id:e1,punto_venta:2})+';').trim();
+ assert.notEqual(revised,e1);
+ assertSQL("SELECT punto_venta=1 AND certificado_key IS NOT NULL FROM emisores_fiscales WHERE id='"+e1+"'",'old issuer preserved');
+ assertSQL("SELECT punto_venta=2 AND predeterminado FROM emisores_fiscales WHERE id='"+revised+"'",'new default issuer');
+ assertSQL("SELECT NOT predeterminado FROM emisores_fiscales WHERE id='"+e1+"'",'old default cleared');
+ assert.equal(sql('SELECT jsonb_agg(emisor_snapshot ORDER BY id) FROM ventas;'),snapshotsBefore);
+ const changed=sql(asUser+'SELECT '+save({...first,id:revised,cuit_emisor:'20666666667',certificado_crt:undefined,certificado_key:undefined,certificado_vencimiento:'2030-01-01'})+';').trim();
+ assertSQL("SELECT certificado_crt IS NULL AND certificado_key IS NULL AND certificado_vencimiento IS NULL FROM emisores_fiscales WHERE id='"+changed+"'",'credentials cleared for different CUIT');
+ sql(asUser+'SELECT '+save({...first,id:e2,cuit_emisor:'20222222223',predeterminado:false,eliminar_certificados:true})+';');
+ assertSQL("SELECT certificado_crt IS NULL AND certificado_key IS NULL FROM emisores_fiscales WHERE id='"+e2+"'",'explicit certificate removal');
+ fails("SET app.test_admin='off';SET ROLE authenticated;SELECT "+save({...first,id:revised})+';','emisores_no_autorizado');
+ fails("SET app.test_comercio='"+foreignTenant+"';SET ROLE authenticated;SELECT guardar_emisor_fiscal('"+foreignTenant+"',"+quote({...first,id:revised})+');','emisor_fiscal_no_disponible');
+ assert.equal(sql(asUser+"SELECT consultar_clave_emisor_fiscal('"+tenant+"','"+e2+"') IS NULL;").trim(),'t','Deleted key is not returned');
+ console.log('OK ARCA editing: identity changes, historical snapshots, old credentials, default, certificate replacement/removal and permissions');
+
 } finally {
  if(started)command('pg_ctl',['-D',dataDir,'-m','immediate','-w','stop']);
  const resolved=realpathSync(cluster);if(!resolved.startsWith(tempRoot+path.sep)||!path.basename(resolved).startsWith('vortex-multi-cuit-test-'))throw Error('Ruta temporal no segura');

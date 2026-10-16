@@ -1,0 +1,859 @@
+import { useState, useEffect, useRef } from 'react';
+import { useCreateAfipConfig, useUpdateAfipConfig } from '@/hooks/useAfipConfig';
+import { useConsultarUltimoComprobante, useNombreReceptorArca } from '@/hooks/useConsultarUltimoComprobante';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { AMBIENTES_AFIP, TIPOS_COMPROBANTE } from '@/types/afip';
+import { FileKey, Save, RefreshCw, CheckCircle, Folder, Search, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { extractCertificateExpirationDate } from '@/utils/certificate';
+import { useComercio } from '@/hooks/useComercio';
+import { useCertificadoEmisorFiscal, useClaveEmisorFiscal, useGuardarEmisorFiscal } from '@/hooks/useEmisoresFiscales';
+import type { EmisorFiscal } from '@/types/emisorFiscal';
+import type { AfipConfig } from '@/types/afip';
+import { SITUACIONES_AFIP } from '@/types/cliente';
+
+export const ArcaConfig = ({ config, emisor, multiple = false, onSaved }: { config: AfipConfig | null; emisor?: EmisorFiscal; multiple?: boolean; onSaved?: (id: string) => void }) => {
+  const guardarEmisor = useGuardarEmisorFiscal();
+  const certificadoGuardado = useCertificadoEmisorFiscal(multiple ? emisor?.id : undefined);
+  const claveGuardada = useClaveEmisorFiscal(multiple ? emisor?.id : undefined);
+  const [razonSocial, setRazonSocial] = useState(emisor?.razon_social || '');
+  const [situacionAfip, setSituacionAfip] = useState(emisor?.situacion_afip || '');
+  const [predeterminado, setPredeterminado] = useState(emisor?.predeterminado ?? false);
+  const [datosFiscales, setDatosFiscales] = useState({ domicilio: emisor?.domicilio || '', localidad: emisor?.localidad || '', provincia: emisor?.provincia || '', ingresos_brutos: emisor?.ingresos_brutos || '', fecha_inicio_actividad: emisor?.fecha_inicio_actividad || null });
+  const createConfig = useCreateAfipConfig();
+  const updateConfig = useUpdateAfipConfig();
+  const consultarUltimo = useConsultarUltimoComprobante();
+  const { comercio } = useComercio();
+  const { reset: resetConsultarUltimo } = consultarUltimo;
+
+  const [puntoVenta, setPuntoVenta] = useState<number | ''>(config?.punto_venta ?? '');
+  const [cuitEmisor, setCuitEmisor] = useState(config?.cuit_emisor || '');
+  const [ambiente, setAmbiente] = useState<'homologacion' | 'produccion'>(config?.ambiente || 'homologacion');
+  const [certificadoCrt, setCertificadoCrt] = useState(config?.certificado_crt || '');
+  const [certificadoKey, setCertificadoKey] = useState(config?.certificado_key || '');
+  const [nombreCertificadoCrt, setNombreCertificadoCrt] = useState(config?.nombre_certificado_crt || '');
+  const [nombreCertificadoKey, setNombreCertificadoKey] = useState(config?.nombre_certificado_key || '');
+  const [certificadoVencimiento, setCertificadoVencimiento] = useState(config?.certificado_vencimiento || '');
+  const [activo, setActivo] = useState(config?.activo ?? true);
+  const [crtError, setCrtError] = useState('');
+  const [keyError, setKeyError] = useState('');
+  const [tipoComprobanteConsulta, setTipoComprobanteConsulta] = useState('factura_b');
+  const [showResultDialog, setShowResultDialog] = useState(false);
+  const [resultadoConsulta, setResultadoConsulta] = useState<{
+    comercioId?: string;
+    ultimoNumero?: number;
+    puntoVenta?: number;
+    tipoComprobante?: string;
+    ambiente?: string;
+    fechaEmision?: string;
+    importeTotal?: number;
+    importeNeto?: number;
+    importeIVA?: number;
+    cuitReceptor?: string;
+    tipoDocReceptor?: number;
+    cae?: string;
+    caeVencimiento?: string;
+  } | null>(null);
+
+  const nombreReceptor = useNombreReceptorArca(
+    comercio?.id,
+    resultadoConsulta?.cuitReceptor,
+    resultadoConsulta?.tipoDocReceptor,
+    showResultDialog && resultadoConsulta?.comercioId === comercio?.id,
+  );
+
+  const certificadosGuardados = multiple ? Boolean(emisor?.tiene_certificados) : Boolean(config?.certificado_crt && config?.certificado_key);
+  const puedeConsultar = Boolean(config?.id && config.activo && certificadosGuardados);
+  const guardando = createConfig.isPending || updateConfig.isPending || guardarEmisor.isPending;
+
+  const inputCrtRef = useRef<HTMLInputElement>(null);
+  const inputKeyRef = useRef<HTMLInputElement>(null);
+  const currentComercioIdRef = useRef<string | null>(comercio?.id ?? null);
+
+  const updateCertificadoCrt = (content: string) => {
+    setCertificadoCrt(content);
+    setCrtError('');
+
+    if (!content.trim()) {
+      setCertificadoVencimiento('');
+      return;
+    }
+
+    try {
+      setCertificadoVencimiento(extractCertificateExpirationDate(content));
+    } catch (error) {
+      setCertificadoVencimiento('');
+      setCrtError(error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado');
+    }
+  };
+
+  useEffect(() => {
+    if (config) {
+      setPuntoVenta(config.punto_venta);
+      setCuitEmisor(config.cuit_emisor);
+      setAmbiente(config.ambiente);
+      updateCertificadoCrt(config.certificado_crt || '');
+      if (multiple) setCertificadoVencimiento(config.certificado_vencimiento || '');
+      setCertificadoKey(config.certificado_key || '');
+      setNombreCertificadoCrt(config.nombre_certificado_crt || '');
+      setNombreCertificadoKey(config.nombre_certificado_key || '');
+      setActivo(config.activo ?? true);
+      return;
+    }
+
+    setPuntoVenta('');
+    setCuitEmisor('');
+    setAmbiente('homologacion');
+    setCertificadoCrt('');
+    setCertificadoKey('');
+    setNombreCertificadoCrt('');
+    setNombreCertificadoKey('');
+    setCertificadoVencimiento('');
+    setActivo(true);
+    setCrtError('');
+    setKeyError('');
+  }, [config, multiple]);
+
+  useEffect(() => {
+    currentComercioIdRef.current = comercio?.id ?? null;
+    setResultadoConsulta(null);
+    setShowResultDialog(false);
+    resetConsultarUltimo();
+    return () => { currentComercioIdRef.current = null; };
+  }, [comercio?.id, resetConsultarUltimo]);
+
+  const handleCrtFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setCrtError('');
+
+    if (!file) return;
+
+    if (!file.name.endsWith('.crt')) {
+      setCrtError('El archivo debe tener extensión .crt');
+      return;
+    }
+
+    if (file.size > 100 * 1024) {
+      setCrtError('El archivo no puede exceder 100 KB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      updateCertificadoCrt(content);
+      setNombreCertificadoCrt(file.name);
+    };
+    reader.onerror = () => {
+      setCrtError('Error al leer el archivo');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleKeyFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setKeyError('');
+
+    if (!file) return;
+
+    if (!file.name.endsWith('.key')) {
+      setKeyError('El archivo debe tener extensión .key');
+      return;
+    }
+
+    if (file.size > 100 * 1024) {
+      setKeyError('El archivo no puede exceder 100 KB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setCertificadoKey(content);
+      setNombreCertificadoKey(file.name);
+    };
+    reader.onerror = () => {
+      setKeyError('Error al leer el archivo');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const cuitNormalizado = cuitEmisor.replace(/\D/g, '');
+    if (cuitNormalizado.length !== 11) {
+      toast.error('El CUIT debe contener exactamente 11 dígitos.');
+      return;
+    }
+
+    if (typeof puntoVenta !== 'number' || !Number.isInteger(puntoVenta) || puntoVenta < 1 || puntoVenta > 9999) {
+      toast.error('El punto de venta debe ser un entero entre 1 y 9999.');
+      return;
+    }
+
+    let vencimientoCertificado = certificadoVencimiento || config?.certificado_vencimiento || null;
+    if (certificadoCrt.trim()) {
+      try {
+        vencimientoCertificado = extractCertificateExpirationDate(certificadoCrt);
+        setCertificadoVencimiento(vencimientoCertificado);
+        setCrtError('');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudo leer el vencimiento del certificado';
+        setCrtError(message);
+        toast.error(message);
+        return;
+      }
+    }
+
+    const certificadoCrtGuardado = certificadoCrt.trim() || config?.certificado_crt || null;
+    const certificadoKeyGuardada = certificadoKey.trim() || config?.certificado_key || null;
+    const configData = {
+      punto_venta: puntoVenta,
+      cuit_emisor: cuitNormalizado,
+      ambiente,
+      certificado_crt: certificadoCrtGuardado,
+      certificado_key: certificadoKeyGuardada,
+      nombre_certificado_crt: nombreCertificadoCrt || config?.nombre_certificado_crt || null,
+      nombre_certificado_key: nombreCertificadoKey || config?.nombre_certificado_key || null,
+      certificado_vencimiento: vencimientoCertificado,
+      certificado_vigente: vencimientoCertificado
+        ? new Date(`${vencimientoCertificado}T23:59:59`).getTime() >= Date.now()
+        : null,
+      activo,
+    };
+
+    if (multiple) {
+      if (!razonSocial.trim() || !SITUACIONES_AFIP.some(s => s === situacionAfip)) {
+        toast.error('Ingrese razon social y condicion frente a ARCA.'); return;
+      }
+      try {
+        const id = await guardarEmisor.mutateAsync({
+          ...(emisor || {}), ...datosFiscales,
+          razon_social: razonSocial.trim(), situacion_afip: situacionAfip, predeterminado: activo && predeterminado,
+          cuit_emisor: cuitNormalizado, punto_venta: puntoVenta, ambiente, activo,
+          certificado_vencimiento: vencimientoCertificado,
+          ...(certificadoCrt.trim() ? { certificado_crt: certificadoCrt.trim() } : {}),
+          ...(certificadoKey.trim() ? { certificado_key: certificadoKey.trim() } : {}),
+        });
+        setCertificadoCrt(''); setCertificadoKey('');
+        toast.success('Configuracion ARCA guardada');
+        if (id) onSaved?.(id);
+      } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo guardar el emisor'); }
+      return;
+    }
+    if (config?.id) {
+      updateConfig.mutate({ id: config.id, ...configData });
+    } else {
+      createConfig.mutate(configData);
+    }
+  };
+
+  const handleDeleteCertificates = () => {
+    if (!config?.id) return;
+
+    if (multiple && emisor) {
+      guardarEmisor.mutate({ ...emisor, eliminar_certificados: true }, {
+        onSuccess: () => { setCertificadoCrt(''); setCertificadoKey(''); toast.success('Certificados eliminados'); },
+        onError: (error) => toast.error(error.message),
+      }); return;
+    }
+    updateConfig.mutate(
+      {
+        id: config.id,
+        certificado_crt: null,
+        certificado_key: null,
+        nombre_certificado_crt: null,
+        nombre_certificado_key: null,
+        certificado_vencimiento: null,
+        certificado_vigente: null,
+      },
+      {
+        onSuccess: () => {
+          setCertificadoCrt('');
+          setCertificadoKey('');
+          setNombreCertificadoCrt('');
+          setNombreCertificadoKey('');
+          setCertificadoVencimiento('');
+          setCrtError('');
+          setKeyError('');
+          if (inputCrtRef.current) inputCrtRef.current.value = '';
+          if (inputKeyRef.current) inputKeyRef.current.value = '';
+        },
+      }
+    );
+  };
+
+  const handleConsultarUltimo = () => {
+    setResultadoConsulta(null);
+    setShowResultDialog(false);
+
+    if (!comercio?.id) {
+      toast.error('Debe seleccionar un comercio antes de consultar');
+      return;
+    }
+
+    if (!puedeConsultar) {
+      toast.error('Para consultar ARCA debés guardar la configuración y cargar certificado y clave privada.');
+      return;
+    }
+    const requestedComercioId = comercio.id;
+
+    consultarUltimo.mutate(
+      { tipoComprobante: tipoComprobanteConsulta, comercioId: requestedComercioId, emisorFiscalId: multiple ? emisor?.id : undefined },
+      {
+        onSuccess: (data) => {
+          const activeComercioId = currentComercioIdRef.current;
+
+          if (activeComercioId !== requestedComercioId || (data.comercioId && data.comercioId !== requestedComercioId)) {
+            toast.error('La respuesta no corresponde al comercio seleccionado');
+            return;
+          }
+
+          setResultadoConsulta(data);
+          setShowResultDialog(true);
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
+            <FileKey className="h-8 w-8" />
+            Configuración ARCA
+          </h1>
+          <p className="text-muted-foreground">
+            Configure los parámetros de conexión con ARCA para facturación electrónica
+          </p>
+        </div>
+
+        <Tabs defaultValue="configuracion" className="space-y-4">
+          <TabsList aria-label="Secciones de ARCA" className="grid h-auto w-full grid-cols-3">
+            <TabsTrigger value="configuracion" className="px-1 text-xs sm:px-3 sm:text-sm">Configuración</TabsTrigger>
+            <TabsTrigger value="certificados" className="px-1 text-xs sm:px-3 sm:text-sm">Certificados</TabsTrigger>
+            <TabsTrigger value="ultimo-comprobante" className="px-1 text-xs sm:px-3 sm:text-sm">Último comprobante</TabsTrigger>
+          </TabsList>
+          <TabsContent value="configuracion">
+        <Card>
+          <CardHeader>
+            <CardTitle>Datos de Configuración</CardTitle>
+            <CardDescription>
+              Ingrese los datos necesarios para la integración con ARCA
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {multiple && <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label htmlFor="razonSocial">Razon social *</Label><Input id="razonSocial" value={razonSocial} onChange={e => setRazonSocial(e.target.value)} required /></div>
+                <div className="space-y-2"><Label htmlFor="situacionEmisor">Condicion frente a ARCA *</Label><Select value={situacionAfip} onValueChange={setSituacionAfip}><SelectTrigger id="situacionEmisor"><SelectValue placeholder="Seleccionar condicion" /></SelectTrigger><SelectContent>{SITUACIONES_AFIP.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                {(['domicilio', 'localidad', 'provincia', 'ingresos_brutos', 'fecha_inicio_actividad'] as const).map(field => <div key={field} className="space-y-2"><Label htmlFor={field}>{{ domicilio: 'Domicilio fiscal', localidad: 'Localidad', provincia: 'Provincia', ingresos_brutos: 'Ingresos brutos', fecha_inicio_actividad: 'Inicio de actividades' }[field]}</Label><Input id={field} type={field === 'fecha_inicio_actividad' ? 'date' : 'text'} value={datosFiscales[field] || ''} onChange={e => setDatosFiscales(current => ({ ...current, [field]: e.target.value || (field === 'fecha_inicio_actividad' ? null : '') }))} /></div>)}
+                <Label className="flex items-center gap-2"><Switch checked={predeterminado} disabled={!activo} onCheckedChange={setPredeterminado} />Emisor predeterminado</Label>
+                <p className="text-sm text-muted-foreground sm:col-span-2">Si cambia CUIT, punto de venta o ambiente de un emisor con ventas, se conserva la configuracion anterior para esos comprobantes y se crea una nueva. Al cambiar CUIT o ambiente debe cargar sus certificados.</p>
+              </div>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="puntoVenta">Punto de Venta *</Label>
+                  <Input
+                    id="puntoVenta"
+                    type="number"
+                    min="1"
+                    max="9999"
+                    step="1"
+                    value={puntoVenta}
+                    onChange={(e) => setPuntoVenta(e.target.value === '' ? '' : Number(e.target.value))}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Número asignado por ARCA (1-9999)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cuitEmisor">CUIT Emisor *</Label>
+                  <Input
+                    id="cuitEmisor"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{11}"
+                    maxLength={11}
+                    placeholder="11 dígitos"
+                    value={cuitEmisor}
+                    onChange={(e) => setCuitEmisor(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Debe contener 11 dígitos.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ambiente">Ambiente *</Label>
+                  <Select
+                    value={ambiente}
+                    onValueChange={(value) => setAmbiente(value as 'homologacion' | 'produccion')}
+                  >
+                    <SelectTrigger id="ambiente">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AMBIENTES_AFIP.map((amb) => (
+                        <SelectItem key={amb.value} value={amb.value}>
+                          {amb.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Homologación para pruebas, Producción para facturas reales</p>
+                </div>
+
+                <div className="space-y-2 flex items-center justify-between">
+                  <Label htmlFor="activo">Configuración Activa</Label>
+                  <Switch
+                    id="activo"
+                    checked={activo}
+                    onCheckedChange={setActivo}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  variant="success"
+                  disabled={guardando}
+                >
+                  {guardando ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      {config?.id ? 'Actualizar' : 'Guardar'} Configuración
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+          </TabsContent>
+          <TabsContent value="certificados">
+            <Card>
+              <CardHeader>
+                <CardTitle>Certificados Digitales</CardTitle>
+                <CardDescription>Cargue el certificado y la clave privada para operar con ARCA. {multiple && "Cargue archivos para reemplazar los certificados guardados."}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-6">
+                {multiple && certificadosGuardados && <p role="status" className="text-sm text-muted-foreground">Certificado y clave privada guardados para este emisor.</p>}
+                <Alert className="mb-4">
+                  <FileKey className="h-4 w-4" />
+                  <AlertDescription>
+                    Opcional para guardar CUIT y punto de venta. Se requieren ambos únicamente al solicitar CAE.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="certificadoVencimiento">Vencimiento del certificado</Label>
+                    <Input
+                      id="certificadoVencimiento"
+                      type="date"
+                      value={certificadoVencimiento || ''}
+                      disabled
+                    />
+                    <p className="text-xs text-muted-foreground">Se obtiene automaticamente del archivo .crt cargado</p>
+                  </div>
+                  {certificadoVencimiento && (
+                    <div className="space-y-2">
+                      <Label>Estado del certificado</Label>
+                      <div>
+                        <Badge
+                          variant={new Date(`${certificadoVencimiento}T23:59:59`).getTime() >= Date.now() ? "outline" : "destructive"}
+                        >
+                          {new Date(`${certificadoVencimiento}T23:59:59`).getTime() >= Date.now() ? "Vigente" : "Vencido"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-6">
+                  <div className="space-y-3 p-4 border-2 border-dashed rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="crtFile" className="text-base font-semibold">Certificado Digital (.crt)</Label>
+                        {nombreCertificadoCrt && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              {nombreCertificadoCrt}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <input
+                      ref={inputCrtRef}
+                      id="crtFile"
+                      type="file"
+                      accept=".crt"
+                      onChange={handleCrtFileUpload}
+                      className="hidden"
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => inputCrtRef.current?.click()}
+                    >
+                      <Folder className="h-4 w-4 mr-2" />
+                      Buscar archivo .crt
+                    </Button>
+
+                    {crtError && (
+                      <p className="text-sm text-destructive">{crtError}</p>
+                    )}
+
+                    {multiple && !certificadoCrt && certificadoGuardado.isFetching && <p role="status" className="text-sm text-muted-foreground">Cargando certificado guardado...</p>}
+                    {multiple && !certificadoCrt && certificadoGuardado.error && <p role="alert" className="text-sm text-destructive">No se pudo leer el certificado guardado: {certificadoGuardado.error.message}</p>}
+                    {multiple && !certificadoCrt && certificadoGuardado.data && (
+                      <Textarea aria-label="Certificado guardado del emisor" value={certificadoGuardado.data} readOnly rows={4} className="font-mono text-xs" />
+                    )}
+                    {certificadoCrt && (
+                      <Textarea
+                        value={certificadoCrt}
+                        onChange={(e) => updateCertificadoCrt(e.target.value)}
+                        rows={4}
+                        className="font-mono text-xs"
+                        placeholder="Contenido del certificado..."
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-3 p-4 border-2 border-dashed rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="keyFile" className="text-base font-semibold">Clave Privada (.key)</Label>
+                        {nombreCertificadoKey && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              {nombreCertificadoKey}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <input
+                      ref={inputKeyRef}
+                      id="keyFile"
+                      type="file"
+                      accept=".key"
+                      onChange={handleKeyFileUpload}
+                      className="hidden"
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => inputKeyRef.current?.click()}
+                    >
+                      <Folder className="h-4 w-4 mr-2" />
+                      Buscar archivo .key
+                    </Button>
+
+                    {keyError && (
+                      <p className="text-sm text-destructive">{keyError}</p>
+                    )}
+
+                    {multiple && !certificadoKey && claveGuardada.isFetching && <p role="status" className="text-sm text-muted-foreground">Cargando clave privada guardada...</p>}
+                    {multiple && !certificadoKey && claveGuardada.error && <p role="alert" className="text-sm text-destructive">No se pudo leer la clave privada guardada: {claveGuardada.error.message}</p>}
+                    {multiple && !certificadoKey && claveGuardada.data && (
+                      <Textarea aria-label="Clave privada guardada del emisor" value={claveGuardada.data} readOnly rows={4} className="font-mono text-xs" />
+                    )}
+                    {certificadoKey && (
+                      <Textarea
+                        value={certificadoKey}
+                        onChange={(e) => setCertificadoKey(e.target.value)}
+                        rows={4}
+                        className="font-mono text-xs"
+                        placeholder="Contenido de la clave..."
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  variant="success"
+                  disabled={guardando}
+                >
+                  {guardando ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      {config?.id ? 'Actualizar' : 'Guardar'} Configuración
+                    </>
+                  )}
+                </Button>
+                {config?.id && (certificadosGuardados || certificadoCrt || certificadoKey) && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={guardando}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar certificados
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar los certificados de ARCA?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Se eliminarán permanentemente el certificado CRT y la clave privada KEY. La configuración fiscal se conservará, pero no podrá emitir comprobantes hasta cargar y guardar certificados nuevos.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteCertificates}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Eliminar certificados
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+          </TabsContent>
+          <TabsContent value="ultimo-comprobante">
+        {puedeConsultar && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Consultar Último Comprobante</CardTitle>
+              <CardDescription>
+                Obtenga el último número de comprobante autorizado por ARCA según punto de venta y tipo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipoComprobanteConsulta">Tipo de Comprobante</Label>
+                    <Select value={tipoComprobanteConsulta} onValueChange={setTipoComprobanteConsulta}>
+                      <SelectTrigger id="tipoComprobanteConsulta">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_COMPROBANTE.filter(t =>
+                          t.value.includes('factura') ||
+                          t.value.includes('nota_credito') ||
+                          t.value.includes('nota_debito')
+                        ).map((tipo) => (
+                          <SelectItem key={tipo.value} value={tipo.value}>
+                            {tipo.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Punto de Venta Configurado</Label>
+                    <Input value={config?.punto_venta ?? ''} disabled />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleConsultarUltimo}
+                  disabled={consultarUltimo.isPending}
+                  className="w-full md:w-auto"
+                >
+                  {consultarUltimo.isPending ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Consultando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Consultar Último Número
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+            {!puedeConsultar && (
+              <Alert>
+                <FileKey className="h-4 w-4" />
+                <AlertDescription>Guarde la configuración y cargue el certificado y la clave privada para consultar el último comprobante.</AlertDescription>
+              </Alert>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Resultado de Consulta AFIP
+              </DialogTitle>
+              <DialogDescription>
+                Detalles del último comprobante autorizado
+              </DialogDescription>
+            </DialogHeader>
+
+            {resultadoConsulta && (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Último Número</p>
+                    <p className="text-5xl font-bold text-primary">
+                      {resultadoConsulta.ultimoNumero}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Punto de Venta</p>
+                    <p className="text-lg font-semibold">{resultadoConsulta.puntoVenta}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Ambiente</p>
+                    <Badge variant={resultadoConsulta.ambiente === 'produccion' ? 'default' : 'secondary'}>
+                      {resultadoConsulta.ambiente === 'produccion' ? 'Producción' : 'Homologación'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="text-center pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">Tipo de Comprobante</p>
+                  <p className="text-base font-medium">
+                    {TIPOS_COMPROBANTE.find(t => t.value === resultadoConsulta.tipoComprobante)?.label || resultadoConsulta.tipoComprobante}
+                  </p>
+                </div>
+
+                {resultadoConsulta.ultimoNumero && resultadoConsulta.ultimoNumero > 0 && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                      {resultadoConsulta.importeTotal !== undefined && (
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Importe Total</p>
+                          <p className="text-xl font-bold text-green-600">
+                            ${resultadoConsulta.importeTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )}
+                      {resultadoConsulta.cuitReceptor && (
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">
+                            {resultadoConsulta.tipoDocReceptor === 80 ? 'CUIT Receptor' :
+                             resultadoConsulta.tipoDocReceptor === 96 ? 'DNI Receptor' :
+                             resultadoConsulta.tipoDocReceptor === 99 ? 'Consumidor Final' : 'Doc. Receptor'}
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {resultadoConsulta.cuitReceptor === '0' ? 'Sin identificar' : resultadoConsulta.cuitReceptor}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {resultadoConsulta.tipoDocReceptor === 80 && resultadoConsulta.cuitReceptor?.replace(/\D/g, '').length === 11 && (
+                      <div className="text-center pt-2">
+                        <p className="text-sm text-muted-foreground">Nombre / Razón social del receptor</p>
+                        <p className="text-base font-medium">
+                          {nombreReceptor.isFetching ? 'Consultando padrón de ARCA...' : nombreReceptor.data?.nombre || 'No disponible en el padrón'}
+                        </p>
+                        {nombreReceptor.data?.advertencia && (
+                          <p className="text-xs text-muted-foreground">{nombreReceptor.data.advertencia}</p>
+                        )}
+                        {nombreReceptor.isError && (
+                          <Button variant="outline" size="sm" className="mt-2" onClick={() => nombreReceptor.refetch()}>Reintentar consulta del padrón</Button>
+                        )}
+                      </div>
+                    )}
+
+                    {resultadoConsulta.fechaEmision && (
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Fecha Emisión</p>
+                          <p className="text-base font-medium">{resultadoConsulta.fechaEmision.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1')}</p>
+                        </div>
+                        {resultadoConsulta.cae && (
+                          <div className="text-center">
+                            <p className="text-sm text-muted-foreground">CAE</p>
+                            <p className="text-sm font-mono">{resultadoConsulta.cae}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {resultadoConsulta.ultimoNumero === 0 && (
+                  <div className="text-center pt-4 border-t">
+                    <p className="text-sm text-muted-foreground italic">
+                      No hay comprobantes emitidos de este tipo
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button onClick={() => setShowResultDialog(false)} variant="cancel" className="w-full">
+                <X className="mr-2 h-4 w-4" />
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+};

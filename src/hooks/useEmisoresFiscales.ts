@@ -22,6 +22,39 @@ export function useEmisoresFiscales(enabled = true) {
   });
 }
 
+export function useCertificadoEmisorFiscal(emisorId?: string) {
+  const { comercio } = useComercio();
+  return useQuery({
+    queryKey: ["certificado-emisor-fiscal", comercio?.id, emisorId],
+    enabled: Boolean(comercio?.id && emisorId),
+    gcTime: 0,
+    queryFn: async () => {
+      const { data, error } = await rpcEmisorFiscal<string>("consultar_certificado_emisor_fiscal", {
+        p_comercio_id: comercio!.id, p_emisor_id: emisorId,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+}
+
+export function useClaveEmisorFiscal(emisorId?: string) {
+  const { comercio } = useComercio();
+  return useQuery({
+    queryKey: ["clave-emisor-fiscal", comercio?.id, emisorId],
+    enabled: Boolean(comercio?.id && emisorId),
+    gcTime: 0,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await rpcEmisorFiscal<string>("consultar_clave_emisor_fiscal", {
+        p_comercio_id: comercio!.id, p_emisor_id: emisorId,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+}
+
 export function useGuardarEmisorFiscal() {
   const { comercio } = useComercio();
   const client = useQueryClient();
@@ -32,6 +65,6 @@ export function useGuardarEmisorFiscal() {
       if (error) throw new Error(error.message);
       return data;
     },
-    onSuccess: () => { client.invalidateQueries({ queryKey: ["emisores-fiscales"] }); client.invalidateQueries({ queryKey: ["afip-config"] }); },
+    onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: ["emisores-fiscales"] }), client.invalidateQueries({ queryKey: ["afip-config"] }), client.invalidateQueries({ queryKey: ["certificado-emisor-fiscal"] }), client.invalidateQueries({ queryKey: ["clave-emisor-fiscal"] })]); },
   });
 }
