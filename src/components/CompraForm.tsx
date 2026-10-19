@@ -33,6 +33,7 @@ import { useProductos } from "@/hooks/useProductos";
 import { useProveedores } from "@/hooks/useProveedores";
 import type { Compra } from "@/types/compra";
 import type { Producto } from "@/types/producto";
+import { compraItemTotal } from "@/utils/compraTotales";
 
 const today = () =>
   new Date().toLocaleDateString("en-CA", {
@@ -61,20 +62,7 @@ const formatComprobante = (value: string) => {
     ? `${digits.slice(0, 4)}-${digits.slice(4)}`
     : digits;
 };
-const roundMoney = (value: number) =>
-  Math.round((value + Number.EPSILON) * 100) / 100;
-const itemTotal = (item: CompraNuevaItem) => {
-  const raw = Number(item.cantidad_solicitada || 0) *
-    Number(item.costo_unitario || 0);
-  const discount = Math.min(
-    raw,
-    raw * Number(item.porcentaje_descuento || 0) / 100 +
-      Number(item.monto_descuento || 0),
-  );
-  const surcharge = raw * Number(item.porcentaje_recargo || 0) / 100 +
-    Number(item.monto_recargo || 0);
-  return roundMoney(Math.max(raw - discount + surcharge, 0));
-};
+const itemTotal = compraItemTotal;
 
 type CompraFormProps = {
   compra?: Compra;
@@ -296,7 +284,7 @@ export default function CompraForm(
                   <TableHead>Producto</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Cantidad</TableHead>
-                  <TableHead>Costo unitario</TableHead>
+                  <TableHead>Costo unitario sin IVA</TableHead>
                   <TableHead>Desc. %</TableHead>
                   <TableHead>Desc. $</TableHead>
                   <TableHead>Rec. %</TableHead>
@@ -483,7 +471,7 @@ export default function CompraForm(
                       />
                     </div>
                     <div>
-                      <Label>Costo unit.</Label>
+                      <Label>Costo sin IVA</Label>
                       <Input
                         type="number"
                         min="0"

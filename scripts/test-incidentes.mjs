@@ -18,6 +18,26 @@ function load(file, dependencies = {}) {
 }
 
 const monitor = load('src/utils/incidentes.ts');
+const agrupador = load('src/utils/agruparIncidentes.ts');
+const base = { id: '1', comercio_id: 'c1', modulo: 'ventas', origen: 'consulta', codigo: null,
+  mensaje: 'Failed to fetch dynamically imported module: [URL]', creado_en: '2026-10-16T14:43:19Z',
+  estado: 'resuelto', ruta: '/ventas', notas: '', user_id: 'u1' };
+const repetidos = [base, { ...base, id: '2', creado_en: '2026-10-16T14:47:14Z', estado: 'pendiente', user_id: 'u2', ruta: '/ventas/:id' }];
+const grupos = agrupador.agruparIncidentes([
+  ...repetidos,
+  { ...base, id: '3', comercio_id: 'c2' },
+  { ...base, id: '4', mensaje: 'No se pudo generar el PDF' },
+  { ...base, id: '5', modulo: 'compras' },
+  { ...base, id: '6', origen: 'aviso' },
+  { ...base, id: '7', codigo: 'ERROR' },
+]);
+assert.equal(grupos.length, 6, 'No debe mezclar comercios, errores, módulos, orígenes ni códigos');
+assert.equal(grupos[0].id, '2');
+assert.equal(grupos[0].ocurrencias.length, 2);
+assert.equal(grupos[0].primeraOcurrencia, base.creado_en);
+assert.equal(grupos[0].ocurrencias[1].estado, 'resuelto', 'Debe conservar el seguimiento de cada aparición');
+assert.equal(repetidos[0].id, '1', 'No debe reordenar los datos originales');
+assert.equal(agrupador.agruparIncidentes([]).length, 0);
 assert.equal(monitor.contextoRutaIncidente('/compras/123456/editar?token=secret#abc').ruta, '/compras/:id/editar');
 assert.equal(monitor.contextoRutaIncidente('/compras/nueva').modulo, 'compras');
 assert.equal(monitor.contextoRutaIncidente('/admin/incidentes'), null);
@@ -92,9 +112,11 @@ const queries = [];
 const mutations = [];
 const filters = [];
 let adminRpcCalls = 0;
+let pageRange = [0, 499];
+const registrosListado = Array.from({ length: 551 }, (_, index) => ({ ...base, id: String(index) }));
 const builder = new Proxy({}, { get: (_target, name) => {
-  if (name === 'then') return (resolve) => resolve({ data: [], error: null, count: 0 });
-  return (...args) => { filters.push([name, ...args]); return builder; };
+  if (name === 'then') return (resolve) => resolve({ data: registrosListado.slice(pageRange[0], pageRange[1] + 1), error: null, count: registrosListado.length });
+  return (...args) => { filters.push([name, ...args]); if (name === 'range') pageRange = args; return builder; };
 } });
 const hook = load('src/hooks/useIncidentes.ts', {
   '@tanstack/react-query': {
@@ -103,19 +125,25 @@ const hook = load('src/hooks/useIncidentes.ts', {
     useQueryClient: () => ({ invalidateQueries() {} }),
   },
   '@/integrations/supabase/client': { supabase: { from: () => builder, rpc: async () => { adminRpcCalls++; return { error: null }; } } },
-  '@/utils/fetchMasterRecords': {},
+  '@/utils/fetchMasterRecords': load('src/utils/fetchMasterRecords.ts'),
+  '@/utils/agruparIncidentes': agrupador,
 });
 const rango = hook.rangoFechasIncidentes('2026-10-01', '2026-10-15');
 assert.equal(rango.inicio, '2026-10-01T00:00:00-03:00');
 assert.equal(rango.fin, '2026-10-16T03:00:00.000Z');
 const filtros = { comercioId: 'comercio-1', modulo: 'compras', estado: 'pendiente', desde: '2026-10-01', hasta: '2026-10-15', pagina: 2 };
 hook.useIncidentes(filtros, true);
-await queries[1].queryFn();
+const listadoAgrupado = await queries[1].queryFn();
+assert.equal(listadoAgrupado.total, 1);
+assert.equal(listadoAgrupado.totalOcurrencias, 551);
+assert.equal(listadoAgrupado.incidentes[0].ocurrencias.length, 551, 'Debe agrupar más allá de la primera página del servidor');
+assert.equal('pagina' in queries[1].queryKey[1], false, 'Cambiar de página no debe volver a cargar todos los registros');
 assert.ok(filters.some(([name, field, value]) => name === 'eq' && field === 'comercio_id' && value === 'comercio-1'));
 assert.ok(filters.some(([name, field, value]) => name === 'eq' && field === 'modulo' && value === 'compras'));
 assert.ok(filters.some(([name, field, value]) => name === 'eq' && field === 'estado' && value === 'pendiente'));
 assert.ok(filters.some(([name, field, value]) => name === 'lt' && field === 'creado_en' && value === rango.fin));
-assert.ok(filters.some(([name, from, to]) => name === 'range' && from === 100 && to === 149));
+assert.ok(filters.some(([name, from, to]) => name === 'range' && from === 0 && to === 499));
+assert.ok(filters.some(([name, from, to]) => name === 'range' && from === 500 && to === 999));
 hook.useIncidentes(filtros, false);
 assert.equal(queries[3].enabled, false);
 await assert.rejects(queries[3].queryFn());
@@ -123,4 +151,4 @@ await assert.rejects(mutations[1].mutationFn({ id: 'incidente', estado: 'resuelt
 assert.equal(adminRpcCalls, 0);
 hook.useIncidentes({ ...filtros, desde: '2026-10-20' }, true);
 assert.equal(queries[5].enabled, false);
-console.log('OK Incidentes: privacidad, límites, duplicados, captura automática real de React Query, cambio de comercio, filtros, fechas y paginación. Supabase simulado; RLS se verifica por separado en test-incidentes-sql.mjs.');
+console.log('OK Incidentes: agrupación por comercio y error, conteo de 551 apariciones entre páginas, seguimiento individual, privacidad, límites, captura de React Query, filtros y fechas. Supabase simulado; RLS se verifica por separado en test-incidentes-sql.mjs.');

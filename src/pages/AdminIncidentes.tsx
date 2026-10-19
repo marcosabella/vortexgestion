@@ -4,6 +4,7 @@ import { Activity, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { INCIDENTES_POR_PAGINA, useIncidentes, type IncidentesFiltros } from "@/hooks/useIncidentes";
 import { incidenteModulos } from "@/utils/incidentes";
+import type { IncidenteAgrupado } from "@/utils/agruparIncidentes";
 import { incidenteEstados, incidenteOrigenes, type Incidente, type IncidenteEstado } from "@/types/incidente";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ export default function AdminIncidentes() {
   const { data: isAdmin, isLoading: adminLoading } = useIsAppAdmin();
   const [filtros, setFiltros] = useState(inicial);
   const [detalle, setDetalle] = useState<Incidente | null>(null);
+  const [grupoDetalle, setGrupoDetalle] = useState<IncidenteAgrupado | null>(null);
   const [estado, setEstado] = useState<IncidenteEstado>("pendiente");
   const [notas, setNotas] = useState("");
   const { listado, actualizar, comercios } = useIncidentes(filtros, isAdmin === true);
@@ -31,9 +33,10 @@ export default function AdminIncidentes() {
   if (adminLoading) return <div className="p-8">Cargando permisos...</div>;
   if (!isAdmin) return <Navigate to="/" replace />;
   const fechaInvalida = Boolean(filtros.desde && filtros.hasta && filtros.desde > filtros.hasta);
-  const filas = listado.data?.incidentes ?? [];
   const total = listado.data?.total ?? 0;
   const paginas = Math.max(1, Math.ceil(total / INCIDENTES_POR_PAGINA));
+  const pagina = Math.min(filtros.pagina, paginas - 1);
+  const filas = (listado.data?.incidentes ?? []).slice(pagina * INCIDENTES_POR_PAGINA, (pagina + 1) * INCIDENTES_POR_PAGINA);
   const cambiar = (campo: keyof Omit<IncidentesFiltros, "pagina">, value: string) => {
     setFiltros((actual) => ({ ...actual, [campo]: value, pagina: 0 }));
   };
@@ -78,6 +81,7 @@ export default function AdminIncidentes() {
       <div className="space-y-2"><Label htmlFor="inc-hasta">Hasta</Label><Input id="inc-hasta" type="date" value={filtros.hasta} onChange={(event) => cambiar("hasta", event.target.value)} /></div>
       <div className="sm:col-span-2 lg:col-span-5"><Button size="sm" variant="ghost" onClick={() => setFiltros(inicial)}>Limpiar filtros</Button></div>
     </CardContent></Card>
+    <p className="text-sm text-muted-foreground">Errores agrupados por comercio, módulo, origen, código y mensaje. Las cantidades y fechas corresponden a los filtros seleccionados.</p>
     {fechaInvalida ? <p role="alert" className="text-destructive">La fecha desde debe ser anterior o igual a la fecha hasta.</p>
       : listado.isError ? <div role="alert" className="rounded-md border border-destructive p-4 text-sm text-destructive">No se pudieron cargar los incidentes. Verificá que la migración de Incidentes esté aplicada y volvé a intentar.</div>
       : <Card><CardContent className="p-0">
@@ -87,21 +91,24 @@ export default function AdminIncidentes() {
             {listado.isLoading ? <TableRow><TableCell colSpan={7} className="h-28 text-center">Cargando incidentes...</TableCell></TableRow>
               : !filas.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">No hay incidentes para los filtros seleccionados.</TableCell></TableRow>
               : filas.map((incidente) => <TableRow key={incidente.id}>
-                <TableCell className="whitespace-nowrap">{fechaHora(incidente.creado_en)}</TableCell>
+                <TableCell className="whitespace-nowrap"><span className="block">Última: {fechaHora(incidente.creado_en)}</span>{incidente.ocurrencias.length > 1 && <span className="block text-xs text-muted-foreground">Primera: {fechaHora(incidente.primeraOcurrencia)}</span>}</TableCell>
                 <TableCell className="min-w-40">{incidente.comercio?.nombre_comercio || incidente.comercio_id}</TableCell>
                 <TableCell>{incidenteModulos[incidente.modulo] || incidente.modulo}</TableCell>
                 <TableCell className="whitespace-nowrap">{incidenteOrigenes[incidente.origen]}</TableCell>
-                <TableCell className="min-w-60 max-w-md"><p className="line-clamp-2 break-words">{incidente.mensaje}</p>{incidente.codigo && <span className="text-xs text-muted-foreground">Código: {incidente.codigo}</span>}</TableCell>
-                <TableCell><Badge variant={incidente.estado === "pendiente" ? "destructive" : "secondary"} className="whitespace-nowrap">{incidenteEstados[incidente.estado]}</Badge></TableCell>
-                <TableCell><Button variant="outline" size="sm" onClick={() => abrir(incidente)}>Ver detalle</Button></TableCell>
+                <TableCell className="min-w-60 max-w-md"><p className="line-clamp-2 break-words">{incidente.mensaje}</p><Badge variant="outline" className="mt-1">{incidente.ocurrencias.length} {incidente.ocurrencias.length === 1 ? "vez" : "veces"}</Badge>{incidente.codigo && <span className="ml-2 text-xs text-muted-foreground">Código: {incidente.codigo}</span>}</TableCell>
+                <TableCell><div className="flex flex-col items-start gap-1">{Object.entries(incidenteEstados).map(([key, label]) => {
+                  const cantidad = incidente.ocurrencias.filter((ocurrencia) => ocurrencia.estado === key).length;
+                  return cantidad > 0 && <Badge key={key} variant={key === "pendiente" ? "destructive" : "secondary"} className="whitespace-nowrap">{label}{cantidad < incidente.ocurrencias.length ? ` (${cantidad})` : ""}</Badge>;
+                })}</div></TableCell>
+                <TableCell><Button variant="outline" size="sm" onClick={() => { setGrupoDetalle(incidente); abrir(incidente); }}>Ver detalle</Button></TableCell>
               </TableRow>)}
           </TableBody>
         </Table>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">
-          <span>{total} incidentes · Página {filtros.pagina + 1} de {paginas}</span>
+          <span>{total} incidentes agrupados · {listado.data?.totalOcurrencias ?? 0} apariciones · Página {pagina + 1} de {paginas}</span>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={filtros.pagina === 0 || listado.isFetching} onClick={() => setFiltros((actual) => ({ ...actual, pagina: actual.pagina - 1 }))}><ChevronLeft className="h-4 w-4" />Anterior</Button>
-            <Button size="sm" variant="outline" disabled={filtros.pagina + 1 >= paginas || listado.isFetching} onClick={() => setFiltros((actual) => ({ ...actual, pagina: actual.pagina + 1 }))}>Siguiente<ChevronRight className="h-4 w-4" /></Button>
+            <Button size="sm" variant="outline" disabled={pagina === 0 || listado.isFetching} onClick={() => setFiltros((actual) => ({ ...actual, pagina: pagina - 1 }))}><ChevronLeft className="h-4 w-4" />Anterior</Button>
+            <Button size="sm" variant="outline" disabled={pagina + 1 >= paginas || listado.isFetching} onClick={() => setFiltros((actual) => ({ ...actual, pagina: pagina + 1 }))}>Siguiente<ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </CardContent></Card>}
@@ -110,6 +117,15 @@ export default function AdminIncidentes() {
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>Detalle del incidente</DialogTitle><DialogDescription>{detalle?.comercio?.nombre_comercio} · {detalle && fechaHora(detalle.creado_en)}</DialogDescription></DialogHeader>
         {detalle && <>
+          {grupoDetalle && <div className="space-y-2 text-sm">
+            <p>{grupoDetalle.ocurrencias.length} apariciones · Primera: {fechaHora(grupoDetalle.primeraOcurrencia)} · Última: {fechaHora(grupoDetalle.creado_en)}</p>
+            <Label htmlFor="inc-ocurrencia">Aparición a consultar</Label>
+            <select id="inc-ocurrencia" className={selectClass} value={detalle.id} disabled={actualizar.isPending} onChange={(event) => {
+              const ocurrencia = grupoDetalle.ocurrencias.find((item) => item.id === event.target.value);
+              if (ocurrencia) abrir(ocurrencia);
+            }}>{grupoDetalle.ocurrencias.map((item, index) => <option key={item.id} value={item.id}>{fechaHora(item.creado_en)} · {incidenteEstados[item.estado]} · #{grupoDetalle.ocurrencias.length - index}</option>)}</select>
+            <p className="text-xs text-muted-foreground">El estado y las notas se guardan para la aparición seleccionada.</p>
+          </div>}
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div><dt className="text-muted-foreground">Módulo</dt><dd>{incidenteModulos[detalle.modulo] || detalle.modulo}</dd></div>
             <div><dt className="text-muted-foreground">Origen</dt><dd>{incidenteOrigenes[detalle.origen]}</dd></div>

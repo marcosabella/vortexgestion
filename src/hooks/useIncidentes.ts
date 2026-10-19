@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Incidente, IncidenteEstado } from "@/types/incidente";
 import { fetchMasterRecords } from "@/utils/fetchMasterRecords";
+import { agruparIncidentes } from "@/utils/agruparIncidentes";
 
 // Esquema acotado de la migración pendiente, sin modificar los tipos generados.
 type IncidentesSchema = {
@@ -38,6 +39,7 @@ export function rangoFechasIncidentes(desde: string, hasta: string) {
 
 export function useIncidentes(filtros: IncidentesFiltros, isAdmin: boolean) {
   const client = useQueryClient();
+  const { pagina: _pagina, ...filtrosConsulta } = filtros;
   const comercios = useQuery({
     queryKey: ["admin-incidentes-comercios"],
     enabled: isAdmin,
@@ -46,25 +48,26 @@ export function useIncidentes(filtros: IncidentesFiltros, isAdmin: boolean) {
       .order("nombre_comercio").order("id").range(from, to)),
   });
   const listado = useQuery({
-    queryKey: ["admin-incidentes", filtros],
+    queryKey: ["admin-incidentes", filtrosConsulta],
     enabled: isAdmin && (!filtros.desde || !filtros.hasta || filtros.desde <= filtros.hasta),
     retry: false,
     refetchInterval: 60000,
     queryFn: async () => {
       if (!isAdmin) throw new Error("Acceso no autorizado");
-      let query = api.from("sistema_incidentes")
-        .select("*, comercio(nombre_comercio)", { count: "exact" });
-      if (filtros.comercioId) query = query.eq("comercio_id", filtros.comercioId);
-      if (filtros.modulo) query = query.eq("modulo", filtros.modulo);
-      if (filtros.estado) query = query.eq("estado", filtros.estado);
-      const { inicio, fin } = rangoFechasIncidentes(filtros.desde, filtros.hasta);
-      if (inicio) query = query.gte("creado_en", inicio);
-      if (fin) query = query.lt("creado_en", fin);
-      const desde = filtros.pagina * INCIDENTES_POR_PAGINA;
-      const { data, error, count } = await query.order("creado_en", { ascending: false })
-        .order("id", { ascending: false }).range(desde, desde + INCIDENTES_POR_PAGINA - 1);
-      if (error) throw error;
-      return { incidentes: data as Incidente[], total: count ?? 0 };
+      const incidentes = await fetchMasterRecords<Incidente>((from, to) => {
+        let query = api.from("sistema_incidentes")
+          .select("*, comercio(nombre_comercio)", { count: "exact" });
+        if (filtros.comercioId) query = query.eq("comercio_id", filtros.comercioId);
+        if (filtros.modulo) query = query.eq("modulo", filtros.modulo);
+        if (filtros.estado) query = query.eq("estado", filtros.estado);
+        const { inicio, fin } = rangoFechasIncidentes(filtros.desde, filtros.hasta);
+        if (inicio) query = query.gte("creado_en", inicio);
+        if (fin) query = query.lt("creado_en", fin);
+        return query.order("creado_en", { ascending: false })
+          .order("id", { ascending: false }).range(from, to);
+      });
+      const grupos = agruparIncidentes(incidentes);
+      return { incidentes: grupos, total: grupos.length, totalOcurrencias: incidentes.length };
     },
   });
   const actualizar = useMutation({
