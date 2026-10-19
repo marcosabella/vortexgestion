@@ -5,20 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClientes, useDeleteCliente } from '@/hooks/useClientes';
-import { ClienteForm } from './ClienteForm';
-import { Cliente } from '@/types/cliente';
 import { useTablePagination } from '@/hooks/useTablePagination';
 import { TablePaginationControls } from './TablePaginationControls';
 import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
 
 export function ClientesList() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: clientes = [], isLoading, error } = useClientes();
   const deleteCliente = useDeleteCliente();
@@ -33,18 +28,8 @@ export function ClientesList() {
 
   const pagination = useTablePagination(filteredClientes, 'clientes-registros-por-pagina', searchTerm);
 
-  const handleEdit = (cliente: Cliente) => {
-    setSelectedCliente(cliente);
-    setIsEditDialogOpen(true);
-  };
-
   const handleDelete = async (id: string) => {
     await deleteCliente.mutateAsync(id);
-  };
-
-  const handleEditSuccess = () => {
-    setIsEditDialogOpen(false);
-    setSelectedCliente(null);
   };
 
   if (error) return <p role="alert" className="text-destructive">No se pudieron cargar los clientes. Volvé a cargar el listado.</p>;
@@ -135,32 +120,11 @@ export function ClientesList() {
                     {mostrarCuentaOnline && <TableCell>{cliente.cliente_usuarios?.length ? <Badge>Vinculada</Badge> : <Badge variant="outline">Sin vincular</Badge>}</TableCell>}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Dialog open={isEditDialogOpen && selectedCliente?.id === cliente.id} onOpenChange={(open) => {
-                          setIsEditDialogOpen(open);
-                          if (!open) setSelectedCliente(null);
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEdit(cliente)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Editar Cliente</DialogTitle>
-                            </DialogHeader>
-                            {selectedCliente && (
-                              <ClienteForm 
-                                cliente={selectedCliente} 
-                                onSuccess={handleEditSuccess} 
-                                showTitle={false}
-                              />
-                            )}
-                          </DialogContent>
-                        </Dialog>
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/clientes/${cliente.id}/editar`} aria-label={`Editar cliente ${cliente.nombre} ${cliente.apellido}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
                         
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

@@ -42,6 +42,28 @@ export function useClientes() {
   });
 }
 
+export function useCliente(id?: string) {
+  const { comercio } = useComercio();
+  const comercioId = comercio?.id;
+
+  return useQuery({
+    queryKey: ['clientes', comercioId, id],
+    enabled: Boolean(comercioId && id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('comercio_id', comercioId)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data || isLegacyDeletedClient(data)) return null;
+      return data as Cliente;
+    },
+  });
+}
+
 export function useCreateCliente() {
   const queryClient = useQueryClient();
   const { comercio } = useComercio();

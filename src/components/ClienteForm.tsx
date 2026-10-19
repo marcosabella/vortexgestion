@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCreateCliente, useUpdateCliente } from '@/hooks/useClientes';
 import { useConsultarArca } from '@/hooks/useConsultarArca';
 import { Cliente, SITUACIONES_AFIP, PROVINCIAS_ARGENTINA } from '@/types/cliente';
-import { validateCUIT, validateEmail, validatePhone, esDNI, formatCUIT } from '@/utils/validations';
+import { validateCUIT, validateEmail, validatePhone, formatCUIT } from '@/utils/validations';
 import { Search, Loader2 } from 'lucide-react';
 
 const clienteSchema = z.object({
@@ -196,7 +196,7 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
           {/* CUIT/DNI - Primer campo */}
           <div className="space-y-2">
             <Label htmlFor="cuit">CUIT o DNI *</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="cuit"
                 {...register('cuit')}
@@ -204,30 +204,27 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
                 maxLength={13}
                 className="flex-1"
               />
-              {!cliente && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleConsultarArca}
-                  disabled={isLoadingArca}
-                >
-                  {isLoadingArca ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  <span className="ml-2">Buscar</span>
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleConsultarArca}
+                disabled={isLoadingArca || isSaving}
+                aria-label="Buscar cliente en ARCA por CUIT o DNI"
+              >
+                {isLoadingArca ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                <span className="ml-2">Buscar en ARCA</span>
+              </Button>
             </div>
             {errors.cuit && (
               <p className="text-sm text-destructive">{String(errors.cuit.message)}</p>
             )}
-            {!cliente && (
-              <div className="text-sm text-muted-foreground">
-                <p>Ingrese <strong>DNI</strong> (7-8 dígitos) o <strong>CUIT</strong> (11 dígitos) y presione Buscar</p>
-              </div>
-            )}
+            <div className="text-sm text-muted-foreground">
+              <p>Ingrese <strong>DNI</strong> (7-8 dígitos) o <strong>CUIT</strong> (11 dígitos) y presione Buscar en ARCA. Revise los datos antes de guardar.</p>
+            </div>
           </div>
 
           {/* Tipo de Persona */}
@@ -441,7 +438,7 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
             <Button
               type="submit"
               variant="success"
-              disabled={isSaving}
+              disabled={isSaving || isLoadingArca}
             >
               {isSaving
                 ? 'Guardando...'

@@ -40,6 +40,7 @@ import Afip from "./pages/Afip";
 import Cheques from "./pages/Cheques";
 import CajaDiaria from "./pages/CajaDiaria";
 import NuevoCliente from "./pages/NuevoCliente";
+import EditarCliente from "./pages/EditarCliente";
 import NuevoProveedor from "./pages/NuevoProveedor";
 import NuevoProducto from "./pages/NuevoProducto";
 import NuevaVenta from "./pages/NuevaVenta";
@@ -260,6 +261,7 @@ function AuthenticatedLayout() {
               <Route path="/inicio" element={parametrizacion.inicio.habilitado ? <InicioOperativo /> : <Navigate to="/caja" replace />} />
               <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
               <Route path="/clientes/nuevo" element={<ParametrizedRoute modulo="clientes"><NuevoCliente /></ParametrizedRoute>} />
+              <Route path="/clientes/:id/editar" element={<ParametrizedRoute modulo="clientes"><EditarCliente /></ParametrizedRoute>} />
               <Route path="/proveedores" element={<ParametrizedRoute modulo="proveedores"><Proveedores /></ParametrizedRoute>} />
               <Route path="/proveedores/nuevo" element={<ParametrizedRoute modulo="proveedores"><NuevoProveedor /></ParametrizedRoute>} />
               <Route path="/compras" element={<ParametrizedRoute modulo="compras"><Compras /></ParametrizedRoute>} />
