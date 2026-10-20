@@ -71,12 +71,17 @@ export function useIncidentes(filtros: IncidentesFiltros, isAdmin: boolean) {
     },
   });
   const actualizar = useMutation({
-    mutationFn: async ({ id, estado, notas }: { id: string; estado: IncidenteEstado; notas: string }) => {
+    mutationFn: async ({ ids, estado, notas }: { ids: string[]; estado: IncidenteEstado; notas: string }) => {
       if (!isAdmin) throw new Error("Acceso no autorizado");
-      const { error } = await api.rpc("admin_actualizar_incidente", { p_id: id, p_estado: estado, p_notas: notas });
-      if (error) throw error;
+      if (!ids.length) throw new Error("El grupo no tiene apariciones");
+      // Reutiliza la RPC que valida los permisos en el backend para cada registro.
+      for (const id of new Set(ids)) {
+        const { error } = await api.rpc("admin_actualizar_incidente", { p_id: id, p_estado: estado, p_notas: notas });
+        if (error) throw error;
+      }
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ["admin-incidentes"] }),
+    // Refresca también si una falla interrumpe el guardado tras actualizar algunas apariciones.
+    onSettled: () => client.invalidateQueries({ queryKey: ["admin-incidentes"] }),
   });
   return { listado, actualizar, comercios };
 }

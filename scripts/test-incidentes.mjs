@@ -112,6 +112,9 @@ const queries = [];
 const mutations = [];
 const filters = [];
 let adminRpcCalls = 0;
+const seguimientos = [];
+let falloSeguimiento = null;
+const invalidaciones = [];
 let pageRange = [0, 499];
 const registrosListado = Array.from({ length: 551 }, (_, index) => ({ ...base, id: String(index) }));
 const builder = new Proxy({}, { get: (_target, name) => {
@@ -122,9 +125,13 @@ const hook = load('src/hooks/useIncidentes.ts', {
   '@tanstack/react-query': {
     useQuery: (options) => { queries.push(options); return {}; },
     useMutation: (options) => { mutations.push(options); return {}; },
-    useQueryClient: () => ({ invalidateQueries() {} }),
+    useQueryClient: () => ({ invalidateQueries: (options) => { invalidaciones.push(options); } }),
   },
-  '@/integrations/supabase/client': { supabase: { from: () => builder, rpc: async () => { adminRpcCalls++; return { error: null }; } } },
+  '@/integrations/supabase/client': { supabase: { from: () => builder, rpc: async (name, args) => {
+    adminRpcCalls++;
+    seguimientos.push({ name, ...args });
+    return { error: args.p_id === falloSeguimiento ? new Error('Sin conexión') : null };
+  } } },
   '@/utils/fetchMasterRecords': load('src/utils/fetchMasterRecords.ts'),
   '@/utils/agruparIncidentes': agrupador,
 });
@@ -147,8 +154,24 @@ assert.ok(filters.some(([name, from, to]) => name === 'range' && from === 500 &&
 hook.useIncidentes(filtros, false);
 assert.equal(queries[3].enabled, false);
 await assert.rejects(queries[3].queryFn());
-await assert.rejects(mutations[1].mutationFn({ id: 'incidente', estado: 'resuelto', notas: '' }));
+await assert.rejects(mutations[1].mutationFn({ ids: ['incidente'], estado: 'resuelto', notas: '' }));
 assert.equal(adminRpcCalls, 0);
+const idsGrupo = ['aparicion-1', 'aparicion-2', 'aparicion-3', 'aparicion-4', 'aparicion-5'];
+await mutations[0].mutationFn({ ids: [...idsGrupo, idsGrupo[0]], estado: 'resuelto', notas: 'Validación corregida' });
+assert.equal(adminRpcCalls, 5, 'Debe guardar las cinco apariciones, sin duplicar ni incluir otros grupos');
+assert.deepEqual(seguimientos, idsGrupo.map((id) => ({
+  name: 'admin_actualizar_incidente', p_id: id, p_estado: 'resuelto', p_notas: 'Validación corregida',
+})));
+await assert.rejects(mutations[0].mutationFn({ ids: [], estado: 'resuelto', notas: '' }));
+assert.equal(adminRpcCalls, 5, 'Un grupo vacío no debe hacer llamadas');
+falloSeguimiento = 'aparicion-2';
+await assert.rejects(mutations[0].mutationFn({ ids: idsGrupo, estado: 'en_revision', notas: 'Revisando' }));
+assert.equal(adminRpcCalls, 7, 'Debe propagar la falla sin informar éxito del grupo');
+await mutations[0].onSettled();
+assert.equal(invalidaciones.at(-1).queryKey[0], 'admin-incidentes', 'Debe refrescar incluso tras un guardado parcial');
+falloSeguimiento = null;
+await mutations[0].mutationFn({ ids: idsGrupo, estado: 'en_revision', notas: 'Revisando' });
+assert.equal(adminRpcCalls, 12, 'Debe poder reintentar el grupo completo tras una falla parcial');
 hook.useIncidentes({ ...filtros, desde: '2026-10-20' }, true);
 assert.equal(queries[5].enabled, false);
-console.log('OK Incidentes: agrupación por comercio y error, conteo de 551 apariciones entre páginas, seguimiento individual, privacidad, límites, captura de React Query, filtros y fechas. Supabase simulado; RLS se verifica por separado en test-incidentes-sql.mjs.');
+console.log('OK Incidentes: agrupación por comercio y error, conteo de 551 apariciones entre páginas, seguimiento de cinco apariciones por grupo, reintento tras falla parcial, permisos, privacidad, límites, captura de React Query, filtros y fechas. Supabase simulado; RLS se verifica por separado en test-incidentes-sql.mjs.');

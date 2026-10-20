@@ -122,9 +122,9 @@ export default function AdminIncidentes() {
             <Label htmlFor="inc-ocurrencia">Aparición a consultar</Label>
             <select id="inc-ocurrencia" className={selectClass} value={detalle.id} disabled={actualizar.isPending} onChange={(event) => {
               const ocurrencia = grupoDetalle.ocurrencias.find((item) => item.id === event.target.value);
-              if (ocurrencia) abrir(ocurrencia);
+              if (ocurrencia) setDetalle(ocurrencia);
             }}>{grupoDetalle.ocurrencias.map((item, index) => <option key={item.id} value={item.id}>{fechaHora(item.creado_en)} · {incidenteEstados[item.estado]} · #{grupoDetalle.ocurrencias.length - index}</option>)}</select>
-            <p className="text-xs text-muted-foreground">El estado y las notas se guardan para la aparición seleccionada.</p>
+            <p className="text-xs text-muted-foreground">El estado y las notas se aplican a las {grupoDetalle.ocurrencias.length} apariciones de este grupo incluidas en los filtros seleccionados. Consultar otra aparición no cambia el seguimiento a guardar.</p>
           </div>}
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div><dt className="text-muted-foreground">Módulo</dt><dd>{incidenteModulos[detalle.modulo] || detalle.modulo}</dd></div>
@@ -137,8 +137,8 @@ export default function AdminIncidentes() {
           </dl>
           <div className="space-y-2"><Label htmlFor="inc-detalle-estado">Estado</Label><select id="inc-detalle-estado" className={selectClass} disabled={actualizar.isPending} value={estado} onChange={(event) => setEstado(event.target.value as IncidenteEstado)}>{Object.entries(incidenteEstados).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div>
           <div className="space-y-2"><Label htmlFor="inc-notas">Notas de seguimiento</Label><Textarea id="inc-notas" maxLength={2000} disabled={actualizar.isPending} value={notas} onChange={(event) => setNotas(event.target.value)} placeholder="Diagnóstico, acciones realizadas o solución..." /></div>
-          {actualizar.isError && <p role="alert" className="text-sm text-destructive">No se pudieron guardar los cambios. Intentá nuevamente.</p>}
-          <DialogFooter><Button variant="outline" disabled={actualizar.isPending} onClick={() => setDetalle(null)}>Cerrar</Button><Button disabled={actualizar.isPending} onClick={() => actualizar.mutate({ id: detalle.id, estado, notas }, { onSuccess: () => setDetalle(null) })}>{actualizar.isPending ? "Guardando..." : "Guardar seguimiento"}</Button></DialogFooter>
+          {actualizar.isError && <p role="alert" className="text-sm text-destructive">No se pudo completar el guardado del grupo. Algunas apariciones pueden haberse actualizado. Reintentá para aplicar el seguimiento a todas.</p>}
+          <DialogFooter><Button variant="outline" disabled={actualizar.isPending} onClick={() => setDetalle(null)}>Cerrar</Button><Button disabled={actualizar.isPending} onClick={() => actualizar.mutate({ ids: grupoDetalle ? grupoDetalle.ocurrencias.map((item) => item.id) : [detalle.id], estado, notas }, { onSuccess: () => setDetalle(null) })}>{actualizar.isPending ? "Guardando..." : "Guardar seguimiento del grupo"}</Button></DialogFooter>
         </>}
       </DialogContent>
     </Dialog>
