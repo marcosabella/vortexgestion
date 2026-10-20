@@ -3,7 +3,7 @@ import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format, subDays } from "date-fns";
 import { CuentaCorriente, CuentaCorrienteResumen } from "@/types/cuenta-corriente";
 import { Comercio } from "@/types/comercio";
-import { formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
+import { formatCuentaCorrienteComprobante, formatCuentaCorrienteMovimiento } from "@/utils/cuentaCorrientePresentation";
 import type { ResumenCuentaClientePdf } from "@/utils/resumenesCuentaCliente";
 
 const PAGE_WIDTH = 595;
@@ -172,7 +172,7 @@ const buildRows = (movimientos: CuentaCorriente[], options: CuentaCorrientePdfOp
     const presentacion = formatCuentaCorrienteMovimiento(movimiento);
 
     const comprobante = [
-      movimiento.venta?.numero_comprobante ? `FACTURA ${movimiento.venta.numero_comprobante}` : presentacion.concepto,
+      formatCuentaCorrienteComprobante(movimiento, undefined, "FACTURA"),
       movimiento.tarjeta ? `Tarjeta ${movimiento.tarjeta.nombre}` : "",
       presentacion.observaciones,
     ]

@@ -1,4 +1,4 @@
-import { CONCEPTOS_MOVIMIENTO } from "@/types/cuenta-corriente";
+import { CONCEPTOS_MOVIMIENTO, type CuentaCorriente } from "@/types/cuenta-corriente";
 
 const MEDIOS_PAGO: Record<string, string> = {
   contado: "CONTADO",
@@ -7,6 +7,16 @@ const MEDIOS_PAGO: Record<string, string> = {
   tarjeta: "TARJETA",
   cheque: "CHEQUE",
   cta_cte: "CUENTA CORRIENTE",
+};
+
+export const formatCuentaCorrienteComprobante = (
+  movimiento: Pick<CuentaCorriente, "tipo_movimiento" | "concepto" | "venta" | "observaciones">,
+  numero = movimiento.venta?.numero_comprobante,
+  prefijoVenta = "Venta:",
+) => {
+  const concepto = formatCuentaCorrienteMovimiento(movimiento).concepto;
+  if (!numero || (movimiento.tipo_movimiento === "credito" && /^pago(?:[_\s-]|$)/i.test(movimiento.concepto.trim()))) return concepto;
+  return `${prefijoVenta} ${numero}`;
 };
 
 const isPagoHistorico = (concepto: string) => /^pago hist[oó]rico\s*#/i.test(concepto.trim());
@@ -37,7 +47,7 @@ export const formatCuentaCorrienteMovimiento = (
     .join(" | ");
 
   return {
-    concepto: CONCEPTOS_MOVIMIENTO.find((item) => item.value === concepto)?.label || concepto,
+    concepto: concepto === "pago_efectivo" ? "PAGO EN EFECTIVO" : CONCEPTOS_MOVIMIENTO.find((item) => item.value === concepto)?.label || concepto,
     observaciones,
   };
 };
