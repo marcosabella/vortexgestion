@@ -3,6 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { parseConstanciaInscripcion, soapFaultMessage } from './padron.ts';
+import { getAuthorizedComercioId } from './autorizacion.ts';
+import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,7 +106,7 @@ async function obtenerTokenYSign(
   keyPem: string,
   service: string,
   ambiente: 'homologacion' | 'produccion'
-): Promise<{ token: string; sign: string }> {
+): Promise<{ token: string; sign: string; expirationTime: string }> {
   const tra = crearTRA(service);
   console.log('TRA creado');
   
@@ -161,8 +163,9 @@ async function obtenerTokenYSign(
 
   const tokenMatch = xmlContent.match(/<token>([\s\S]*?)<\/token>/);
   const signMatch = xmlContent.match(/<sign>([\s\S]*?)<\/sign>/);
+  const expirationMatch = xmlContent.match(/<expirationTime>([^<]+)<\/expirationTime>/);
 
-  if (!tokenMatch || !signMatch) {
+  if (!tokenMatch || !signMatch || !expirationMatch || !Number.isFinite(Date.parse(expirationMatch[1]))) {
     throw new Error(soapFaultMessage(responseText) || 'No se pudo extraer token y sign de WSAA');
   }
 
@@ -171,6 +174,7 @@ async function obtenerTokenYSign(
   return {
     token: tokenMatch[1].trim(),
     sign: signMatch[1].trim(),
+    expirationTime: expirationMatch[1].trim(),
   };
 }
 
@@ -502,42 +506,6 @@ function detectarTipoPersona(cuit: string): 'fisica' | 'juridica' {
   return ['30', '33', '34'].includes(prefijo) ? 'juridica' : 'fisica';
 }
 
-async function getAuthorizedComercioId(req: Request, supabase: any, requestedComercioId?: string): Promise<string> {
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '');
-
-  if (!token) {
-    throw new Error('Usuario no autenticado');
-  }
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user) {
-    throw new Error('Sesion invalida');
-  }
-
-  let query = supabase
-    .from('comercio_usuarios')
-    .select('comercio_id')
-    .eq('user_id', userData.user.id)
-    .eq('activo', true)
-    .eq('solo_restaurante', false);
-
-  if (requestedComercioId) {
-    query = query.eq('comercio_id', requestedComercioId);
-  }
-
-  const { data, error } = await query;
-  if (error || !data?.length) {
-    throw new Error('No tiene acceso al comercio solicitado');
-  }
-
-  if (!requestedComercioId && data.length > 1) {
-    throw new Error('Debe indicar el comercio para esta consulta');
-  }
-
-  return data[0].comercio_id;
-}
-
 // ==========================================
 // Handler principal
 // ==========================================
@@ -552,8 +520,8 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { cuit, comercioId } = await req.json();
-    const authorizedComercioId = await getAuthorizedComercioId(req, supabase, comercioId);
+    const { cuit, comercioId, altaComercio } = await req.json();
+    const authorizedComercioId = await getAuthorizedComercioId(req, supabase, comercioId, altaComercio === true);
 
     if (!cuit) {
       throw new Error('CUIT es requerido');
@@ -561,14 +529,22 @@ Deno.serve(async (req) => {
 
     const cuitLimpio = cuit.replace(/[-\s]/g, '');
     
-    if (cuitLimpio.length !== 11) {
+    if (!/^\d{11}$/.test(cuitLimpio)) {
       throw new Error('El CUIT debe tener 11 dígitos');
     }
 
     console.log('=== INICIO CONSULTA PADRON ===');
     console.log('CUIT a consultar:', cuitLimpio);
 
-    const afipConfig = await resolverConfiguracionFiscal(supabase, authorizedComercioId, { permitirPredeterminado: true }).catch(() => null);
+    const afipConfig = authorizedComercioId
+      ? await resolverConfiguracionFiscal(supabase, authorizedComercioId, { permitirPredeterminado: true }).catch(() => null)
+      : null;
+
+    // El alta administrativa necesita datos oficiales, incluido el período de actividad.
+    // No sustituir una consulta fallida por un padrón alternativo incompleto.
+    if (altaComercio === true && (!afipConfig?.certificado_crt || !afipConfig?.certificado_key)) {
+      throw new Error('Para consultar el padrón oficial, configurá un certificado ARCA activo en un comercio propio del administrador y seleccioná ese comercio.');
+    }
 
     let errorOficial = '';
 
@@ -582,11 +558,10 @@ Deno.serve(async (req) => {
       
       try {
         console.log('Obteniendo token y sign para ws_sr_constancia_inscripcion...');
-        const { token, sign } = await obtenerTokenYSign(
-          afipConfig.certificado_crt,
-          afipConfig.certificado_key,
-          'ws_sr_constancia_inscripcion',
-          afipConfig.ambiente
+        const { token, sign } = await obtenerTicketWsaaCacheado(
+          supabase, authorizedComercioId!, afipConfig.certificado_crt,
+          'ws_sr_constancia_inscripcion', afipConfig.ambiente,
+          () => obtenerTokenYSign(afipConfig.certificado_crt, afipConfig.certificado_key, 'ws_sr_constancia_inscripcion', afipConfig.ambiente),
         );
         console.log('Token obtenido OK, longitud:', token.length);
 
@@ -615,6 +590,7 @@ Deno.serve(async (req) => {
         console.error('=== ERROR EN WEBSERVICE OFICIAL ===');
         console.error('Error:', errorMessage);
         errorOficial = errorMessage;
+        if (altaComercio === true) throw new Error(`No se pudo consultar el padrón oficial de ARCA: ${errorMessage.replace(' Este mensaje no indica si la factura tiene CAE.', '')}`);
         // Continuar con fallback
       }
     } else {

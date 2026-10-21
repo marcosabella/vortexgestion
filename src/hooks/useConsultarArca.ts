@@ -11,6 +11,7 @@ export interface DatosArca {
   razonSocial?: string;
   tipoPersona: 'fisica' | 'juridica';
   situacionAfip: string;
+  periodoInicioActividad?: string;
   domicilioFiscal?: {
     calle?: string;
     numero?: string;
@@ -30,14 +31,14 @@ function detectarTipoPersona(cuit: string): 'fisica' | 'juridica' {
   return ['30', '33', '34'].includes(prefijo) ? 'juridica' : 'fisica';
 }
 
-export function useConsultarArca() {
+export function useConsultarArca({ altaComercio = false }: { altaComercio?: boolean } = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const { comercio } = useComercio();
 
   const consultarCuitDirecto = async (cuit: string): Promise<{ data: DatosArca | null; encontrado: boolean }> => {
     try {
       const { data, error } = await supabase.functions.invoke('consultar-padron-afip', {
-        body: { cuit, comercioId: comercio?.id },
+        body: { cuit, comercioId: comercio?.id, ...(altaComercio ? { altaComercio: true } : {}) },
       });
 
       if (error || !data?.success) {
@@ -80,7 +81,7 @@ export function useConsultarArca() {
 
   const consultarCuit = async (valor: string): Promise<DatosArca | null> => {
     const valorLimpio = valor.replace(/[-\s]/g, '');
-    if (!comercio?.id) {
+    if (!comercio?.id && !altaComercio) {
       toast({ title: 'Seleccione un comercio', description: 'La consulta necesita la configuracion ARCA del comercio actual.', variant: 'destructive' });
       return null;
     }
@@ -125,7 +126,7 @@ export function useConsultarArca() {
       }
 
       const { data, error } = await supabase.functions.invoke('consultar-padron-afip', {
-        body: { cuit: valorLimpio, comercioId: comercio.id },
+        body: { cuit: valorLimpio, comercioId: comercio?.id, ...(altaComercio ? { altaComercio: true } : {}) },
       });
 
       if (error) {

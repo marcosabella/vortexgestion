@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
-import { CaeRechazado, camposAutorizacionCae, validarComprobanteRecuperado } from './cae.ts';
+import { CaeRechazado, camposAutorizacionCae, camposServicioArca, validarComprobanteRecuperado } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
   const date = new Date(value);
@@ -434,6 +434,9 @@ async function solicitarCAE(
             <ar:ImpOpEx>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpOpEx)}</ar:ImpOpEx>
             <ar:ImpIVA>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpIVA)}</ar:ImpIVA>
             <ar:ImpTrib>${formatearImporteAfip(solicitud.FeDetReq.FECAEDetRequest.ImpTrib)}</ar:ImpTrib>
+            ${solicitud.FeDetReq.FECAEDetRequest.Concepto > 1 ? `<ar:FchServDesde>${solicitud.FeDetReq.FECAEDetRequest.FchServDesde}</ar:FchServDesde>
+            <ar:FchServHasta>${solicitud.FeDetReq.FECAEDetRequest.FchServHasta}</ar:FchServHasta>
+            <ar:FchVtoPago>${solicitud.FeDetReq.FECAEDetRequest.FchVtoPago}</ar:FchVtoPago>` : ''}
             <ar:MonId>${solicitud.FeDetReq.FECAEDetRequest.MonId}</ar:MonId>
             <ar:MonCotiz>${solicitud.FeDetReq.FECAEDetRequest.MonCotiz}</ar:MonCotiz>
             ${solicitud.FeDetReq.FECAEDetRequest.Iva?.AlicIva?.length ? `
@@ -517,6 +520,10 @@ interface AfipConfig {
 }
 
 interface Venta {
+  concepto_arca?: number;
+  servicio_desde?: string | null;
+  servicio_hasta?: string | null;
+  servicio_vencimiento_pago?: string | null;
   id: string;
   comercio_id?: string;
   numero_comprobante: string;
@@ -747,7 +754,7 @@ Deno.serve(async (req) => {
         },
         FeDetReq: {
           FECAEDetRequest: {
-            Concepto: 1, // Productos
+            ...camposServicioArca(venta),
             DocTipo: documentoReceptor.docTipo,
             DocNro: documentoReceptor.docNro,
             CbteDesde: 0,
@@ -788,7 +795,7 @@ Deno.serve(async (req) => {
       const detallePrevio = intentoPrevio.solicitud?.FeDetReq?.FECAEDetRequest;
       if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
           || intentoPrevio.punto_venta !== afipConfig.punto_venta || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
-          || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA'].some(campo =>
+          || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA', 'Concepto', 'FchServDesde', 'FchServHasta', 'FchVtoPago'].some(campo =>
             String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {
         throw new Error('La venta cambio desde la solicitud fiscal anterior. Revise el comprobante autorizado antes de continuar.');
       }
@@ -851,6 +858,8 @@ Deno.serve(async (req) => {
           puntoVenta: puntoVentaFiscal, tipoComprobante: codigoComprobante, numero: numeroComprobante,
           docTipo: detalleActual.DocTipo, docNro: detalleActual.DocNro,
           fecha: detalleActual.CbteFch, total: detalleActual.ImpTotal,
+          concepto: detalleActual.Concepto, servicioDesde: detalleActual.FchServDesde,
+          servicioHasta: detalleActual.FchServHasta, vencimientoPago: detalleActual.FchVtoPago,
         })
       : await solicitarCAE(
       token,

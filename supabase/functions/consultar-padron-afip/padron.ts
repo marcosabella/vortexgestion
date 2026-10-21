@@ -64,6 +64,12 @@ export function parseConstanciaInscripcion(response: string) {
     : activo('20') ? 'Monotributista'
     : activo('32') ? 'Exento' : '';
   const fisica = value(general, 'tipoPersona') === 'FISICA';
+  // El padrón informa período AAAAMM de alta de cada actividad, sin día exacto.
+  // No confundirlo con períodos de impuestos ni con la fecha del contrato social.
+  const periodos = [...xml.matchAll(/<(?:actividad|actividadMonotributista)(?:\s[^>]*)?>([\s\S]*?)<\/(?:actividad|actividadMonotributista)>/g)]
+    .map((match) => value(match[1], 'periodo'))
+    .filter((periodo) => /^\d{4}(0[1-9]|1[0-2])$/.test(periodo)).sort();
+  const periodoInicioActividad = periodos[0] ? `${periodos[0].slice(0, 4)}-${periodos[0].slice(4)}` : undefined;
 
   return {
     nombre: fisica ? nombre : razonSocial || nombre,
@@ -71,6 +77,7 @@ export function parseConstanciaInscripcion(response: string) {
     razonSocial,
     tipoPersona: fisica ? 'fisica' : 'juridica',
     situacionAfip,
+    periodoInicioActividad,
     domicilioFiscal: {
       ...direccionPartes,
       piso: value(domicilio, 'piso') || direccionPartes.piso,

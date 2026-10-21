@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Building2, CalendarCheck2, KeyRound, Pencil, Plus, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
+import { Building2, CalendarCheck2, KeyRound, Loader2, Pencil, Plus, Search, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin, AdminComercio } from "@/hooks/useAdminComercios";
 import { ComercioFormData } from "@/types/comercio";
 import {
@@ -24,6 +24,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SITUACIONES_AFIP } from "@/types/cliente";
+import { useConsultarArca } from "@/hooks/useConsultarArca";
+import { useToast } from "@/hooks/use-toast";
+import { formatCUIT, validateCUIT } from "@/utils/validations";
+import { LicenciaComercioButton } from "@/components/admin/LicenciaComercioButton";
 
 const emptyComercio: ComercioFormData = {
   nombre_comercio: "",
@@ -69,18 +73,60 @@ function AdminComercioForm({
   const [comercio, setComercio] = useState<ComercioFormData>(initialData);
   const [userEmail, setUserEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { consultarCuit, isLoading: isLoadingArca } = useConsultarArca({ altaComercio: true });
+  const { toast } = useToast();
+  const [periodoInicioArca, setPeriodoInicioArca] = useState("");
+  const [arcaConsultado, setArcaConsultado] = useState(false);
 
   useEffect(() => {
     setComercio(initialData);
+    setPeriodoInicioArca("");
+    setArcaConsultado(false);
   }, [initialData]);
 
   const updateField = (field: keyof ComercioFormData, value: string) => {
     setComercio((current) => ({ ...current, [field]: value }));
+    if (field === "cuit") {
+      setArcaConsultado(false);
+      setPeriodoInicioArca("");
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isLoadingArca) return;
     onSubmit({ comercio, userEmail, password });
+  };
+
+  const handleConsultarArca = async () => {
+    const cuit = comercio.cuit;
+    setArcaConsultado(false);
+    if (!validateCUIT(cuit)) {
+      toast({ title: "CUIT inválido", description: "Ingresá un CUIT válido de 11 dígitos para buscar en ARCA.", variant: "destructive" });
+      return;
+    }
+    const datos = await consultarCuit(cuit);
+    if (!datos) return;
+    setArcaConsultado(true);
+    const periodo = /^\d{4}-(0[1-9]|1[0-2])$/.test(datos.periodoInicioActividad || "") ? datos.periodoInicioActividad! : "";
+    setPeriodoInicioArca(periodo);
+    setComercio((current) => {
+      if (current.cuit !== cuit) return current;
+      const domicilio = datos.domicilioFiscal;
+      const nombre = datos.razonSocial || [datos.nombre, datos.apellido].filter(Boolean).join(" ");
+      return {
+        ...current,
+        cuit: formatCUIT(datos.cuitEncontrado || cuit),
+        nombre_comercio: nombre || current.nombre_comercio,
+        situacion_afip: datos.situacionAfip || current.situacion_afip,
+        calle: domicilio?.calle || current.calle,
+        numero: domicilio?.numero ?? current.numero,
+        codigo_postal: domicilio?.codigoPostal || current.codigo_postal,
+        localidad: domicilio?.localidad || current.localidad,
+        provincia: domicilio?.provincia || current.provincia,
+        fecha_inicio_actividad: current.fecha_inicio_actividad || (periodo ? `${periodo}-01` : ""),
+      };
+    });
   };
 
   return (
@@ -92,7 +138,14 @@ function AdminComercioForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="cuit">CUIT</Label>
-          <Input id="cuit" value={comercio.cuit} onChange={(event) => updateField("cuit", event.target.value)} required minLength={11} />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input id="cuit" value={comercio.cuit} onChange={(event) => updateField("cuit", event.target.value)} required minLength={11} maxLength={13} inputMode="numeric" placeholder="20-12345678-9" className="min-w-0 flex-1" disabled={isLoadingArca || isLoading} />
+            <Button type="button" variant="secondary" onClick={handleConsultarArca} disabled={isLoadingArca || isLoading} aria-label="Buscar comercio en ARCA por CUIT">
+              {isLoadingArca ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {isLoadingArca ? "Consultando..." : "Buscar en ARCA"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Completá el CUIT y buscá en ARCA. Revisá los datos antes de guardar.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="situacion_afip">Condicion frente a ARCA</Label>
@@ -136,6 +189,8 @@ function AdminComercioForm({
         <div className="space-y-2">
           <Label htmlFor="fecha_inicio_actividad">Inicio de actividad</Label>
           <Input id="fecha_inicio_actividad" type="date" value={comercio.fecha_inicio_actividad} onChange={(event) => updateField("fecha_inicio_actividad", event.target.value)} required />
+          {periodoInicioArca && <p className="text-xs text-muted-foreground">ARCA informa {periodoInicioArca.slice(5)}/{periodoInicioArca.slice(0, 4)} como el alta más antigua de las actividades consultadas. Si la fecha estaba vacía, se propuso el día 1. Revisá y confirmá la fecha exacta.</p>}
+          {arcaConsultado && !periodoInicioArca && <p role="status" className="text-xs text-muted-foreground">La consulta no devolvió el período de inicio de actividad. Completá la fecha manualmente.</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="ingresos_brutos">Ingresos brutos</Label>
@@ -168,7 +223,7 @@ function AdminComercioForm({
         </div>
       )}
 
-      <Button type="submit" variant="success" disabled={isLoading}>
+      <Button type="submit" variant="success" disabled={isLoading || isLoadingArca}>
         {includeAccess ? <Plus className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
         {isLoading ? loadingLabel : submitLabel}
       </Button>
@@ -562,6 +617,7 @@ export default function AdminComercios() {
                           )}
                           <EditComercioButton comercio={comercio} updateComercio={updateComercio} />
                           <RenewMembershipButton comercio={comercio} renovarMembresia={renovarMembresia} />
+                          <LicenciaComercioButton comercio={comercio} />
                           <Button asChild variant="outline" size="sm">
                             <Link to={`/admin/comercios/${comercio.id}/parametrizacion`}>
                               <SlidersHorizontal className="h-4 w-4" />

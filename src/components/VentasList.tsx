@@ -48,9 +48,10 @@ interface OperacionMercadoPagoVenta {
 interface VentasListProps {
   detalleId?: string;
   onCerrarDetalle?: () => void;
+  notificacionComercioIdInicial?: string;
 }
 
-export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {}) => {
+export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdInicial }: VentasListProps = {}) => {
   const { ventas, isLoading, deleteVenta } = useVentas({ ventaId: detalleId });
   const [searchParams, setSearchParams] = useSearchParams();
   const { mutate: obtenerCAE, isPending: isObteniendoCAE } = useObtenerCAE();
@@ -666,7 +667,10 @@ export const VentasList = ({ detalleId, onCerrarDetalle }: VentasListProps = {})
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowNotificationDialog(true)}
+                      onClick={() => {
+                        if (notificacionComercioIdInicial) setNotificationComercioIds([notificacionComercioIdInicial]);
+                        setShowNotificationDialog(true);
+                      }}
                     >
                       <BellPlus className="mr-2 h-4 w-4" />
                       Enviar a notificaciones

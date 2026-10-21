@@ -68,6 +68,7 @@ const fakeFetch = async (_url, options) => {
   state.calls.push(action);
   if (action.endsWith('FECompUltimoAutorizado')) return new Response('<CbteNro>125</CbteNro>');
   if (action.endsWith('FECAESolicitar')) {
+    state.solicitudSoap = options.body;
     assert.ok(state.attempt, 'Debe conservar el numero ANTES de llamar a ARCA');
     if (state.failNetwork) throw new Error('Conexion interrumpida despues del envio');
     if (state.rejected) return new Response('<Resultado>R</Resultado><Obs><Msg>Dato invalido</Msg></Obs>');
@@ -80,6 +81,7 @@ load('supabase/functions/obtener-cae-afip/index.ts', name => {
   if (name.includes('supabase-js')) return { createClient: () => supabase };
   if (name.includes('node-forge')) return {};
   if (name.includes('wsaa-cache')) return cache;
+  if (name.includes('emisor-fiscal')) return { resolverConfiguracionFiscal: async () => config };
   if (name === './cae.ts') return caeHelpers;
   throw new Error('Import inesperado: ' + name);
 }, { fetch: fakeFetch, Deno: { env: { get: () => 'test' }, serve: fn => { handler = fn; } } });
@@ -94,6 +96,21 @@ await test('Guarda CAE junto con punto de venta y secuencia fiscal', async () =>
   const response = await request(); assert.equal(response.status, 200, JSON.stringify(response.body));
   assert.equal(state.sale.numero_comprobante, '0003-00000126'); assert.equal(state.sale.punto_venta, 3);
   assert.equal(state.sale.numero_secuencial, 126); assert.equal(state.sale.cae, '86406153037880');
+});
+await test('Licencia mensual se envía como servicio con sus fechas', async () => {
+  Object.assign(state.sale, { concepto_arca: 2, servicio_desde: '2026-10-01', servicio_hasta: '2026-10-31', servicio_vencimiento_pago: '2026-11-05' });
+  assert.equal((await request()).status, 200);
+  for (const text of ['<ar:Concepto>2</ar:Concepto>','<ar:FchServDesde>20261001</ar:FchServDesde>','<ar:FchServHasta>20261031</ar:FchServHasta>','<ar:FchVtoPago>20261105</ar:FchVtoPago>']) assert.ok(state.solicitudSoap.includes(text),text);
+});
+await test('Servicio sin fechas no solicita CAE', async () => {
+  state.sale.concepto_arca = 2;
+  assert.equal((await request()).status, 400);assert.equal(state.calls.length, 0);
+});
+await test('Recuperación de servicio rechaza otro período', async () => {
+  Object.assign(state.sale, { concepto_arca: 2, servicio_desde: '2026-10-01', servicio_hasta: '2026-10-31', servicio_vencimiento_pago: '2026-11-05' });
+  state.failNetwork = true;await request();state.failNetwork = false;
+  state.consultXml = consultXml().replace('</ResultGet>','<Concepto>2</Concepto><FchServDesde>20260901</FchServDesde><FchServHasta>20260930</FchServHasta><FchVtoPago>20261105</FchVtoPago></ResultGet>');
+  assert.equal((await request()).status,400);assert.equal(state.calls.filter(x => x.endsWith('FECAESolicitar')).length,1);
 });
 await test('Fallo de guardado: reintento recupera CAE sin autenticar ni emitir otra vez', async () => {
   state.failFinal = true; assert.equal((await request()).status, 400);
