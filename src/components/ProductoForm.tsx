@@ -47,7 +47,7 @@ type ProductoFormData = Producto & {
 };
 
 export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: ProductoFormProps) => {
-  const { createProducto, updateProducto, isCreating, isUpdating } = useProductos();
+  const { createProducto, updateProducto, isCreating, isUpdating } = useProductos({ cargarListado: false });
   const { data: proveedores = [] } = useProveedores();
   const { marcas } = useMarcas();
   const { rubros } = useRubros();

@@ -17,13 +17,13 @@ import { ProductoForm } from "@/components/ProductoForm";
 import { AjusteStockDialog } from "@/components/AjusteStockDialog";
 import { Producto } from "@/types/producto";
 import { buildProductoEtiquetasPdfFile, buildProductosEtiquetasPdfFile } from "@/utils/productoEtiquetasPdf";
-import { useTablePagination } from "@/hooks/useTablePagination";
+import { useProductosPagina } from "@/hooks/useProductosPagina";
 import { TablePaginationControls } from "@/components/TablePaginationControls";
 
 type PrintMode = "full-sheet" | "selected-products";
 
 export const ProductosList = () => {
-  const { productos, isLoading, error, deleteProducto } = useProductos();
+  const { deleteProducto } = useProductos({ cargarListado: false });
   const { data: parametrizacion } = useComercioParametrizacion();
   const { comercio } = useComercio();
   const { toast } = useToast();
@@ -37,20 +37,17 @@ export const ProductosList = () => {
   const [printMode, setPrintMode] = useState<PrintMode>("full-sheet");
   const [labelSearchTerm, setLabelSearchTerm] = useState("");
   const [labelQuantities, setLabelQuantities] = useState<Record<string, string>>({});
+  const [labelProducts, setLabelProducts] = useState<Record<string, Producto>>({});
   const [includeComercioLogo, setIncludeComercioLogo] = useState(false);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
   const permiteImprimirEtiquetas = Boolean(parametrizacion?.funciones.impresion_etiquetas_productos);
   const comercioLogoUrl = comercio?.logo_url?.trim() || "";
 
-  const filteredProductos = productos.filter((producto) =>
-    producto.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    producto.cod_producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (producto.cod_barras && producto.cod_barras.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (producto.marca?.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (producto.proveedor?.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  const pagination = useTablePagination(filteredProductos, 'productos-registros-por-pagina', searchTerm);
+  const { productos, isLoading, isFetching, isSearching, error, pagination } = useProductosPagina(searchTerm);
+  const labelQuery = useProductosPagina(labelSearchTerm, {
+    etiquetas: true,
+    enabled: isPrintDialogOpen && printMode === "selected-products" && Boolean(labelSearchTerm.trim()),
+  });
 
   const selectedLabelProductIds = new Set(
     Object.entries(labelQuantities)
@@ -58,19 +55,10 @@ export const ProductosList = () => {
       .map(([productoId]) => productoId)
   );
 
-  const labelSearchResults = productos.filter((producto) => {
-    const term = labelSearchTerm.toLowerCase().trim();
-    if (!term || selectedLabelProductIds.has(producto.id)) return false;
+  const labelSearchResults = labelQuery.productos
+    .filter((producto) => !selectedLabelProductIds.has(producto.id)).slice(0, 8);
 
-    return (
-      producto.descripcion.toLowerCase().includes(term) ||
-      producto.cod_producto.toLowerCase().includes(term) ||
-      (producto.cod_barras && producto.cod_barras.toLowerCase().includes(term)) ||
-      (producto.marca?.nombre.toLowerCase().includes(term))
-    );
-  }).slice(0, 8);
-
-  const selectedLabelItems = productos
+  const selectedLabelItems = Object.values(labelProducts)
     .map((producto) => ({
       producto,
       cantidad: Math.floor(Number(labelQuantities[producto.id] || 0)),
@@ -94,11 +82,13 @@ export const ProductosList = () => {
     setPrintMode("full-sheet");
     setLabelSearchTerm("");
     setLabelQuantities({});
+    setLabelProducts({});
     setIncludeComercioLogo(false);
     setIsPrintDialogOpen(true);
   };
 
   const handleAddLabelProduct = (producto: Producto) => {
+    setLabelProducts((current) => ({ ...current, [producto.id]: producto }));
     setLabelQuantities((current) => ({
       ...current,
       [producto.id]: current[producto.id] || "1",
@@ -181,11 +171,6 @@ export const ProductosList = () => {
     return `${symbol} ${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  if (error) return <p role="alert" className="text-destructive">No se pudieron cargar los productos. Volvé a cargar el listado.</p>;
-  if (isLoading) {
-    return <div className="text-center p-4">Cargando productos...</div>;
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -222,7 +207,8 @@ export const ProductosList = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        {error && <p role="alert" className="text-destructive">No se pudieron cargar los productos. Volvé a cargar el listado.</p>}
+        <div className="overflow-x-auto" aria-busy={isFetching || isSearching}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -239,14 +225,16 @@ export const ProductosList = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProductos.length === 0 ? (
+              {isLoading || isFetching || isSearching ? (
+                <TableRow><TableCell colSpan={10} className="text-center py-4">Cargando productos...</TableCell></TableRow>
+              ) : productos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-4">
                     No se encontraron productos
                   </TableCell>
                 </TableRow>
               ) : (
-                pagination.items.map((producto) => (
+                productos.map((producto) => (
                   <TableRow key={producto.id}>
                     <TableCell className="font-medium">{producto.cod_producto}</TableCell>
                     <TableCell>{producto.cod_barras || '-'}</TableCell>
@@ -326,7 +314,7 @@ export const ProductosList = () => {
             </TableBody>
           </Table>
         </div>
-        <TablePaginationControls id="productos" label="productos" pagination={pagination} />
+        {!isFetching && !isSearching && !error && <TablePaginationControls id="productos" label="productos" pagination={pagination} />}
       </CardContent>
       <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -397,7 +385,11 @@ export const ProductosList = () => {
                     <div className="max-h-52 overflow-y-auto rounded-md border">
                       <Table>
                         <TableBody>
-                          {labelSearchResults.length === 0 ? (
+                          {labelQuery.isFetching || labelQuery.isSearching ? (
+                            <TableRow><TableCell className="text-center py-4">Buscando productos...</TableCell></TableRow>
+                          ) : labelQuery.error ? (
+                            <TableRow><TableCell role="alert" className="text-center py-4 text-destructive">No se pudieron buscar los productos.</TableCell></TableRow>
+                          ) : labelSearchResults.length === 0 ? (
                             <TableRow>
                               <TableCell className="text-center py-4">
                                 No se encontraron productos para agregar

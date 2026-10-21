@@ -29,7 +29,7 @@ const normalizeProductoPayload = <T extends ProductoInsert | ProductoUpdate>(pro
   return normalized as T;
 };
 
-export const useProductos = () => {
+export const useProductos = ({ cargarListado = true }: { cargarListado?: boolean } = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio(); const comercioId = comercio?.id;
@@ -40,7 +40,7 @@ export const useProductos = () => {
     error,
   } = useQuery({
     queryKey: ["productos", comercioId],
-    enabled: Boolean(comercioId),
+    enabled: Boolean(comercioId) && cargarListado,
     queryFn: async () => {
       return fetchMasterRecords<Producto>((from, to) => supabase
         .from("productos")
