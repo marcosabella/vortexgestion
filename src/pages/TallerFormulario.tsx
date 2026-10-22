@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTaller } from '@/hooks/useTaller';
+import { puedeEditarConceptosTaller } from '@/types/taller';
 import { TallerLayout, TallerEmpty, type TallerData } from '@/components/taller/TallerUI';
 import { VehiculoForm, TecnicoForm, OrdenTallerForm, ItemTallerForm } from '@/components/taller/TallerForms';
 
@@ -24,7 +25,7 @@ function Formulario({ data, tipo, editar }: { data: TallerData; tipo: TipoFormul
   const volver = tipo === 'vehiculo' ? '/taller/vehiculos' : tipo === 'tecnico' ? '/taller/tecnicos' : ordenId ? `/taller/ordenes/${ordenId}` : '/taller/ordenes';
   const titulo = tipo === 'vehiculo' ? (editar ? 'Editar vehículo' : 'Nuevo vehículo') : tipo === 'tecnico' ? (editar ? 'Editar técnico' : 'Nuevo técnico') : tipo === 'orden' ? (editar ? 'Datos del trabajo' : 'Nueva orden de trabajo') : (editar ? 'Editar concepto' : 'Agregar concepto');
   const inexistente = editar && ((tipo === 'vehiculo' && !vehiculo) || (tipo === 'tecnico' && !tecnico) || (tipo === 'orden' && !orden) || (tipo === 'concepto' && !item));
-  const protegido = orden && ((tipo === 'orden' && ['entregado', 'cancelado'].includes(orden.estado)) || (tipo === 'concepto' && (!['recibido', 'diagnostico'].includes(orden.estado) || Boolean(orden.presupuesto_id))));
+  const protegido = orden && ((tipo === 'orden' && ['entregado', 'cancelado'].includes(orden.estado)) || (tipo === 'concepto' && !puedeEditarConceptosTaller(orden)));
   const cerrar = () => navigate(volver);
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-semibold">{titulo}</h2><Button asChild variant="outline" disabled={data.isPending}><Link to={volver}><ArrowLeft className="mr-2 h-4 w-4" />Volver</Link></Button></div>

@@ -6,9 +6,13 @@ export const ESTADOS_TALLER = {
   entregado: 'Entregado', cancelado: 'Cancelado',
 } as const;
 export type EstadoTaller = keyof typeof ESTADOS_TALLER;
-export const TRANSICIONES_TALLER: Partial<Record<EstadoTaller, EstadoTaller>> = {
-  recibido: 'diagnostico', presupuestado: 'aprobado', aprobado: 'en_reparacion', en_reparacion: 'listo', listo: 'entregado',
+export const TRANSICIONES_TALLER: Partial<Record<EstadoTaller, EstadoTaller[]>> = {
+  recibido: ['en_reparacion', 'diagnostico'], diagnostico: ['en_reparacion'],
+  presupuestado: ['en_reparacion', 'aprobado'], aprobado: ['en_reparacion'],
+  en_reparacion: ['listo'], listo: ['entregado'],
 };
+export const puedeEditarConceptosTaller = (orden: Pick<TallerOrden, 'estado' | 'venta_id'>) =>
+  !['entregado', 'cancelado'].includes(orden.estado) && !orden.venta_id;
 export type TallerVehiculo = {
   id: string; comercio_id: string; cliente_id: string; patente: string; marca: string; modelo: string;
   anio: number | null; vin: string | null; kilometraje: number; observaciones: string; activo: boolean;
@@ -57,6 +61,7 @@ export type TallerDatabase = Omit<Database, 'public'> & {
       taller_guardar_orden: Rpc<{ p_comercio_id: string; p_id: string | null; p_version: number | null; p_datos: Json }, string>;
       taller_guardar_item: Rpc<{ p_orden_id: string; p_version: number; p_id: string | null; p_datos: Json; p_eliminar: boolean }, string>;
       taller_cambiar_estado: Rpc<{ p_orden_id: string; p_version: number; p_estado: string; p_detalle: string }, undefined>;
+      taller_finalizar_orden: Rpc<{ p_orden_id: string; p_version: number; p_trabajo_realizado: string; p_detalle: string }, undefined>;
       taller_generar_presupuesto: Rpc<{ p_orden_id: string; p_version: number }, string>;
       taller_facturar_orden: Rpc<{ p_orden_id: string; p_tipo: Database['public']['Enums']['tipo_comprobante']; p_pagos: Json }, string>;
     };

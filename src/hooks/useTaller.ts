@@ -16,9 +16,9 @@ export function tallerError(error: unknown): string {
   const messages: Record<string, string> = {
     version_desactualizada: 'Otra persona modificó la orden. Actualizá los datos y volvé a intentar.',
     sin_permisos_o_deshabilitado: 'El módulo no está habilitado o no tenés permisos de administrador.',
-    detalle_congelado: 'El presupuesto ya está emitido. El detalle de esa orden está protegido.',
+    detalle_congelado: 'La orden está cerrada o ya tiene una venta. Sus conceptos están protegidos.',
     presupuesto_protegido: 'Este presupuesto pertenece a Taller. Gestioná el trabajo desde su orden.',
-    orden_no_lista: 'La orden debe estar lista para entregar antes de generar la venta.',
+    orden_no_lista: 'La orden debe estar lista para entregar o entregada antes de generar la venta.',
     pagos_no_coinciden: 'La suma de los pagos debe coincidir con el total.',
     trabajo_realizado_requerido: 'Completá el trabajo realizado antes de marcar la orden como lista.',
     kilometraje_inferior: 'El kilometraje no puede ser inferior al registrado en el vehículo.',
@@ -62,7 +62,7 @@ export function useTaller() {
     },
   });
   type Functions = TallerDatabase['public']['Functions'];
-  type FunctionName = 'taller_guardar_catalogo' | 'taller_guardar_marca_modelo' | 'taller_guardar_orden' | 'taller_guardar_item' | 'taller_cambiar_estado' | 'taller_generar_presupuesto' | 'taller_facturar_orden';
+  type FunctionName = 'taller_guardar_catalogo' | 'taller_guardar_marca_modelo' | 'taller_guardar_orden' | 'taller_guardar_item' | 'taller_cambiar_estado' | 'taller_finalizar_orden' | 'taller_generar_presupuesto' | 'taller_facturar_orden';
   type Operation = { [Name in FunctionName]: { name: Name; args: Functions[Name]['Args'] } }[FunctionName];
   const mutation = useMutation({
     mutationFn: async (operation: Operation) => {
@@ -140,7 +140,8 @@ export function useTallerDocumento(comercioId: string | undefined, id: string | 
       const { data, error } = await db.from(tipo === 'venta' ? 'ventas' : 'presupuestos').select(`*,cliente:clientes(nombre,apellido,cuit,calle,numero,localidad,provincia,codigo_postal,telefono,situacion_afip,tipo_persona),${relations}`).eq('comercio_id', comercioId!).eq('id', id!).maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      const row = data as unknown as Venta & { presupuesto_items?: Venta['venta_items']; presupuesto_pagos?: Venta['pagos_venta'] };
+      const row = data as unknown as Venta & { origen_taller_automatico?: boolean; presupuesto_items?: Venta['venta_items']; presupuesto_pagos?: Venta['pagos_venta'] };
+      if (tipo === 'presupuesto' && row.origen_taller_automatico) return null;
       return tipo === 'venta' ? row : { ...row, venta_items: row.presupuesto_items, pagos_venta: row.presupuesto_pagos };
     },
   });

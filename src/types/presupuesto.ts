@@ -1,6 +1,7 @@
 import { Venta } from "@/types/venta";
 
 export interface Presupuesto extends Venta {
+  origen_taller_automatico?: boolean;
   estado: "pendiente" | "confirmado";
   venta_id?: string | null;
   confirmado_at?: string | null;

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { TallerLineaTiempo } from '@/components/taller/TallerLineaTiempo';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,14 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FacturaImpresion } from '@/components/FacturaImpresion';
-import { PagosVentaManager } from '@/components/PagosVentaManager';
-import { TallerLayout, TallerEstado, TallerEmpty, TallerReadOnlyField, TallerCampo, tallerSelectClass, type TallerData } from '@/components/taller/TallerUI';
+import { FacturarOrdenForm } from '@/components/taller/FacturarOrdenForm';
+import { TallerLayout, TallerEstado, TallerEmpty, TallerReadOnlyField, TallerCampo, type TallerData } from '@/components/taller/TallerUI';
 import { TallerModal } from '@/components/taller/TallerForms';
-import { useTaller, useTallerEventos, useTallerDocumento, tallerJson } from '@/hooks/useTaller';
+import { FinalizarTrabajoModal } from '@/components/taller/FinalizarTrabajoModal';
+import { useTaller, useTallerEventos, useTallerDocumento } from '@/hooks/useTaller';
 import { useClientes } from '@/hooks/useClientes';
 import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
-import { ESTADOS_TALLER, TRANSICIONES_TALLER, type EstadoTaller, type TallerItem, type TallerOrden } from '@/types/taller';
-import { type PagoVenta, type TipoComprobante, getTotalPagosBase, getVentaTotalFinal } from '@/types/venta';
+import { ESTADOS_TALLER, TRANSICIONES_TALLER, puedeEditarConceptosTaller, type EstadoTaller, type TallerItem, type TallerOrden } from '@/types/taller';
+import { getVentaTotalFinal } from '@/types/venta';
 import { fechaTaller, moneyTaller, numeroOrdenTaller, totalTaller } from '@/utils/taller';
 import { OrdenTallerImpresion } from '@/components/taller/OrdenTallerImpresion';
 
@@ -36,16 +36,20 @@ function OrdenDetalle({ data, orden }: { data: TallerData; orden: TallerOrden })
   const [confirm, setConfirm] = useState<{ tipo: 'estado' | 'presupuesto' | 'eliminar'; estado?: EstadoTaller; item?: TallerItem } | null>(null);
   const [detalle, setDetalle] = useState('');
   const [facturar, setFacturar] = useState(false);
+  const [finalizar, setFinalizar] = useState(false);
   const vehiculo = data.vehiculos.find(row => row.id === orden.vehiculo_id);
   const cliente = clientes.find(row => row.id === orden.cliente_id);
   const nombreCliente = cliente ? `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente no disponible';
   const tecnico = data.tecnicos.find(row => row.id === orden.tecnico_id);
   const items = data.items.filter(row => row.orden_id === orden.id);
   const total = totalTaller(items);
-  const detalleEditable = data.isAdmin && ['recibido','diagnostico'].includes(orden.estado) && !orden.presupuesto_id;
+  const detalleEditable = data.isAdmin && puedeEditarConceptosTaller(orden);
   const cerrado = ['cancelado','entregado'].includes(orden.estado);
   const siguiente = TRANSICIONES_TALLER[orden.estado];
-  const abrirConfirmacion = (value: typeof confirm) => { setDetalle(''); setConfirm(value); };
+  const abrirConfirmacion = (value: typeof confirm) => {
+    if (value?.tipo === 'estado' && value.estado === 'listo') { setFinalizar(true); return; }
+    setDetalle(''); setConfirm(value);
+  };
   const confirmar = async () => {
     if (!confirm || data.isPending) return;
     try {
@@ -60,11 +64,12 @@ function OrdenDetalle({ data, orden }: { data: TallerData; orden: TallerOrden })
     <div className="flex flex-wrap gap-2">
       {data.isAdmin && !cerrado && <Button asChild variant="outline"><Link to={`/taller/ordenes/${orden.id}/editar`}><Pencil className="mr-2 h-4 w-4" />Datos del trabajo</Link></Button>}
       {vehiculo && (parametros.funciones.impresion_comprobantes || parametros.funciones.exportacion_pdf) && <OrdenTallerImpresion orden={orden} vehiculo={vehiculo} items={items} cliente={cliente} comercio={data.comercio} responsable={tecnico?.nombre || ''} showPrint={parametros.funciones.impresion_comprobantes} showPdf={parametros.funciones.exportacion_pdf} />}
-      {detalleEditable && <Button disabled={data.isPending || !items.length} onClick={() => abrirConfirmacion({ tipo: 'presupuesto' })}>Generar presupuesto</Button>}
-      {data.isAdmin && siguiente && <Button disabled={data.isPending || (siguiente === 'entregado' && !orden.venta_id)} onClick={() => abrirConfirmacion({ tipo: 'estado', estado: siguiente })}>Marcar {ESTADOS_TALLER[siguiente]}</Button>}
-      {data.isAdmin && orden.estado === 'listo' && !orden.venta_id && <Button disabled={data.isPending} onClick={() => setFacturar(true)}>Generar venta / cobro</Button>}
+      {detalleEditable && !orden.presupuesto_id && <Button disabled={data.isPending || total <= 0} onClick={() => abrirConfirmacion({ tipo: 'presupuesto' })}>Generar presupuesto</Button>}
+      {data.isAdmin && siguiente?.map(estado => <Button key={estado} disabled={data.isPending} onClick={() => abrirConfirmacion({ tipo: 'estado', estado })}>{estado === 'listo' ? 'Finalizar trabajo' : `Marcar ${ESTADOS_TALLER[estado]}`}</Button>)}
+      {data.isAdmin && ['listo', 'entregado'].includes(orden.estado) && !orden.venta_id && <Button disabled={data.isPending || total <= 0} onClick={() => setFacturar(true)}>Generar venta / cobro</Button>}
       {data.isAdmin && !cerrado && !orden.venta_id && <Button variant="outline" disabled={data.isPending} onClick={() => abrirConfirmacion({ tipo: 'estado', estado: 'cancelado' })}>Cancelar orden</Button>}
     </div>
+    <p className="text-sm text-muted-foreground">Podés ingresar directamente a reparación. Diagnóstico y presupuesto son opcionales. Agregá conceptos hasta generar la venta o cerrar la orden. Si modificás una orden presupuestada, se actualizará el presupuesto y quedará sin efecto su aprobación anterior.</p>
     <Tabs defaultValue="datos" className="space-y-4">
       <TabsList className="grid h-auto w-full grid-cols-3"><TabsTrigger className="whitespace-normal" value="datos">Datos de la orden</TabsTrigger><TabsTrigger value="historial">Historial</TabsTrigger><TabsTrigger className="whitespace-normal" value="comercial">Gestión comercial</TabsTrigger></TabsList>
       <TabsContent value="datos" className="space-y-5">
@@ -77,7 +82,7 @@ function OrdenDetalle({ data, orden }: { data: TallerData; orden: TallerOrden })
         </TableBody></Table></div>
         <p className="text-right text-xl font-semibold">Total: {moneyTaller(total)}</p>
         {data.isAdmin && <p className="text-right text-sm text-muted-foreground">Costo previsto: {moneyTaller(items.reduce((sum,item) => sum + item.cantidad * item.costo_unitario,0))}. Los costos previstos no generan movimientos financieros.</p>}
-        {!detalleEditable && <p className="text-sm text-muted-foreground">El detalle está protegido desde la emisión del presupuesto para conservar lo aprobado.</p>}
+        {!detalleEditable && <p className="text-sm text-muted-foreground">Los conceptos quedan protegidos al generar la venta o cerrar la orden.</p>}
       </section>
       </TabsContent>
       <TabsContent value="historial">
@@ -95,15 +100,8 @@ function OrdenDetalle({ data, orden }: { data: TallerData; orden: TallerOrden })
     {!orden.presupuesto_id && !orden.venta_id && <TallerEmpty>No hay comprobantes vinculados a esta orden.</TallerEmpty>}
       </TabsContent>
     </Tabs>
-    {confirm && <TallerModal title={confirm.tipo === 'presupuesto' ? 'Generar presupuesto' : confirm.tipo === 'eliminar' ? 'Eliminar concepto' : `Marcar ${ESTADOS_TALLER[confirm.estado!]}`} open pending={data.isPending} onClose={() => setConfirm(null)}><p className="text-sm">{confirm.tipo === 'presupuesto' ? 'Se generará un presupuesto en Vortex Gestión y el detalle quedará protegido. El stock no se modifica.' : confirm.tipo === 'eliminar' ? `Se quitará ${confirm.item?.descripcion} de la orden.` : confirm.estado === 'entregado' ? 'Se registrará la fecha de entrega y se cerrará el trabajo.' : 'Registrá el detalle de este cambio de estado.'}</p>{confirm.tipo === 'estado' && <TallerCampo label={confirm.estado === 'aprobado' ? 'Quién aprobó y por qué medio *' : confirm.estado === 'cancelado' ? 'Motivo de cancelación *' : 'Observaciones'}><Textarea value={detalle} onChange={event => setDetalle(event.target.value)} /></TallerCampo>}<Button disabled={data.isPending || (['aprobado','cancelado'].includes(confirm.estado || '') && !detalle.trim())} onClick={confirmar}>{data.isPending ? 'Guardando...' : 'Confirmar'}</Button></TallerModal>}
-    {facturar && <TallerModal title="Generar venta y registrar cobro" open pending={data.isPending} onClose={() => setFacturar(false)}><FacturarOrden data={data} orden={orden} total={total} onClose={() => setFacturar(false)} /></TallerModal>}
+    {confirm && <TallerModal title={confirm.tipo === 'presupuesto' ? 'Generar presupuesto' : confirm.tipo === 'eliminar' ? 'Eliminar concepto' : `Marcar ${ESTADOS_TALLER[confirm.estado!]}`} open pending={data.isPending} onClose={() => setConfirm(null)}><p className="text-sm">{confirm.tipo === 'presupuesto' ? 'Se generará un presupuesto en Vortex Gestión. Si modificás conceptos, se actualizará y su aprobación quedará sin efecto. El stock no se modifica.' : confirm.tipo === 'eliminar' ? `Se quitará ${confirm.item?.descripcion} de la orden.` : confirm.estado === 'entregado' ? 'Se registrará la fecha de entrega y se cerrará el trabajo. Podés generar la venta y registrar el cobro ahora o después de la entrega.' : 'Registrá el detalle de este cambio de estado.'}</p>{confirm.tipo === 'estado' && <TallerCampo label={confirm.estado === 'aprobado' ? 'Quién aprobó y por qué medio *' : confirm.estado === 'cancelado' ? 'Motivo de cancelación *' : 'Observaciones'}><Textarea value={detalle} onChange={event => setDetalle(event.target.value)} /></TallerCampo>}<Button disabled={data.isPending || (['aprobado','cancelado'].includes(confirm.estado || '') && !detalle.trim())} onClick={confirmar}>{data.isPending ? 'Guardando...' : 'Confirmar'}</Button></TallerModal>}
+    {finalizar && <FinalizarTrabajoModal data={data} orden={orden} onClose={() => setFinalizar(false)} />}
+    {facturar && <TallerModal title="Generar venta y registrar cobro" description="Elegí el comprobante y registrá cómo paga el cliente. La cuenta corriente es opcional." open pending={data.isPending} onClose={() => setFacturar(false)}><FacturarOrdenForm data={data} orden={orden} total={total} onClose={() => setFacturar(false)} /></TallerModal>}
   </div>;
-}
-function FacturarOrden({ data, orden, total, onClose }: { data: TallerData; orden: TallerOrden; total: number; onClose: () => void }) {
-  const [tipo, setTipo] = useState<TipoComprobante>('recibo_x');
-  const [pagos, setPagos] = useState<PagoVenta[]>([{ tipo_pago: 'cta_cte', monto: total }]);
-  return <div className="space-y-4"><TallerCampo label="Comprobante"><select className={tallerSelectClass} value={tipo} onChange={event => setTipo(event.target.value as TipoComprobante)}><option value="recibo_x">Recibo X</option><option value="factura_a">Factura A</option><option value="factura_b">Factura B</option><option value="factura_c">Factura C</option></select></TallerCampo><PagosVentaManager totalVenta={total} clienteId={orden.cliente_id} pagos={pagos} onChange={setPagos} /><p className="text-sm text-muted-foreground">Podés dejar el total en cuenta corriente o reemplazarlo por pagos. El CAE se solicita luego desde Ventas.</p><Button className="w-full" disabled={data.isPending || Math.abs(getTotalPagosBase(pagos)-total)>0.005} onClick={async () => {
-    if (Math.abs(getTotalPagosBase(pagos)-total)>0.005) { toast.error('Los pagos no coinciden con el total.'); return; }
-    try { await data.run({ name: 'taller_facturar_orden', args: { p_orden_id: orden.id, p_tipo: tipo, p_pagos: tallerJson(pagos) } }); onClose(); } catch { /* Error informado por la mutación. */ }
-  }}>{data.isPending ? 'Generando venta...' : `Generar venta por ${moneyTaller(total)}`}</Button></div>;
 }

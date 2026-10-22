@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,6 +44,15 @@ export const ChequeDialogForm = ({ open, onOpenChange, onSubmit, monto, clienteI
       fecha_vencimiento: format(new Date(), 'yyyy-MM-dd'),
     },
   });
+
+  useEffect(() => {
+    if (open) reset({
+      numero_cheque: '', banco_emisor: '', monto,
+      fecha_emision: format(new Date(), 'yyyy-MM-dd'),
+      fecha_vencimiento: format(new Date(), 'yyyy-MM-dd'),
+      emisor_nombre: '', emisor_cuit: '', observaciones: '',
+    });
+  }, [open, monto, reset]);
 
   const handleFormSubmit = (data: ChequeFormData) => {
     onSubmit(data);

@@ -18,8 +18,8 @@ import { TallerClienteBuscador } from './TallerClienteBuscador';
 import { itemTallerSchema, vehiculoSchema } from '@/utils/taller';
 import { TallerCampo, tallerSelectClass, type TallerData } from './TallerUI';
 
-export function TallerModal({ title, open, onClose, pending, children }: { title: string; open: boolean; onClose: () => void; pending: boolean; children: React.ReactNode }) {
-  return <Dialog open={open} onOpenChange={value => { if (!value && !pending) onClose(); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>Completá los datos del comercio actual y guardá los cambios.</DialogDescription></DialogHeader>{children}</DialogContent></Dialog>;
+export function TallerModal({ title, open, onClose, pending, children, description = 'Completá los datos del comercio actual y guardá los cambios.' }: { title: string; open: boolean; onClose: () => void; pending: boolean; children: React.ReactNode; description?: string }) {
+  return <Dialog open={open} onOpenChange={value => { if (!value && !pending) onClose(); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>{children}</DialogContent></Dialog>;
 }
 function Submit({ pending, onClose }: { pending: boolean; onClose: () => void }) {
   return <div className="flex flex-wrap justify-end gap-2 pt-3"><Button type="button" variant="outline" disabled={pending} onClick={onClose}>Cancelar</Button><Button type="submit" disabled={pending}>{pending ? 'Guardando...' : 'Guardar'}</Button></div>;
@@ -111,7 +111,7 @@ export function ItemTallerForm({ data, orden, item, onClose }: { data: TallerDat
     </>}
     <TallerCampo label="Descripción"><Input {...form.register('descripcion')} /></TallerCampo>
     <div className="grid gap-4 sm:grid-cols-2">
-      <TallerCampo label="Cantidad / horas"><Input type="number" min="0.0001" step={tipo === 'repuesto' ? '1' : '0.0001'} {...form.register('cantidad', { valueAsNumber: true })} /></TallerCampo>
+      <TallerCampo label="Cantidad / horas"><Input type="number" min={tipo === 'repuesto' ? '1' : '0.0001'} max="999999" step={tipo === 'repuesto' ? '1' : '0.0001'} {...form.register('cantidad', { valueAsNumber: true })} /></TallerCampo>
       <TallerCampo label="Precio unitario con IVA"><Input type="number" min="0" step="0.01" {...form.register('precio_unitario', { valueAsNumber: true })} /></TallerCampo>
       <TallerCampo label="IVA (%)"><Input type="number" min="0" max="100" step="0.01" {...form.register('porcentaje_iva', { valueAsNumber: true })} /></TallerCampo>
       <TallerCampo label="Costo unitario previsto"><Input type="number" min="0" step="0.01" {...form.register('costo_unitario', { valueAsNumber: true })} /></TallerCampo>

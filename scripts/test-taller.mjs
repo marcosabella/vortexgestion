@@ -121,6 +121,119 @@ try {
   sql(actor+`SELECT taller_guardar_catalogo('${tenant}','vehiculo','${mapped}',${json({...vehicleData,patente:'EF345GH',marca_id:brand,modelo_id:model,kilometraje:1006})});`);
   test('Cambiar vehiculo no modifica datos del presupuesto emitido',actor+check(`SELECT taller_vehiculo->>'patente'='CD234EF' AND taller_vehiculo->>'marca'='RENAULT' AND (taller_vehiculo->>'kilometraje')::integer=1005 FROM presupuestos WHERE id='${anotherBudget}'`,'datos congelados')+fails(`UPDATE presupuestos SET taller_vehiculo='{}' WHERE id='${anotherBudget}';`,'taller_presupuesto_protegido'));
   test('Proteccion del presupuesto restaurada tras reparacion',check(`SELECT tgenabled='O' FROM pg_trigger WHERE tgname='taller_presupuesto_protegido'`,'trigger activo'));
+  sql(migration('20261022120000_taller_flujo_flexible.sql'));
+  const flexible=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+  const flexVersion=()=>Number(sql(`SELECT version FROM taller_ordenes WHERE id='${flexible}'`).trim());
+  const flexState=next=>`SELECT taller_cambiar_estado('${flexible}',${flexVersion()},'${next}','');`;
+  const flexAdd=(data=service)=>`SELECT taller_guardar_item('${flexible}',${flexVersion()},NULL,${json(data)},false);`;
+  test('Ingresa directo a reparacion sin diagnostico ni presupuesto',actor+flexState('en_reparacion')+check(`SELECT estado='en_reparacion' AND presupuesto_id IS NULL AND aprobacion_cliente IS NULL FROM taller_ordenes WHERE id='${flexible}'`,'flujo directo'));
+  test('Permite cargar mano de obra durante reparacion',actor+flexAdd());
+  test('Mantiene control de version y tenant en flujo flexible',actor+fails(`SELECT taller_guardar_item('${flexible}',1,NULL,${json(service)},false);`,'taller_version_desactualizada')+fails(flexAdd({...part,producto_id:foreignProduct,producto_variante_id:null}),'taller_producto_otro_comercio'));
+  sql(actor+`SELECT taller_guardar_orden('${tenant}','${flexible}',${flexVersion()},${json({trabajo_realizado:'Service directo'})});`);
+  sql(actor+flexState('listo'));
+  test('Permite agregar repuestos al finalizar antes de facturar',actor+flexAdd(part));
+  const directSale=sql(actor+`SELECT taller_facturar_orden('${flexible}','recibo_x',${json(pay)});`).trim();
+  test('Factura sin presupuesto previo con stock y deuda correctos',actor+check(`SELECT venta_id='${directSale}' AND estado='listo' FROM taller_ordenes WHERE id='${flexible}'`,'venta directa')+check(`SELECT total=423.5 FROM ventas WHERE id='${directSale}'`,'total final')+check(`SELECT stock=6 FROM producto_variantes WHERE id='${variant}'`,'stock directo')+check(`SELECT sum(monto)=423.5 FROM cuenta_corriente WHERE venta_id='${directSale}'`,'deuda directa')+fails(flexAdd(),'taller_detalle_congelado'));
+  test('Reintento de venta directa no duplica stock',actor+check(`SELECT taller_facturar_orden('${flexible}','recibo_x',${json(pay)})='${directSale}'`,'reintento directo')+check(`SELECT stock=6 FROM producto_variantes WHERE id='${variant}'`,'stock idempotente'));
+  sql(actor+flexState('entregado'));
+  // La orden presupuestada anterior sigue abierta: cambiar conceptos debe
+  // actualizar totales y pagos, sin permitir edicion directa del comprobante.
+  const quoteVersion=()=>Number(sql(`SELECT version FROM taller_ordenes WHERE id='${anotherOrder}'`).trim());
+  sql(actor+`SELECT taller_cambiar_estado('${anotherOrder}',${quoteVersion()},'aprobado','Cliente por telefono');`);
+  const external={...service,tipo:'servicio_externo',proveedor_id:product,descripcion:'Rectificacion'};
+  const extra=sql(actor+`SELECT taller_guardar_item('${anotherOrder}',${quoteVersion()},NULL,${json(external)},false);`).trim();
+  test('Agregar servicio externo actualiza presupuesto e invalida aprobacion',actor+check(`SELECT total=363 AND subtotal=300 AND total_iva=63 FROM presupuestos WHERE id='${anotherBudget}'`,'presupuesto actualizado')+check(`SELECT estado='presupuestado' AND aprobacion_cliente IS NULL FROM taller_ordenes WHERE id='${anotherOrder}'`,'aprobacion invalidada')+check(`SELECT sum(monto)=363 FROM presupuesto_pagos WHERE presupuesto_id='${anotherBudget}'`,'pagos actualizados')+fails(`UPDATE presupuesto_items SET precio_unitario=1 WHERE presupuesto_id='${anotherBudget}';`,'taller_presupuesto_protegido'));
+  sql(actor+`SELECT taller_cambiar_estado('${anotherOrder}',${quoteVersion()},'en_reparacion','');`);
+  sql(actor+`SELECT taller_guardar_item('${anotherOrder}',${quoteVersion()},'${extra}',${json({...external,cantidad:2})},false);`);
+  test('Editar y eliminar conceptos funciona con presupuesto durante reparacion',actor+check(`SELECT total=423.5 FROM presupuestos WHERE id='${anotherBudget}'`,'edicion presupuesto')+`SELECT taller_guardar_item('${anotherOrder}',${quoteVersion()},'${extra}','{}',true);`+check(`SELECT total=181.5 FROM presupuestos WHERE id='${anotherBudget}'`,'eliminacion presupuesto'));
+  const noCharge=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+  sql(actor+`SELECT taller_cambiar_estado('${noCharge}',1,'en_reparacion',''); SELECT taller_guardar_orden('${tenant}','${noCharge}',2,${json({trabajo_realizado:'Revision sin cargo'})}); SELECT taller_cambiar_estado('${noCharge}',3,'listo',''); SELECT taller_cambiar_estado('${noCharge}',4,'entregado','');`);
+  test('Finaliza y entrega sin conceptos ni comprobantes obligatorios',actor+check(`SELECT estado='entregado' AND venta_id IS NULL AND presupuesto_id IS NULL AND entregado_at IS NOT NULL FROM taller_ordenes WHERE id='${noCharge}'`,'sin cargo')+fails(`SELECT taller_guardar_item('${noCharge}',5,NULL,${json(service)},false);`,'taller_detalle_congelado'));
+  sql(migration('20261022123000_taller_finalizar_desde_modal.sql'));
+  const modalOrder=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+  const finish=(ver,work='  Revision y cambio de filtro  ',detail='Control final correcto')=>`SELECT taller_finalizar_orden('${modalOrder}',${ver},${json(work)} #>> '{}',${json(detail)} #>> '{}');`;
+  test('Finalizar en estado invalido revierte tambien el trabajo realizado',actor+fails(finish(1),'taller_transicion_invalida')+check(`SELECT estado='recibido' AND trabajo_realizado='' AND version=1 FROM taller_ordenes WHERE id='${modalOrder}'`,'finalizacion atomica'));
+  sql(actor+`SELECT taller_cambiar_estado('${modalOrder}',1,'en_reparacion','');`);
+  test('Modal requiere trabajo realizado y conserva version ante errores',actor+fails(finish(2,'  '),'taller_trabajo_realizado_requerido')+fails(finish(1),'taller_version_desactualizada')+check(`SELECT trabajo_realizado='' AND version=2 FROM taller_ordenes WHERE id='${modalOrder}'`,'sin cambios parciales'));
+  test('Finalizar desde modal rechaza operador y otro comercio',`SET app.test_user='${operator}'; SET ROLE authenticated; `+fails(finish(2),'taller_sin_permisos')+`SET app.test_user='${foreign}'; `+fails(finish(2),'taller_sin_permisos'));
+  sql(actor+finish(2));
+  test('Finalizar guarda descripcion e historial sin perder otros datos',actor+check(`SELECT estado='listo' AND trabajo_realizado='Revision y cambio de filtro' AND version=3 AND turno='2026-10-10T10:00:00Z' AND motivo='Service' FROM taller_ordenes WHERE id='${modalOrder}'`,'datos finalizacion')+check(`SELECT count(*)=1 FROM taller_orden_eventos WHERE orden_id='${modalOrder}' AND estado_nuevo='listo' AND detalle='Control final correcto'`,'historial finalizacion'));
+  test('Reintento desactualizado no sobrescribe trabajo terminado',actor+fails(finish(2,'Otro trabajo'),'taller_version_desactualizada')+check(`SELECT trabajo_realizado='Revision y cambio de filtro' AND version=3 FROM taller_ordenes WHERE id='${modalOrder}'`,'sin sobrescritura')+check("SELECT NOT has_function_privilege('anon','taller_finalizar_orden(uuid,integer,text,text)','EXECUTE')",'finalizar privado anon'));
+  sql(migration('20261022130000_taller_facturar_orden_entregada.sql'));
+  for (const withQuote of [false,true]) {
+    const label=withQuote?'con presupuesto':'sin presupuesto previo';
+    const delivered=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+    const deliveredVersion=()=>Number(sql(`SELECT version FROM taller_ordenes WHERE id='${delivered}'`).trim());
+    sql(actor+`SELECT taller_guardar_item('${delivered}',1,NULL,${json(service)},false);`);
+    sql(actor+`SELECT taller_guardar_item('${delivered}',2,NULL,${json(part)},false);`);
+    if(withQuote)sql(actor+`SELECT taller_generar_presupuesto('${delivered}',${deliveredVersion()});`);
+    sql(actor+`SELECT taller_cambiar_estado('${delivered}',${deliveredVersion()},'en_reparacion','');`);
+    sql(actor+`SELECT taller_finalizar_orden('${delivered}',${deliveredVersion()},'Service terminado','');`);
+    sql(actor+`SELECT taller_cambiar_estado('${delivered}',${deliveredVersion()},'entregado','');`);
+    const deliveryDate=sql(`SELECT entregado_at::text FROM taller_ordenes WHERE id='${delivered}'`).trim();
+    const previousStock=Number(sql(`SELECT stock FROM producto_variantes WHERE id='${variant}'`).trim());
+    const previousSales=Number(sql('SELECT count(*) FROM ventas').trim());
+    const previousBudgets=Number(sql('SELECT count(*) FROM presupuestos').trim());
+    const deliveredInvoice=payments=>`SELECT taller_facturar_orden('${delivered}','recibo_x',${json(payments)});`;
+    test(`Entrega ${label}: pagos invalidos revierten la operacion completa`,actor+fails(deliveredInvoice([{tipo_pago:'cta_cte',monto:1}]),'taller_pagos_no_coinciden')+fails(deliveredInvoice([{tipo_pago:'transferencia',monto:423.5,banco_id:foreignProduct}]),'banco pertenece a otro comercio')+check(`SELECT count(*)=${previousSales} FROM ventas`,'sin venta parcial entregada')+check(`SELECT count(*)=${previousBudgets} FROM presupuestos`,'sin presupuesto parcial entregada')+check(`SELECT stock=${previousStock} FROM producto_variantes WHERE id='${variant}'`,'sin stock parcial entregada'));
+    test(`Entrega ${label}: operador y otro comercio no facturan`,`SET app.test_user='${operator}'; SET ROLE authenticated; `+fails(deliveredInvoice(pay),'taller_sin_permisos')+`SET app.test_user='${foreign}'; `+fails(deliveredInvoice(pay),'taller_sin_permisos'));
+    const deliveredSale=sql(actor+deliveredInvoice(pay)).trim();
+    test(`Factura orden entregada ${label} sin cambiar su entrega`,actor+check(`SELECT estado='entregado' AND entregado_at='${deliveryDate}'::timestamptz AND venta_id='${deliveredSale}' FROM taller_ordenes WHERE id='${delivered}'`,'entrega conservada')+check(`SELECT total=423.5 FROM ventas WHERE id='${deliveredSale}'`,'total entregada')+check(`SELECT stock=${previousStock-2} FROM producto_variantes WHERE id='${variant}'`,'stock entregada')+check(`SELECT sum(monto)=423.5 FROM cuenta_corriente WHERE venta_id='${deliveredSale}'`,'deuda entregada')+check(`SELECT count(*)=1 FROM taller_orden_eventos WHERE orden_id='${delivered}' AND estado_anterior='entregado' AND estado_nuevo='entregado' AND detalle LIKE 'Venta vinculada:%'`,'historial entregada'));
+    test(`Reintento ${label} no duplica venta ni stock`,actor+check(`SELECT taller_facturar_orden('${delivered}','recibo_x',${json(pay)})='${deliveredSale}'`,'venta unica entregada')+check(`SELECT count(*)=${previousSales+1} FROM ventas`,'cantidad ventas entregada')+check(`SELECT stock=${previousStock-2} FROM producto_variantes WHERE id='${variant}'`,'stock unico entregada')+fails(`SELECT taller_guardar_item('${delivered}',${deliveredVersion()},NULL,${json(service)},false);`,'taller_detalle_congelado')+fails(`UPDATE venta_items SET cantidad=3 WHERE venta_id='${deliveredSale}';`,'taller_venta_protegida'));
+  }
+  test('Facturar sigue rechazando ordenes sin finalizar',actor+fails(`SELECT taller_facturar_orden('${anotherOrder}','recibo_x',${json(pay)});`,'taller_orden_no_lista'));
+  sql(actor+`SELECT taller_cambiar_estado('${anotherOrder}',${quoteVersion()},'cancelado','Cancelado por el cliente');`);
+  test('Facturar sigue rechazando ordenes canceladas',actor+fails(`SELECT taller_facturar_orden('${anotherOrder}','recibo_x',${json(pay)});`,'taller_orden_no_lista'));
+  sql(`INSERT INTO bancos VALUES ('${product}','${tenant}'); INSERT INTO cheques VALUES ('${product}','${tenant}'),('${foreignProduct}','${other}');`);
+  for (const [method,payments,debt] of [
+    ['contado',[{tipo_pago:'contado',monto:181.5}],0],
+    ['transferencia',[{tipo_pago:'transferencia',monto:181.5,banco_id:product}],0],
+    ['cheque',[{tipo_pago:'cheque',monto:181.5,cheque_id:product}],0],
+    ['tarjeta',[{tipo_pago:'tarjeta',monto:181.5,tarjeta_id:product,cuotas:1}],0],
+    ['mixto',[{tipo_pago:'contado',monto:100},{tipo_pago:'cta_cte',monto:81.5}],81.5],
+  ]) {
+    const paidOrder=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+    sql(actor+`SELECT taller_guardar_item('${paidOrder}',1,NULL,${json(service)},false); SELECT taller_cambiar_estado('${paidOrder}',2,'en_reparacion',''); SELECT taller_finalizar_orden('${paidOrder}',3,'Service terminado','');`);
+    if(method==='cheque')test('Cobro de taller rechaza cheque de otro comercio',actor+fails(`SELECT taller_facturar_orden('${paidOrder}','recibo_x',${json([{tipo_pago:'cheque',monto:181.5,cheque_id:foreignProduct}])});`,'cheque pertenece a otro comercio'));
+    const paidSale=sql(actor+`SELECT taller_facturar_orden('${paidOrder}','recibo_x',${json(payments)});`).trim();
+    test(`Venta de taller con pago ${method} conserva el medio elegido`,actor+check(`SELECT count(*)=${payments.length} AND sum(monto)=181.5 FROM pagos_venta WHERE venta_id='${paidSale}'`,'pagos completos')+payments.map(payment=>check(`SELECT count(*)=1 FROM pagos_venta WHERE venta_id='${paidSale}' AND tipo_pago='${payment.tipo_pago}' AND monto=${payment.monto}${payment.banco_id?` AND banco_id='${payment.banco_id}'`:''}${payment.cheque_id?` AND cheque_id='${payment.cheque_id}'`:''}`,'medio correcto')).join('')+check(`SELECT coalesce(sum(monto),0)=${debt} FROM cuenta_corriente WHERE venta_id='${paidSale}'`,'solo deuda elegida'));
+  }
+  sql(migration('20261022140000_taller_venta_directa_sin_presupuesto.sql'));
+  const financialFingerprint=`md5(jsonb_build_object('ventas',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM ventas t),'pagos',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM pagos_venta t),'deuda',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM cuenta_corriente t),'ordenes',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM taller_ordenes t),'stock',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM producto_variantes t))::text)`;
+  const fingerprint=sql(`SELECT ${financialFingerprint}`).trim();
+  sql(migration('20261022141000_taller_clasificar_presupuestos_automaticos.sql'));
+  test('Identifica documentos automaticos sin modificar ventas, deuda, stock ni ordenes',check(`SELECT ${financialFingerprint}='${fingerprint}'`,'datos financieros conservados')+check(`SELECT p.origen_taller_automatico FROM presupuestos p JOIN taller_ordenes o ON o.presupuesto_id=p.id WHERE o.id='${flexible}'`,'automatico identificado')+check(`SELECT NOT origen_taller_automatico FROM presupuestos WHERE id='${budget}'`,'presupuesto emitido conservado'));
+  const marked=Number(sql('SELECT count(*) FROM presupuestos WHERE origen_taller_automatico').trim());
+  sql(migration('20261022141000_taller_clasificar_presupuestos_automaticos.sql'));
+  test('Clasificacion historica es idempotente',check(`SELECT count(*)=${marked} FROM presupuestos WHERE origen_taller_automatico`,'clasificacion estable'));
+  for(const [method,payments,debt] of [
+    ['contado',[{tipo_pago:'contado',monto:181.5}],0],
+    ['transferencia',[{tipo_pago:'transferencia',monto:181.5,banco_id:product}],0],
+    ['cheque',[{tipo_pago:'cheque',monto:181.5,cheque_id:product}],0],
+    ['tarjeta con recargo',[{tipo_pago:'tarjeta',monto:199.65,recargo_cuotas:18.15,tarjeta_id:product,cuotas:3}],0],
+    ['cuenta corriente',[{tipo_pago:'cta_cte',monto:181.5}],181.5],
+    ['mixto',[{tipo_pago:'contado',monto:100},{tipo_pago:'cta_cte',monto:81.5}],81.5],
+  ]) {
+    const direct=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+    sql(actor+`SELECT taller_guardar_item('${direct}',1,NULL,${json(service)},false); SELECT taller_cambiar_estado('${direct}',2,'en_reparacion',''); SELECT taller_finalizar_orden('${direct}',3,'Service terminado','');`);
+    if(method!=='contado')sql(actor+`SELECT taller_cambiar_estado('${direct}',4,'entregado','');`);
+    const beforeBudgets=Number(sql('SELECT count(*) FROM presupuestos').trim());
+    test(`Venta directa ${method}: errores no crean presupuesto ni venta`,actor+fails(`SELECT taller_facturar_orden('${direct}','recibo_x',${json([{tipo_pago:'cta_cte',monto:1}])});`,'taller_pagos_no_coinciden')+fails(`SELECT taller_facturar_orden('${direct}','recibo_x',${json([{tipo_pago:'transferencia',monto:181.5,banco_id:foreignProduct}])});`,'banco pertenece a otro comercio')+check(`SELECT venta_id IS NULL AND presupuesto_id IS NULL FROM taller_ordenes WHERE id='${direct}'`,'sin comprobantes parciales'));
+    const saleId=sql(actor+`SELECT taller_facturar_orden('${direct}','recibo_x',${json(payments)});`).trim();
+    const finalTotal=payments.reduce((sum,p)=>sum+p.monto,0);
+    test(`Venta directa ${method} sin generar ni confirmar presupuesto`,actor+check(`SELECT count(*)=${beforeBudgets} FROM presupuestos`,'sin presupuesto nuevo')+check(`SELECT presupuesto_id IS NULL AND venta_id='${saleId}' AND estado='${method==='contado'?'listo':'entregado'}' FROM taller_ordenes WHERE id='${direct}'`,'orden directa')+check(`SELECT total=${finalTotal} FROM ventas WHERE id='${saleId}'`,'total directo')+check(`SELECT count(*)=${payments.length} AND sum(monto)=${finalTotal} FROM pagos_venta WHERE venta_id='${saleId}'`,'pagos directos')+check(`SELECT coalesce(sum(monto),0)=${debt} FROM cuenta_corriente WHERE venta_id='${saleId}'`,'deuda directa correcta')+check(`SELECT count(*)=0 FROM taller_orden_eventos WHERE orden_id='${direct}' AND detalle='Presupuesto integrado generado'`,'historial sin presupuesto ficticio'));
+    test(`Venta directa ${method}: reintento conserva la venta y la deuda`,actor+check(`SELECT taller_facturar_orden('${direct}','recibo_x',${json(payments)})='${saleId}'`,'reintento nueva venta directa')+check(`SELECT coalesce(sum(monto),0)=${debt} FROM cuenta_corriente WHERE venta_id='${saleId}'`,'deuda no duplicada'));
+  }
+  const directParts=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+  const stockBefore=Number(sql(`SELECT stock FROM producto_variantes WHERE id='${variant}'`).trim());
+  sql(actor+`SELECT taller_guardar_item('${directParts}',1,NULL,${json(part)},false); SELECT taller_cambiar_estado('${directParts}',2,'en_reparacion',''); SELECT taller_finalizar_orden('${directParts}',3,'Cambio de filtro','');`);
+  const partsSale=sql(actor+`SELECT taller_facturar_orden('${directParts}','recibo_x',${json([{tipo_pago:'contado',monto:242}])});`).trim();
+  test('Venta directa conserva variante, descuento de stock y proteccion de la venta',actor+check(`SELECT producto_variante_id='${variant}' AND afecta_stock FROM venta_items WHERE venta_id='${partsSale}'`,'variante directa')+check(`SELECT stock=${stockBefore-2} FROM producto_variantes WHERE id='${variant}'`,'stock directo sin presupuesto')+fails(`UPDATE venta_items SET cantidad=3 WHERE venta_id='${partsSale}';`,'taller_venta_protegida')+check("SELECT NOT has_function_privilege('authenticated','taller_facturar_directa(uuid,tipo_comprobante,jsonb)','EXECUTE')",'helper privado'));
+  const quoted=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+  sql(actor+`SELECT taller_guardar_item('${quoted}',1,NULL,${json(service)},false);`);
+  const explicitBudget=sql(actor+`SELECT taller_generar_presupuesto('${quoted}',2);`).trim();
+  sql(actor+`SELECT taller_cambiar_estado('${quoted}',3,'en_reparacion',''); SELECT taller_finalizar_orden('${quoted}',4,'Service con presupuesto',''); SELECT taller_facturar_orden('${quoted}','recibo_x',${json([{tipo_pago:'contado',monto:181.5}])});`);
+  test('Conserva confirmacion de presupuestos emitidos explicitamente',actor+check(`SELECT estado='confirmado' AND venta_id IS NOT NULL AND NOT origen_taller_automatico FROM presupuestos WHERE id='${explicitBudget}'`,'presupuesto verdadero'));
   console.log(`${passed} pruebas PostgreSQL locales correctas.`);
 } finally {
   if(started)checked(command('pg_ctl',['-D',dataDir,'-m','immediate','-w','stop']));

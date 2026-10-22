@@ -22,6 +22,6 @@ export const totalTaller = (items: TallerItem[]) => items.reduce((sum, item) => 
 export const resumenTaller = (ordenes: TallerOrden[], items: TallerItem[]) => ({
   abiertas: ordenes.filter(orden => !['cancelado', 'entregado'].includes(orden.estado)).length,
   listas: ordenes.filter(orden => orden.estado === 'listo').length,
-  pendientesFacturar: ordenes.filter(orden => orden.estado === 'listo' && !orden.venta_id).length,
+  pendientesFacturar: ordenes.filter(orden => ['listo', 'entregado'].includes(orden.estado) && !orden.venta_id).length,
   totalFacturado: totalTaller(items.filter(item => ordenes.some(orden => orden.id === item.orden_id && orden.venta_id))),
 });

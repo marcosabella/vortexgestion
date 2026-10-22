@@ -53,7 +53,7 @@ export const usePresupuestos = () => {
       if (selectedComercioId) request = request.eq("comercio_id", selectedComercioId);
       const { data, error } = await request.order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []).map((item: PresupuestoRow) => ({
+      return (data || []).filter((item: PresupuestoRow) => !item.origen_taller_automatico).map((item: PresupuestoRow) => ({
         ...item,
         venta_items: item.presupuesto_items || [],
         pagos_venta: item.presupuesto_pagos || [],
