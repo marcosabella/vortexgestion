@@ -511,6 +511,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   if (documentType === "venta") { const fiscal = datosFiscalesVenta(venta, comercio, afipConfig); comercio = fiscal.comercio; afipConfig = fiscal.afipConfig; }
   const isPresupuesto = documentType === "presupuesto";
   const isOrden = documentType === "orden_taller";
+  const mostrarMarcaSistema = documentType === "venta" || isPresupuesto;
   const hasCae = !isPresupuesto && !isOrden && Boolean(venta.cae?.trim());
   const discriminaIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
   const totalFinal = getVentaTotalFinal(venta);
@@ -580,7 +581,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
     : "";
 
   return `
-    ${documentType === "venta" ? '<div class="comprobante-documento">' : ""}
+    ${mostrarMarcaSistema ? '<div class="comprobante-documento">' : ""}
     <div class="factura-container ${hasCae ? "con-cae" : "sin-cae"} ${isOrden ? "orden-taller" : ""}">
       <div class="copy-indicator">ORIGINAL</div>
 
@@ -755,7 +756,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
       }
       ${isOrden ? '<div class="orden-pie cliente-section"><div class="cliente-row full"><div>Firma / conformidad del cliente: __________________________</div></div><div class="cliente-row full"><div>Orden de trabajo no fiscal. El comprobante de venta se emite por separado.</div></div></div>' : '<div class="page-number">Pag. 1/1</div>'}
     </div>
-    ${documentType === "venta" ? `<div class="comprobante-marca">${escapeHtml(LEYENDA_SISTEMA)}</div></div>` : ""}
+    ${mostrarMarcaSistema ? `<div class="comprobante-marca">${escapeHtml(LEYENDA_SISTEMA)}</div></div>` : ""}
   `;
 };
 
