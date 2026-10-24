@@ -19,6 +19,7 @@ import { Producto } from "@/types/producto";
 import { ProductDescriptionEditor } from "@/components/ProductDescriptionEditor";
 import { sanitizeProductDescription } from "@/utils/productDescription";
 import { mensajeCodigoProductoDuplicado } from "@/utils/productoErrors";
+import { generarUuid } from "@/utils/uuid";
 import { useComercio } from "@/hooks/useComercio";
 import { AtributoProducto, ProductoVariante, useProductoAtributos } from "@/hooks/useProductoAtributos";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,7 +48,8 @@ type ProductoFormData = Producto & {
 };
 
 export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: ProductoFormProps) => {
-  const { createProducto, updateProducto, isCreating, isUpdating } = useProductos({ cargarListado: false });
+  const { createProductoAsync, updateProductoAsync, isCreating, isUpdating } = useProductos({ cargarListado: false, notificarExito: false });
+  const [productoCreado, setProductoCreado] = useState<Producto | null>(null);
   const { data: proveedores = [] } = useProveedores();
   const { marcas } = useMarcas();
   const { rubros } = useRubros();
@@ -65,7 +67,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
   const descripcionTiendaHabilitada = parametrizacion?.funciones.descripcion_enriquecida_productos ?? false;
   const atributosHabilitados = parametrizacion?.funciones.talles_colores_productos ?? false;
   const comercioId = producto?.comercio_id || comercio?.id;
-  const { colores, talles, asignaciones, variantes: variantesGuardadas, crearAtributo, guardarAsignaciones, guardarVariantes } = useProductoAtributos({
+  const { colores, talles, asignaciones, variantes: variantesGuardadas, errorCarga, crearAtributo, guardarAsignaciones, guardarVariantes } = useProductoAtributos({
     productoId: producto?.id,
     comercioId,
     enabled: atributosHabilitados,
@@ -75,6 +77,9 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
   const [nuevoAtributo, setNuevoAtributo] = useState<"producto_colores" | "producto_talles" | null>(null);
   const [nombreAtributo, setNombreAtributo] = useState("");
   const [variantes, setVariantes] = useState<ProductoVariante[]>([]);
+  const [atributosInicializados, setAtributosInicializados] = useState<string | null>(null);
+  const [atributosModificados, setAtributosModificados] = useState(false);
+  const cargandoAtributos = atributosHabilitados && Boolean(producto) && atributosInicializados !== producto?.id;
 
   const {
     register,
@@ -153,32 +158,36 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
   }, [producto, setValue]);
 
   useEffect(() => {
-    if (!producto || !asignaciones) return;
+    if (!producto || !asignaciones || !variantesGuardadas || atributosInicializados === producto.id) return;
     setColoresSeleccionados(asignaciones.colores);
     setTallesSeleccionados(asignaciones.talles);
-  }, [producto, asignaciones]);
+    setVariantes(variantesGuardadas);
+    setAtributosInicializados(producto.id);
+    setAtributosModificados(false);
+  }, [producto, asignaciones, variantesGuardadas, atributosInicializados]);
 
-  useEffect(() => {
-    if (producto && variantesGuardadas) setVariantes(variantesGuardadas);
-  }, [producto, variantesGuardadas]);
-
-  useEffect(() => {
-    if (!atributosHabilitados) return;
-    const coloresVariante = coloresSeleccionados.length ? coloresSeleccionados.map((item) => item.id) : [null];
-    const tallesVariante = tallesSeleccionados.length ? tallesSeleccionados.map((item) => item.id) : [null];
-    if (!coloresSeleccionados.length && !tallesSeleccionados.length) {
-      setVariantes([]);
-      return;
-    }
-    setVariantes((actual) => coloresVariante.flatMap((color_id) => tallesVariante.map((talle_id) => {
+  const actualizarCombinaciones = (nuevosColores: AtributoProducto[], nuevosTalles: AtributoProducto[]) => {
+    const coloresVariante = nuevosColores.length ? nuevosColores.map((item) => item.id) : [null];
+    const tallesVariante = nuevosTalles.length ? nuevosTalles.map((item) => item.id) : [null];
+    setAtributosModificados(true);
+    setVariantes((actual) => !nuevosColores.length && !nuevosTalles.length ? [] : coloresVariante.flatMap((color_id) => tallesVariante.map((talle_id) => {
       const anterior = actual.find((item) => item.color_id === color_id && item.talle_id === talle_id);
       return anterior || { color_id, talle_id, stock: 0 };
     })));
-  }, [atributosHabilitados, coloresSeleccionados, tallesSeleccionados]);
+  };
+
+  const actualizarColores = (items: AtributoProducto[]) => {
+    setColoresSeleccionados(items);
+    actualizarCombinaciones(items, tallesSeleccionados);
+  };
+  const actualizarTalles = (items: AtributoProducto[]) => {
+    setTallesSeleccionados(items);
+    actualizarCombinaciones(coloresSeleccionados, items);
+  };
 
   useEffect(() => {
-    if (atributosHabilitados && variantes.length) setValue("stock", variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0));
-  }, [atributosHabilitados, setValue, variantes]);
+    if (atributosHabilitados && atributosModificados && variantes.length) setValue("stock", variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0));
+  }, [atributosHabilitados, atributosModificados, setValue, variantes]);
 
   useEffect(() => {
     if (!producto?.id || !imagenesHabilitadas) {
@@ -261,24 +270,23 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
 
   const uploadPendingImages = async (savedProducto: Producto) => {
     if (!imagenesPendientes.length) return;
-    const comercioId = savedProducto.comercio_id || localStorage.getItem("selectedComercioId");
+    const comercioId = savedProducto.comercio_id;
     if (!comercioId) throw new Error("No se identificó el comercio del producto.");
 
     setIsUploadingImages(true);
     try {
-      const newImages: ProductoImagen[] = [];
       const usedOrders = new Set(imagenes.map((image) => image.orden));
       for (const pendingImage of imagenesPendientes) {
+        const orden = [1, 2, 3, 4, 5].find((position) => !usedOrders.has(position));
+        if (!orden) throw new Error("Cada producto admite hasta cinco imagenes.");
         const extension = pendingImage.file.name.split(".").pop() || "jpg";
-        const storagePath = `${comercioId}/${savedProducto.id}/${crypto.randomUUID()}.${extension}`;
+        const storagePath = `${comercioId}/${savedProducto.id}/${generarUuid()}.${extension}`;
         const { error: uploadError } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(storagePath, pendingImage.file, {
           cacheControl: "3600",
           contentType: pendingImage.file.type,
         });
         if (uploadError) throw uploadError;
 
-        const orden = [1, 2, 3, 4, 5].find((position) => !usedOrders.has(position));
-        if (!orden) throw new Error("Cada producto admite hasta cinco imagenes.");
         usedOrders.add(orden);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
@@ -290,17 +298,21 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
           await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([storagePath]);
           throw error;
         }
-        newImages.push({ ...data, publicUrl: supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(storagePath).data.publicUrl });
+        // Confirmar cada foto antes de continuar: un reintento conserva las ya guardadas.
+        setImagenes((current) => [...current, { ...data, publicUrl: supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(storagePath).data.publicUrl }]);
+        setImagenesPendientes((current) => current.filter((image) => image !== pendingImage));
+        URL.revokeObjectURL(pendingImage.previewUrl);
       }
-      imagenesPendientes.forEach((image) => URL.revokeObjectURL(image.previewUrl));
-      setImagenes((current) => [...current, ...newImages]);
-      setImagenesPendientes([]);
     } finally {
       setIsUploadingImages(false);
     }
   };
 
-  const onSubmit = (data: Producto) => {
+  const onSubmit = async (data: Producto) => {
+    if (atributosHabilitados && (cargandoAtributos || errorCarga)) {
+      toast({ variant: "destructive", title: "No se pudo cargar el stock por variante", description: "Esperá a que termine la carga o volvé a abrir el producto antes de guardar." });
+      return;
+    }
     // Limpiar datos relacionados antes de enviar
     const {
       proveedor: _proveedor,
@@ -310,6 +322,8 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
       ...cleanData
     } = data as ProductoFormData;
     cleanData.descripcion_tienda_html = sanitizeProductDescription(cleanData.descripcion_tienda_html);
+    // El stock por variantes lo mantienen sus triggers; editar fotos no debe sobrescribirlo.
+    if (producto && atributosHabilitados && (variantes.length || variantesGuardadas?.length)) delete cleanData.stock;
     
     const afterSuccess = (savedProducto: Producto) => {
       if (!producto) {
@@ -319,32 +333,44 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
       onClose?.();
     };
 
-    const completarGuardado = async (savedProducto: Producto) => {
-      try {
-        if (atributosHabilitados) {
-          await guardarAsignaciones(savedProducto.id, coloresSeleccionados.map((item) => item.id), tallesSeleccionados.map((item) => item.id));
-          await guardarVariantes(savedProducto.id, variantes);
-        }
-        await uploadPendingImages(savedProducto);
-        afterSuccess(savedProducto);
-      } catch (error) {
-        toast({ variant: "destructive", title: "Producto guardado", description: `No se pudieron guardar todos los datos: ${error instanceof Error ? error.message : "intente nuevamente"}` });
-      }
-    };
-
-    if (producto) {
-      updateProducto({ ...cleanData, id: producto.id }, { onSuccess: async (savedProducto) => completarGuardado(savedProducto as Producto) });
-    } else {
-      createProducto(cleanData, { onSuccess: async (savedProducto) => completarGuardado(savedProducto as Producto) });
+    let savedProducto: Producto;
+    try {
+      const id = producto?.id || productoCreado?.id;
+      savedProducto = (id
+        ? await updateProductoAsync({ ...cleanData, id })
+        : await createProductoAsync(cleanData)) as Producto;
+      if (!producto) setProductoCreado(savedProducto);
+    } catch {
+      // El hook informa los errores del guardado principal.
+      return;
     }
+
+    let etapa = "los talles y colores";
+    try {
+      if (atributosHabilitados && (!producto || atributosModificados)) {
+        await guardarAsignaciones(savedProducto.id, coloresSeleccionados.map((item) => item.id), tallesSeleccionados.map((item) => item.id));
+        etapa = "las variantes";
+        await guardarVariantes(savedProducto.id, variantes);
+      }
+      etapa = "las fotos";
+      await uploadPendingImages(savedProducto);
+    } catch (error) {
+      const detalle = error && typeof error === "object" && "message" in error && typeof error.message === "string"
+        ? error.message : "Intente nuevamente.";
+      toast({ variant: "destructive", title: "Guardado incompleto", description: `Los datos principales del producto se guardaron, pero no se pudieron guardar ${etapa}: ${detalle}` });
+      return;
+    }
+    toast({ title: "Éxito", description: "Producto guardado correctamente" });
+    setProductoCreado(null);
+    afterSuccess(savedProducto);
   };
 
   const agregarAtributo = async () => {
     if (!nuevoAtributo) return;
     try {
       const nuevo = await crearAtributo({ tabla: nuevoAtributo, nombre: nombreAtributo });
-      if (nuevoAtributo === "producto_colores") setColoresSeleccionados((actual) => [...actual, nuevo]);
-      else setTallesSeleccionados((actual) => [...actual, nuevo]);
+      if (nuevoAtributo === "producto_colores") actualizarColores([...coloresSeleccionados, nuevo]);
+      else actualizarTalles([...tallesSeleccionados, nuevo]);
       setNombreAtributo("");
       setNuevoAtributo(null);
     } catch (error) {
@@ -379,7 +405,8 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
                       .select("id")
                       .eq("comercio_id", comercio.id)
                       .eq("cod_producto", codigo);
-                    if (producto?.id) consulta = consulta.neq("id", producto.id);
+                    const id = producto?.id || productoCreado?.id;
+                    if (id) consulta = consulta.neq("id", id);
                     const { data, error } = await consulta.limit(1);
                     if (error) return "No se pudo verificar el código del producto. Intentá nuevamente.";
                     return !data?.length || mensajeCodigoProductoDuplicado(codigo);
@@ -413,10 +440,12 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
               )}
             </div>
 
+            {atributosHabilitados && (cargandoAtributos || errorCarga) && <p className="text-sm text-muted-foreground md:col-span-2" role="status">{errorCarga ? "No se pudieron cargar los talles, colores y existencias. Volvé a abrir el producto para reintentar." : "Cargando talles, colores y existencias..."}</p>}
+            <fieldset disabled={cargandoAtributos || Boolean(errorCarga) || isSubmitting} className="contents">
             {atributosHabilitados && <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
               {[
-                { titulo: "Colores", tabla: "producto_colores" as const, disponibles: colores, seleccionados: coloresSeleccionados, actualizar: setColoresSeleccionados, placeholder: "Seleccionar color" },
-                { titulo: "Talles", tabla: "producto_talles" as const, disponibles: talles, seleccionados: tallesSeleccionados, actualizar: setTallesSeleccionados, placeholder: "Seleccionar talle" },
+                { titulo: "Colores", tabla: "producto_colores" as const, disponibles: colores, seleccionados: coloresSeleccionados, actualizar: actualizarColores, placeholder: "Seleccionar color" },
+                { titulo: "Talles", tabla: "producto_talles" as const, disponibles: talles, seleccionados: tallesSeleccionados, actualizar: actualizarTalles, placeholder: "Seleccionar talle" },
               ].map(({ titulo, tabla, disponibles, seleccionados, actualizar, placeholder }) => (
                 <div className="space-y-2" key={tabla}>
                   <Label>{titulo}</Label>
@@ -439,9 +468,11 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
 
             {atributosHabilitados && variantes.length > 0 && <div className="space-y-3 md:col-span-2">
               <div><Label>Stock por talle y color</Label><p className="text-sm text-muted-foreground">El stock total del producto se calcula automáticamente como la suma de estas cantidades.</p></div>
-              <div className="overflow-hidden rounded-md border"><table className="w-full text-sm"><thead className="bg-muted text-left"><tr><th className="p-3">Color</th><th className="p-3">Talle</th><th className="p-3 text-right">Stock</th></tr></thead><tbody>{variantes.map((variante, indice) => <tr key={`${variante.color_id}-${variante.talle_id}`} className="border-t"><td className="p-3">{colores.find((item) => item.id === variante.color_id)?.nombre || "-"}</td><td className="p-3">{talles.find((item) => item.id === variante.talle_id)?.nombre || "-"}</td><td className="p-2 text-right"><Input className="ml-auto w-28 text-right" type="number" min="0" step="1" value={variante.stock} onChange={(event) => setVariantes((actual) => actual.map((item, itemIndex) => itemIndex === indice ? { ...item, stock: Math.max(0, Number(event.target.value) || 0) } : item))} /></td></tr>)}</tbody><tfoot className="border-t bg-muted"><tr><td className="p-3 font-medium" colSpan={2}>Stock total</td><td className="p-3 text-right font-semibold">{variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0)}</td></tr></tfoot></table></div>
+              <div className="overflow-hidden rounded-md border"><table className="w-full text-sm"><thead className="bg-muted text-left"><tr><th className="p-3">Color</th><th className="p-3">Talle</th><th className="p-3 text-right">Stock</th></tr></thead><tbody>{variantes.map((variante, indice) => <tr key={`${variante.color_id}-${variante.talle_id}`} className="border-t"><td className="p-3">{colores.find((item) => item.id === variante.color_id)?.nombre || "-"}</td><td className="p-3">{talles.find((item) => item.id === variante.talle_id)?.nombre || "-"}</td><td className="p-2 text-right"><Input className="ml-auto w-28 text-right" type="number" min="0" step="1" value={variante.stock} onChange={(event) => { setAtributosModificados(true); setVariantes((actual) => actual.map((item, itemIndex) => itemIndex === indice ? { ...item, stock: Math.max(0, Number(event.target.value) || 0) } : item)); }} /></td></tr>)}</tbody><tfoot className="border-t bg-muted"><tr><td className="p-3 font-medium" colSpan={2}>Stock total</td><td className="p-3 text-right font-semibold">{variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0)}</td></tr></tfoot></table></div>
             </div>}
 
+            </fieldset>
+            {atributosHabilitados && !cargandoAtributos && producto && !atributosModificados && variantes.length > 0 && Number(producto.stock) !== variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0) && <p className="text-sm text-amber-700 md:col-span-2" role="status">El stock general registrado ({producto.stock}) difiere de la suma por talle y color ({variantes.reduce((total, variante) => total + Number(variante.stock || 0), 0)}). Guardar fotos o datos del producto conservará las existencias; la distribución debe revisarse por separado.</p>}
             <div className="space-y-2">
               <Label htmlFor="proveedor_id">Proveedor</Label>
               <input type="hidden" {...register("proveedor_id")} />
@@ -695,7 +726,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
                   {imagenes.map((image) => (
                     <div key={image.id} className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted">
                       <img src={image.publicUrl} alt="Imagen del producto" className="h-full w-full object-cover" />
-                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" onClick={() => void removeStoredImage(image)} aria-label="Eliminar imagen">
+                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" disabled={isSubmitting} onClick={() => void removeStoredImage(image)} aria-label="Eliminar imagen">
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -703,7 +734,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
                   {imagenesPendientes.map((image, index) => (
                     <div key={image.previewUrl} className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted">
                       <img src={image.previewUrl} alt="Vista previa de imagen" className="h-full w-full object-cover" />
-                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" onClick={() => removePendingImage(index)} aria-label="Quitar imagen">
+                      <Button type="button" variant="destructive" size="icon" className="absolute right-1 top-1 h-6 w-6" disabled={isSubmitting} onClick={() => removePendingImage(index)} aria-label="Quitar imagen">
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -712,7 +743,7 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
                     <Label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed text-muted-foreground hover:bg-muted" htmlFor="producto-imagenes">
                       <ImagePlus className="h-5 w-5" />
                       <span className="text-xs">Agregar</span>
-                      <Input id="producto-imagenes" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={selectImages} />
+                      <Input id="producto-imagenes" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" disabled={isSubmitting} onChange={selectImages} />
                     </Label>
                   )}
                 </div>
@@ -724,12 +755,12 @@ export const ProductoForm = ({ producto, onClose, onSaved, showTitle = true }: P
             <Button 
               type="submit" 
               variant="success"
-              disabled={isCreating || isUpdating || isUploadingImages || isValidating || isSubmitting}
+              disabled={isCreating || isUpdating || isUploadingImages || isValidating || isSubmitting || cargandoAtributos || Boolean(errorCarga)}
             >
               {isUploadingImages ? "Cargando imagenes..." : `${producto ? "Actualizar" : "Crear"} Producto`}
             </Button>
             {onClose && (
-              <Button type="button" variant="cancel" onClick={onClose}>
+              <Button type="button" variant="cancel" disabled={isSubmitting} onClick={onClose}>
                 Cancelar
               </Button>
             )}

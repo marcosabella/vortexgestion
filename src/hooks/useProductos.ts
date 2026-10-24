@@ -29,7 +29,7 @@ const normalizeProductoPayload = <T extends ProductoInsert | ProductoUpdate>(pro
   return normalized as T;
 };
 
-export const useProductos = ({ cargarListado = true }: { cargarListado?: boolean } = {}) => {
+export const useProductos = ({ cargarListado = true, notificarExito = true }: { cargarListado?: boolean; notificarExito?: boolean } = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { comercio } = useComercio(); const comercioId = comercio?.id;
@@ -88,6 +88,7 @@ export const useProductos = ({ cargarListado = true }: { cargarListado?: boolean
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
+      if (!notificarExito) return;
       toast({
         title: "Éxito",
         description: "Producto creado correctamente",
@@ -134,6 +135,7 @@ export const useProductos = ({ cargarListado = true }: { cargarListado?: boolean
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
+      if (!notificarExito) return;
       toast({
         title: "Éxito",
         description: "Producto actualizado correctamente",
@@ -176,6 +178,8 @@ export const useProductos = ({ cargarListado = true }: { cargarListado?: boolean
     error,
     createProducto: createProductoMutation.mutate,
     updateProducto: updateProductoMutation.mutate,
+    createProductoAsync: createProductoMutation.mutateAsync,
+    updateProductoAsync: updateProductoMutation.mutateAsync,
     deleteProducto: deleteProductoMutation.mutate,
     isCreating: createProductoMutation.isPending,
     isUpdating: updateProductoMutation.isPending,

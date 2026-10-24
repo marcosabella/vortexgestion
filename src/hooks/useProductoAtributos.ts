@@ -94,10 +94,42 @@ export function useProductoAtributos({ productoId, comercioId, enabled }: Params
   };
 
   const guardarVariantes = async (id: string, variantes: ProductoVariante[]) => {
-    const { error: deleteError } = await (supabase as any).from("producto_variantes").delete().eq("producto_id", id);
-    if (deleteError) throw deleteError;
-    if (variantes.length) {
-      const { error } = await (supabase as any).from("producto_variantes").insert(variantes.map(({ color_id, talle_id, stock }) => ({ producto_id: id, color_id, talle_id, stock })));
+    // Las ventas y pedidos referencian estos IDs: conservarlos al editar el producto.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error: loadError } = await (supabase as any).from("producto_variantes")
+      .select("id, color_id, talle_id, stock").eq("producto_id", id);
+    if (loadError) throw loadError;
+    const actuales = (data || []) as ProductoVariante[];
+    const combinacion = (variante: ProductoVariante) => JSON.stringify([variante.color_id, variante.talle_id]);
+    const actualesPorCombinacion = new Map(actuales.map((variante) => [combinacion(variante), variante]));
+    const seleccionadas = new Set(variantes.map(combinacion));
+    const eliminadas = actuales.filter((variante) => !seleccionadas.has(combinacion(variante)));
+
+    if (eliminadas.length) {
+      // Un único DELETE: si alguna tiene movimientos, la FK impide quitar todo el grupo.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("producto_variantes").delete()
+        .eq("producto_id", id).in("id", eliminadas.map((variante) => variante.id));
+      if (error?.code === "23503") {
+        throw new Error("No se puede quitar un talle o color con ventas o pedidos asociados. Conservá esa variante para mantener su historial.");
+      }
+      if (error) throw error;
+    }
+
+    for (const variante of variantes) {
+      const actual = actualesPorCombinacion.get(combinacion(variante));
+      if (!actual || Number(actual.stock) === Number(variante.stock)) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("producto_variantes")
+        .update({ stock: variante.stock }).eq("producto_id", id).eq("id", actual.id);
+      if (error) throw error;
+    }
+
+    const nuevas = variantes.filter((variante) => !actualesPorCombinacion.has(combinacion(variante)));
+    if (nuevas.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("producto_variantes")
+        .insert(nuevas.map(({ color_id, talle_id, stock }) => ({ producto_id: id, color_id, talle_id, stock })));
       if (error) throw error;
     }
     await queryClient.invalidateQueries({ queryKey: ["producto-variantes", id] });
@@ -108,7 +140,8 @@ export function useProductoAtributos({ productoId, comercioId, enabled }: Params
     colores: coloresQuery.data || [],
     talles: tallesQuery.data || [],
     asignaciones: asignacionesQuery.data,
-    variantes: variantesQuery.data || [],
+    variantes: variantesQuery.data,
+    errorCarga: asignacionesQuery.error || variantesQuery.error,
     crearAtributo: crearAtributo.mutateAsync,
     guardarAsignaciones,
     guardarVariantes,
