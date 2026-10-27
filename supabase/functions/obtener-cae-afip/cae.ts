@@ -1,5 +1,19 @@
 export class CaeRechazado extends Error {}
 
+export function validarFechaContraUltimo(xml: string, puntoVenta: number, tipo: number, numero: number, fecha: string) {
+  const tag = (name: string) => xml.match(new RegExp(`<${name}>([^<]*)</${name}>`))?.[1]?.trim();
+  const ultimaFecha = tag('CbteFch');
+  if (tag('Resultado') !== 'A' || Number(tag('PtoVta')) !== puntoVenta || Number(tag('CbteTipo')) !== tipo
+      || Number(tag('CbteDesde')) !== numero || Number(tag('CbteHasta')) !== numero
+      || !ultimaFecha || !/^\d{8}$/.test(ultimaFecha)) {
+    throw new Error('No se pudo verificar la fecha del ultimo comprobante en ARCA. No se solicito CAE.');
+  }
+  if (fecha < ultimaFecha) {
+    const mostrar = (value: string) => `${value.slice(6,8)}/${value.slice(4,6)}/${value.slice(0,4)}`;
+    throw new Error(`La fecha del comprobante (${mostrar(fecha)}) es anterior a la del ultimo autorizado por ARCA (${mostrar(ultimaFecha)}, numero ${numero}, punto de venta ${puntoVenta}). Revise la fecha del comprobante. No se solicito CAE.`);
+  }
+}
+
 export function camposServicioArca(venta: {
   concepto_arca?: number; servicio_desde?: string | null; servicio_hasta?: string | null; servicio_vencimiento_pago?: string | null;
 }): { Concepto: number; FchServDesde?: string; FchServHasta?: string; FchVtoPago?: string } {

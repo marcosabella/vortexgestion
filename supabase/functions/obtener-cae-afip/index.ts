@@ -1,8 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
-import { CaeRechazado, camposAutorizacionCae, camposServicioArca, validarComprobanteRecuperado } from './cae.ts';
+import { CaeRechazado, camposAutorizacionCae, camposServicioArca, validarComprobanteRecuperado, validarFechaContraUltimo } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
   const date = new Date(value);
@@ -321,7 +321,7 @@ async function consultarCaeExistente(token: string, sign: string, cuit: string, 
   });
   const xml = await response.text();
   if (!response.ok || !/<ResultGet>/.test(xml)) {
-    throw new Error('No se pudo confirmar en ARCA el CAE del intento anterior. No se solicitara una nueva factura.');
+    throw new Error('No se pudo consultar el comprobante en ARCA. No se solicitara una nueva factura.');
   }
   return xml;
 }
@@ -384,7 +384,7 @@ function obtenerErrorPublicoCae(error: unknown): string {
   }
 
   if (/WSFE|CAE|ARCA|AFIP/i.test(cleanMessage)) {
-    return cleanMessage.slice(0, 300);
+    return cleanMessage.slice(0, 900);
   }
 
   return cleanMessage || 'No se pudo obtener el CAE.';
@@ -395,7 +395,7 @@ async function solicitarCAE(
   sign: string,
   cuit: string,
   puntoVenta: number,
-  solicitud: any,
+  solicitud: SolicitudCae,
   ambiente: 'homologacion' | 'produccion'
 ): Promise<{ cae: string; caeVencimiento: string }> {
   try {
@@ -441,7 +441,7 @@ async function solicitarCAE(
             <ar:MonCotiz>${solicitud.FeDetReq.FECAEDetRequest.MonCotiz}</ar:MonCotiz>
             ${solicitud.FeDetReq.FECAEDetRequest.Iva?.AlicIva?.length ? `
             <ar:Iva>
-              ${solicitud.FeDetReq.FECAEDetRequest.Iva.AlicIva.map((alicuota: any) => `
+              ${solicitud.FeDetReq.FECAEDetRequest.Iva.AlicIva.map((alicuota) => `
               <ar:AlicIva>
                 <ar:Id>${alicuota.Id}</ar:Id>
                 <ar:BaseImp>${formatearImporteAfip(alicuota.BaseImp)}</ar:BaseImp>
@@ -485,7 +485,10 @@ async function solicitarCAE(
     const mensajesArca = extraerMensajesArca(responseText);
 
     if (resultadoMatch && resultadoMatch[1] === 'R' && mensajesArca.length > 0) {
-      throw new CaeRechazado(`ARCA rechazo la solicitud: ${mensajesArca.join(' | ')}`);
+      const detalle = solicitud.FeDetReq.FECAEDetRequest;
+      const ayudaFecha = mensajesArca.some(mensaje => /numero o fecha|10016/i.test(mensaje))
+        ? ` Se envio el comprobante ${solicitud.FeCabReq.PtoVta}-${detalle.CbteDesde}, con fecha ${detalle.CbteFch}. Este rechazo puede ser por numero o por fecha; la fecha no debe ser anterior al ultimo autorizado y debe estar dentro del plazo permitido por ARCA. No se cambia automaticamente por la fecha actual.` : '';
+      throw new CaeRechazado(`ARCA rechazo la solicitud: ${mensajesArca.join(' | ')}${ayudaFecha}`);
     }
 
     if (resultadoMatch && resultadoMatch[1] === 'R') {
@@ -509,6 +512,16 @@ async function solicitarCAE(
     console.error('Error en solicitarCAE:', error);
     throw error;
   }
+}
+
+interface SolicitudCae {
+  FeCabReq: { CantReg: number; PtoVta: number; CbteTipo: number };
+  FeDetReq: { FECAEDetRequest: {
+    Concepto: number; FchServDesde?: string; FchServHasta?: string; FchVtoPago?: string;
+    DocTipo: number; DocNro: number; CbteDesde: number; CbteHasta: number; CbteFch: string;
+    ImpTotal: number; ImpTotConc: number; ImpNeto: number; ImpOpEx: number; ImpIVA: number; ImpTrib: number;
+    MonId: string; MonCotiz: number; Iva?: { AlicIva: Array<{ Id: number; BaseImp: number; Importe: number }> };
+  } };
 }
 
 interface AfipConfig {
@@ -546,7 +559,7 @@ interface Venta {
   } | null;
 }
 
-async function getAuthenticatedUserId(req: Request, supabase: any): Promise<string> {
+async function getAuthenticatedUserId(req: Request, supabase: SupabaseClient): Promise<string> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '');
 
@@ -562,7 +575,7 @@ async function getAuthenticatedUserId(req: Request, supabase: any): Promise<stri
   return data.user.id;
 }
 
-async function assertUserCanAccessComercio(supabase: any, userId: string, comercioId: string): Promise<void> {
+async function assertUserCanAccessComercio(supabase: SupabaseClient, userId: string, comercioId: string): Promise<void> {
   const { data, error } = await supabase
     .from('comercio_usuarios')
     .select('id')
@@ -801,9 +814,10 @@ Deno.serve(async (req) => {
       }
       if (intentoPrevio.cae && intentoPrevio.cae_vencimiento) {
         const campos = camposAutorizacionCae(intentoPrevio.punto_venta, Number(intentoPrevio.numero_secuencial), intentoPrevio.cae, intentoPrevio.cae_vencimiento);
-        const { data: guardada, error: errorGuardado } = await supabase.from('ventas').update(campos)
-          .eq('id', ventaId).eq('comercio_id', ventaPre.comercio_id).select('id').single();
-        if (errorGuardado || !guardada) throw new Error('ARCA ya autorizo la factura, pero no se pudo guardar en la venta. No solicite otro CAE.');
+        const { error: errorGuardado } = await supabase.rpc('afip_guardar_cae', {
+          p_venta_id: ventaId, p_comercio_id: ventaPre.comercio_id,
+        });
+        if (errorGuardado) throw new Error(`ARCA ya autorizo la factura, pero no se pudo guardar en la venta: ${errorGuardado.message}. El reintento recuperara ese CAE sin emitir otro.`);
         return new Response(JSON.stringify({ success: true, ...campos, mensaje: 'CAE existente recuperado sin emitir otra factura' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -843,12 +857,18 @@ Deno.serve(async (req) => {
     // Reserva unica por venta y numero fiscal. Si otra invocacion ya reservo,
     // esta termina sin enviar FECAESolicitar.
     if (!intentoPrevio) {
-      const { error: reservaError } = await supabase.from('afip_cae_intentos').insert({
+      if (ultimoNumeroAutorizado > 0) {
+        validarFechaContraUltimo(await consultarCaeExistente(token, sign, cuitEmisor, puntoVentaFiscal,
+          codigoComprobante, ultimoNumeroAutorizado, afipConfig.ambiente),
+          puntoVentaFiscal, codigoComprobante, ultimoNumeroAutorizado, fechaFormateada);
+      }
+      // Reserva y concilia la numeracion en una sola transaccion, antes de emitir.
+      const { error: reservaError } = await supabase.rpc('afip_reservar_cae', { p_intento: {
         venta_id: ventaId, comercio_id: ventaPre.comercio_id, ambiente: afipConfig.ambiente,
         cuit_emisor: cuitEmisor, punto_venta: puntoVentaFiscal, tipo_comprobante: codigoComprobante,
         numero_secuencial: numeroComprobante, solicitud: solicitudAfip.FeCAEReq,
-      });
-      if (reservaError) throw new Error('Ya hay una solicitud fiscal en curso para esta venta o numero. Vuelva a intentar para consultar su resultado.');
+      } });
+      if (reservaError) throw new Error(`No se pudo reservar el numero fiscal. No se envio a ARCA: ${reservaError.message}. Vuelva a intentar para consultar si hay una solicitud en curso.`);
     }
     // Solicitar CAE a WSFE solo en el primer intento; los siguientes consultan.
     console.log('Solicitando CAE a WSFE...');
@@ -880,15 +900,11 @@ Deno.serve(async (req) => {
     if (resultadoError) throw new Error('ARCA autorizo el comprobante. No se pudo conservar el resultado; el proximo intento consultara el mismo numero.');
 
     // Actualizar venta con CAE
-    const { data: ventaGuardada, error: updateError } = await supabase
-      .from('ventas')
-      .update({
-        ...camposAutorizacionCae(puntoVentaFiscal, numeroComprobante, cae, fechaVencimientoStr),
-      })
-      .eq('id', ventaId)
-      .eq('comercio_id', ventaPre.comercio_id).select('id').single();
+    const { error: updateError } = await supabase.rpc('afip_guardar_cae', {
+      p_venta_id: ventaId, p_comercio_id: ventaPre.comercio_id,
+    });
 
-    if (updateError || !ventaGuardada) {
+    if (updateError) {
       throw new Error(`ARCA ya autorizo la factura. Error al guardar la venta: ${updateError?.message || 'venta no encontrada'}. El reintento recuperara ese CAE sin emitir otro.`);
     }
 
@@ -909,7 +925,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error al obtener CAE:', error);
     const publicError = obtenerErrorPublicoCae(error);
 

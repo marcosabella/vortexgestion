@@ -27,7 +27,20 @@ let handler;
 const consultXml = (total = 200000) => `<ResultGet><Resultado>A</Resultado><EmisionTipo>CAE</EmisionTipo><CodAutorizacion>86406153037880</CodAutorizacion><FchVto>20261015</FchVto><PtoVta>3</PtoVta><CbteTipo>11</CbteTipo><CbteDesde>126</CbteDesde><CbteHasta>126</CbteHasta><DocTipo>80</DocTipo><DocNro>30545766678</DocNro><CbteFch>20261005</CbteFch><ImpTotal>${total}</ImpTotal></ResultGet>`;
 const supabase = {
   auth: { getUser: async () => ({ data: { user: { id: 'user' } }, error: null }) },
-  rpc: async () => ({ data: { estado: 'vigente', token: 'test-token', sign: 'test-sign', expirationTime: '2099-01-01T00:00:00Z' }, error: null }),
+  rpc: async (name, args) => {
+    if (name === 'afip_reservar_cae') {
+      if (state.attempt || state.failReservation) return { data: null, error: { message: 'numero ocupado' } };
+      state.attempt = structuredClone(args.p_intento);
+      return { data: null, error: null };
+    }
+    if (name === 'afip_guardar_cae') {
+      if (state.failFinal) { state.failFinal = false; return { data: null, error: { message: 'fallo de guardado simulado' } }; }
+      Object.assign(state.sale, caeHelpers.camposAutorizacionCae(state.attempt.punto_venta,
+        state.attempt.numero_secuencial, state.attempt.cae, state.attempt.cae_vencimiento));
+      return { data: null, error: null };
+    }
+    return { data: { estado: 'vigente', token: 'test-token', sign: 'test-sign', expirationTime: '2099-01-01T00:00:00Z' }, error: null };
+  },
   from: table => {
     let action = 'select'; let payload;
     const builder = {
@@ -71,10 +84,15 @@ const fakeFetch = async (_url, options) => {
     state.solicitudSoap = options.body;
     assert.ok(state.attempt, 'Debe conservar el numero ANTES de llamar a ARCA');
     if (state.failNetwork) throw new Error('Conexion interrumpida despues del envio');
-    if (state.rejected) return new Response('<Resultado>R</Resultado><Obs><Msg>Dato invalido</Msg></Obs>');
+    if (state.rejected) return new Response(`<Resultado>R</Resultado><Obs><Msg>${state.rejectionMessage || 'Dato invalido'}</Msg></Obs>`);
     return new Response('<Resultado>A</Resultado><CAE>86406153037880</CAE><CAEFchVto>20261015</CAEFchVto>');
   }
-  if (action.endsWith('FECompConsultar')) return new Response(state.consultXml || consultXml());
+  if (action.endsWith('FECompConsultar')) {
+    if (options.body.includes('<ar:CbteNro>125</ar:CbteNro>')) {
+      return new Response(state.lastXml || consultXml().replaceAll('126','125'));
+    }
+    return new Response(state.consultXml || consultXml());
+  }
   throw new Error('Llamada SOAP inesperada');
 };
 load('supabase/functions/obtener-cae-afip/index.ts', name => {
@@ -123,7 +141,7 @@ await test('Respuesta perdida: consulta exactamente el numero original', async (
   assert.equal(state.attempt.numero_secuencial, 126); state.failNetwork = false;
   assert.equal((await request()).status, 200);
   assert.equal(state.calls.filter(x => x.endsWith('FECAESolicitar')).length, 1);
-  assert.equal(state.calls.filter(x => x.endsWith('FECompConsultar')).length, 1);
+  assert.equal(state.calls.filter(x => x.endsWith('FECompConsultar')).length, 2);
 });
 await test('No vincula un CAE de otro importe ni emite una factura nueva', async () => {
   state.failNetwork = true; await request(); state.failNetwork = false; state.consultXml = consultXml(1);
@@ -152,6 +170,38 @@ await test('Rechazo explicito permite corregir y reintentar sin bloquear la vent
   state.rejected = true; assert.equal((await request()).status, 400); assert.equal(state.attempt.rechazado, true);
   state.rejected = false; assert.equal((await request()).status, 200);
   assert.equal(state.sale.cae, '86406153037880');
+});
+await test('Fecha anterior a la ultima autorizada se explica sin reservar ni emitir', async () => {
+  state.sale.fecha_venta = '2026-10-04T12:00:00Z';
+  const response = await request();
+  assert.equal(response.status, 400);
+  assert.match(response.body.error, /04\/10\/2026.*anterior.*05\/10\/2026/);
+  assert.equal(state.attempt, null);
+  assert.equal(state.calls.filter(x => x.endsWith('FECAESolicitar')).length, 0);
+  state.sale.fecha_venta = '2026-10-05T12:00:00Z';
+  assert.equal((await request()).status, 200);
+});
+await test('La fecha enviada es la del comprobante en Argentina, sin reemplazarla por hoy', async () => {
+  state.sale.fecha_venta = '2026-10-06T01:00:00Z';
+  assert.equal((await request()).status, 200);
+  assert.ok(state.solicitudSoap.includes('<ar:CbteFch>20261005</ar:CbteFch>'));
+});
+await test('Falla de conciliacion cancela antes de pedir CAE', async () => {
+  state.failReservation = true;
+  assert.equal((await request()).status, 400);
+  assert.equal(state.attempt, null);
+  assert.equal(state.calls.filter(x => x.endsWith('FECAESolicitar')).length, 0);
+});
+await test('Rechazo numero o fecha informa ambos campos y permite corregir la fecha', async () => {
+  state.rejected = true;
+  state.rejectionMessage = 'El numero o fecha del comprobante no se corresponde con el proximo a autorizar. Consultar metodo FECompUltimoAutorizado.';
+  const response = await request();
+  assert.match(response.body.error, /3-126.*20261005/);
+  assert.match(response.body.error, /por numero o por fecha/);
+  state.rejected = false;
+  state.sale.fecha_venta = '2026-10-06T12:00:00Z';
+  assert.equal((await request()).status, 200);
+  assert.ok(state.solicitudSoap.includes('<ar:CbteFch>20261006</ar:CbteFch>'));
 });
 await test('TA nuevo se guarda antes de usarlo y otra funcion puede reutilizarlo', async () => {
   let ticket; let emitted = 0; let saves = 0;

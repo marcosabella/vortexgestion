@@ -457,6 +457,8 @@ export const useObtenerCAE = () => {
     },
     onError: (error: Error) => {
       console.error('Error en mutación:', error);
+      // La reserva fiscal puede haber conciliado numeros antes de un rechazo.
+      queryClient.invalidateQueries({ queryKey: ['ventas'] });
       toast({
         title: "Error al obtener CAE",
         description: error.message || "No se pudo obtener el CAE. Revise la configuracion ARCA y vuelva a intentar.",

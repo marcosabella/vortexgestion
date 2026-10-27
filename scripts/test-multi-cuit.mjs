@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import { testCaeNumeracion } from './fixtures/cae-numeracion-tests.mjs';
 
 const tempRoot=realpathSync(os.tmpdir()), cluster=mkdtempSync(path.join(tempRoot,'vortex-multi-cuit-test-')), dataDir=path.join(cluster,'data');
 const pgBin=process.env.PG_BIN||'C:/Program Files/PostgreSQL/17/bin';
@@ -112,6 +113,7 @@ try {
  fails("SET app.test_comercio='"+foreignTenant+"';SET ROLE authenticated;SELECT guardar_emisor_fiscal('"+foreignTenant+"',"+quote({...first,id:revised})+');','emisor_fiscal_no_disponible');
  assert.equal(sql(asUser+"SELECT consultar_clave_emisor_fiscal('"+tenant+"','"+e2+"') IS NULL;").trim(),'t','Deleted key is not returned');
  console.log('OK ARCA editing: identity changes, historical snapshots, old credentials, default, certificate replacement/removal and permissions');
+ testCaeNumeracion({ sql, migration, tenant, foreignTenant, emisor:e1, otroEmisor:e2 });
 
 } finally {
  if(started)command('pg_ctl',['-D',dataDir,'-m','immediate','-w','stop']);
