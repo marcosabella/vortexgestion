@@ -55,6 +55,7 @@ No ejecutar comandos que escriban artefactos, inicien despliegues o alteren serv
 
 ## Migraciones y proteccion de datos
 
+- Publicar en Netlify solamente por pedido expreso del usuario. Un pedido de commit y push no autoriza una publicacion.
 - No ejecutar migraciones en produccion sin autorizacion expresa.
 - No eliminar ni renombrar tablas, columnas u otros objetos persistentes sin autorizacion expresa.
 - No mezclar migraciones estructurales con reparaciones o modificaciones de datos productivos. Cada proposito debe tener una migracion separada y claramente identificada.
