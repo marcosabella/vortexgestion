@@ -252,6 +252,12 @@ export const getFacturaPrintStyles = (formato: FormatoComprobante = "a4") => `
     grid-template-columns: 1fr;
   }
 
+  .presupuesto-observaciones {
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   .items-table {
     width: 100%;
   }
@@ -725,6 +731,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
             <div class="text-right">$ ${escapeHtml(formatMoney(totalFinal))}</div>
           </div>
         </div>
+        ${isPresupuesto && venta.observaciones?.trim() ? `<div class="presupuesto-observaciones"><strong>Observaciones:</strong> ${escapeHtml(venta.observaciones)}</div>` : ''}
       </div>
 
       ${

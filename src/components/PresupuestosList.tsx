@@ -135,9 +135,9 @@ export function PresupuestosList() {
       </Card>
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader><DialogTitle>Presupuesto {selected?.numero_comprobante}</DialogTitle></DialogHeader>
-          {selected && <div className="space-y-5">
+        <DialogContent className="flex max-h-[90dvh] max-w-4xl flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6"><DialogTitle>Presupuesto {selected?.numero_comprobante}</DialogTitle></DialogHeader>
+          {selected && <div className="min-h-0 space-y-5 overflow-y-auto">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p><strong>Cliente:</strong> {selected.cliente_nombre}</p>
