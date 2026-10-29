@@ -17,9 +17,10 @@ const chequeSchema = z.object({
   fecha_emision: z.string().min(1, 'Fecha de emisión requerida'),
   fecha_vencimiento: z.string().min(1, 'Fecha de vencimiento requerida'),
   emisor_nombre: z.string().min(1, 'Nombre del emisor requerido'),
-  emisor_cuit: z.string().optional(),
-  cliente_id: z.string().optional(),
-  estado: z.enum(['en_cartera', 'depositado', 'rechazado', 'endosado']),
+  emisor_cuit: z.string().nullish(),
+  cliente_id: z.string().nullish(),
+  tipo_cheque: z.enum(['propio', 'tercero']),
+  estado: z.enum(['en_cartera', 'depositado', 'rechazado', 'endosado', 'emitido']),
   observaciones: z.string().optional(),
 });
 
@@ -44,9 +45,11 @@ export const ChequeForm = ({ cheque, onSubmit, onCancel }: ChequeFormProps) => {
     resolver: zodResolver(chequeSchema),
     defaultValues: cheque ? {
       ...cheque,
+      tipo_cheque: cheque.tipo_cheque || 'tercero',
       fecha_emision: format(new Date(cheque.fecha_emision), 'yyyy-MM-dd'),
       fecha_vencimiento: format(new Date(cheque.fecha_vencimiento), 'yyyy-MM-dd'),
     } : {
+      tipo_cheque: 'tercero',
       estado: 'en_cartera',
       fecha_emision: format(new Date(), 'yyyy-MM-dd'),
       fecha_vencimiento: format(new Date(), 'yyyy-MM-dd'),
@@ -54,11 +57,30 @@ export const ChequeForm = ({ cheque, onSubmit, onCancel }: ChequeFormProps) => {
   });
 
   const estado = watch('estado');
+  const tipoCheque = watch('tipo_cheque');
   const clienteId = watch('cliente_id');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="tipo_cheque">Origen del cheque *</Label>
+          <Select value={tipoCheque} onValueChange={(value: ChequeFormData['tipo_cheque']) => setValue('tipo_cheque', value, { shouldDirty: true, shouldValidate: true })}>
+            <SelectTrigger id="tipo_cheque" aria-describedby="tipo_cheque_ayuda">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="propio">Propio</SelectItem>
+              <SelectItem value="tercero">De terceros</SelectItem>
+            </SelectContent>
+          </Select>
+          <p id="tipo_cheque_ayuda" className="text-sm text-muted-foreground mt-1">
+            {tipoCheque === 'propio'
+              ? 'Emitido desde una cuenta de tu comercio. Si todavía no lo entregaste, dejalo en cartera y sin cliente asignado.'
+              : 'Recibido de un cliente u otro tercero.'}
+          </p>
+        </div>
+
         <div>
           <Label htmlFor="numero_cheque">Número de Cheque *</Label>
           <Input
@@ -99,7 +121,7 @@ export const ChequeForm = ({ cheque, onSubmit, onCancel }: ChequeFormProps) => {
 
         <div>
           <Label htmlFor="estado">Estado *</Label>
-          <Select value={estado} onValueChange={(value) => setValue('estado', value as any)}>
+          <Select value={estado} onValueChange={(value: ChequeFormData['estado']) => setValue('estado', value)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

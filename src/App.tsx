@@ -162,7 +162,7 @@ function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; childr
 
 function AuthenticatedLayout() {
   const { session, isLoading, signOut, user } = useAuth();
-  const { comercio, comerciosDisponibles, isLoading: comercioLoading, selectComercio } = useComercio();
+  const { comercio, comerciosDisponibles, isLoading: comercioLoading, error: comercioError, refetch: recargarComercio, isFetching: comercioFetching, selectComercio } = useComercio();
   const client = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -212,6 +212,23 @@ function AuthenticatedLayout() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         Cargando comercios...
+      </div>
+    );
+  }
+
+  if (comercioError && !comercio) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="max-w-md space-y-4 text-center" role="alert">
+          <h1 className="text-xl font-semibold">No se pudo cargar el comercio</h1>
+          <p className="text-sm text-muted-foreground">{comercioError.message}</p>
+          <div className="flex justify-center gap-2">
+            <Button onClick={() => void recargarComercio()} disabled={comercioFetching}>
+              {comercioFetching ? "Reintentando..." : "Reintentar"}
+            </Button>
+            <Button variant="outline" onClick={() => void signOut()}>Cerrar sesión</Button>
+          </div>
+        </div>
       </div>
     );
   }

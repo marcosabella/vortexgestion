@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Comercio, ComercioFormData } from "@/types/comercio";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ComercioQueryResult = {
   comercio: Comercio | null;
@@ -12,6 +13,7 @@ type ComercioQueryResult = {
 export const useComercio = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isLoading: authLoading } = useAuth();
   const [selectedComercioId, setSelectedComercioId] = useState(() =>
     localStorage.getItem("selectedComercioId"),
   );
@@ -26,73 +28,93 @@ export const useComercio = () => {
     };
   }, []);
 
-  const { data, isLoading } = useQuery<ComercioQueryResult>({
-    queryKey: ["comercio", selectedComercioId],
-    queryFn: async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
+  const { data, isLoading, error, refetch, isFetching } = useQuery<ComercioQueryResult>({
+    queryKey: ["comercio", selectedComercioId, user?.id],
+    enabled: !authLoading && Boolean(user),
+    retry: false,
+    queryFn: async ({ signal }) => {
       if (!user) {
         return { comercio: null, comerciosDisponibles: [] };
       }
 
-      const { data: memberships, error: membershipsError } = await supabase
-        .from("comercio_usuarios")
-        .select("comercio_id")
-        .eq("user_id", user.id)
-        .eq("activo", true)
-        .order("created_at", { ascending: true });
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      signal.addEventListener("abort", cancel, { once: true });
+      let timer: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("La carga del comercio demoró demasiado. Revisá la conexión e intentá nuevamente."));
+          controller.abort();
+        }, 15_000);
+      });
 
-      if (membershipsError) throw membershipsError;
+      const cargar = async (): Promise<ComercioQueryResult> => {
+        const { data: memberships, error: membershipsError } = await supabase
+          .from("comercio_usuarios")
+          .select("comercio_id")
+          .eq("user_id", user.id)
+          .eq("activo", true)
+          .order("created_at", { ascending: true })
+          .abortSignal(controller.signal);
 
-      const membershipComercioIds = (memberships || []).map((membership) => membership.comercio_id);
-      let comerciosDisponibles: Comercio[] = [];
+        if (membershipsError) throw membershipsError;
+        if (controller.signal.aborted) throw new Error("La carga del comercio fue cancelada.");
 
-      if (membershipComercioIds.length > 0) {
-        const { data: comercios, error: comerciosError } = await supabase
-          .from("comercio")
-          .select("*")
-          .in("id", membershipComercioIds)
-          .eq("activo", true);
+        const membershipComercioIds = (memberships || []).map((membership) => membership.comercio_id);
+        let comerciosDisponibles: Comercio[] = [];
 
-        if (comerciosError) throw comerciosError;
+        if (membershipComercioIds.length > 0) {
+          const { data: comercios, error: comerciosError } = await supabase
+            .from("comercio")
+            .select("*")
+            .in("id", membershipComercioIds)
+            .eq("activo", true)
+            .abortSignal(controller.signal);
 
-        const comerciosById = new Map((comercios || []).map((comercio) => [comercio.id, comercio as Comercio]));
-        comerciosDisponibles = membershipComercioIds
-          .map((comercioId) => comerciosById.get(comercioId))
-          .filter(Boolean) as Comercio[];
-      }
+          if (comerciosError) throw comerciosError;
+          if (controller.signal.aborted) throw new Error("La carga del comercio fue cancelada.");
 
-      const selectedStillAvailable = selectedComercioId
-        ? comerciosDisponibles.some((comercio) => comercio.id === selectedComercioId)
-        : false;
+          const comerciosById = new Map((comercios || []).map((comercio) => [comercio.id, comercio as Comercio]));
+          comerciosDisponibles = membershipComercioIds
+            .map((comercioId) => comerciosById.get(comercioId))
+            .filter(Boolean) as Comercio[];
+        }
 
-      if (selectedComercioId && !selectedStillAvailable) {
-        localStorage.removeItem("selectedComercioId");
-      }
+        const selectedStillAvailable = selectedComercioId
+          ? comerciosDisponibles.some((comercio) => comercio.id === selectedComercioId)
+          : false;
 
-      if (selectedStillAvailable) {
+        if (selectedComercioId && !selectedStillAvailable) {
+          localStorage.removeItem("selectedComercioId");
+        }
+
+        if (selectedStillAvailable) {
+          return {
+            comercio: comerciosDisponibles.find((comercio) => comercio.id === selectedComercioId) || null,
+            comerciosDisponibles,
+          };
+        }
+
+        if (comerciosDisponibles.length === 1) {
+          localStorage.setItem("selectedComercioId", comerciosDisponibles[0].id);
+          return {
+            comercio: comerciosDisponibles[0],
+            comerciosDisponibles,
+          };
+        }
+
         return {
-          comercio: comerciosDisponibles.find((comercio) => comercio.id === selectedComercioId) || null,
+          comercio: null,
           comerciosDisponibles,
         };
-      }
-
-      if (comerciosDisponibles.length === 1) {
-        localStorage.setItem("selectedComercioId", comerciosDisponibles[0].id);
-        return {
-          comercio: comerciosDisponibles[0],
-          comerciosDisponibles,
-        };
-      }
-
-      return {
-        comercio: null,
-        comerciosDisponibles,
       };
+
+      try {
+        return await Promise.race([cargar(), timeout]);
+      } finally {
+        clearTimeout(timer!);
+        signal.removeEventListener("abort", cancel);
+      }
     },
   });
 
@@ -160,7 +182,10 @@ export const useComercio = () => {
   return {
     comercio: data?.comercio ?? null,
     comerciosDisponibles: data?.comerciosDisponibles ?? [],
-    isLoading,
+    isLoading: authLoading || (Boolean(user) && isLoading),
+    error,
+    refetch,
+    isFetching,
     selectComercio,
     createComercio,
     updateComercio,
