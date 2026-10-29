@@ -56,6 +56,7 @@ import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
 import AdminIncidentes from "./pages/AdminIncidentes";
+import AdminConsultasLanding from "./pages/AdminConsultasLanding";
 import { IncidentesMonitor } from "@/components/IncidentesMonitor";
 import { crearCachesIncidentes } from "@/utils/incidentesQuery";
 import Notificaciones from "./pages/Notificaciones";
@@ -302,6 +303,7 @@ function AuthenticatedLayout() {
               <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
               <Route path="/admin/migraciones" element={<AdminMigraciones />} />
               <Route path="/admin/incidentes" element={<AdminIncidentes />} />
+              <Route path="/admin/consultas-landing" element={<AdminConsultasLanding />} />
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />

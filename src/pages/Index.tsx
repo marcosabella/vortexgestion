@@ -15,8 +15,9 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { LandingContactForm } from "@/components/landing/LandingContactForm";
+import { LandingClients } from "@/components/landing/LandingClients";
+import { LandingModules } from "@/components/landing/LandingModules";
 
 const features = [
   {
@@ -54,7 +55,7 @@ const features = [
 const plans = [
   {
     name: "Plan único",
-    price: "$60000 mensuales",
+    price: "$80.000 mensuales",
     description: "Para comercios que necesitan ordenar ventas, clientes, stock y caja desde un solo sistema.",
     items: ["Ventas y productos", "Clientes y cuenta corriente", "Caja diaria", "Bancos, tarjetas y cheques", "Listados operativos"],
     highlighted: true,
@@ -73,6 +74,8 @@ const Index = () => {
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-slate-600 md:flex">
             <a href="#funciones" className="hover:text-slate-950">Funciones</a>
+            <a href="#modulos" className="hover:text-slate-950">Módulos</a>
+            <a href="#clientes" className="hover:text-slate-950">Clientes</a>
             <a href="#precios" className="hover:text-slate-950">Precios</a>
             <a href="#contacto" className="hover:text-slate-950">Contacto</a>
           </nav>
@@ -185,6 +188,9 @@ const Index = () => {
         </div>
       </section>
 
+      <LandingModules />
+      <LandingClients />
+
       <section id="precios" className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-cyan-50 to-emerald-50 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -260,19 +266,7 @@ const Index = () => {
             </div>
           </div>
 
-          <form action="mailto:ms_abella@hotmail.com" method="post" encType="text/plain" className="rounded-lg border border-slate-200 bg-slate-50 p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input name="nombre" placeholder="Nombre" required />
-              <Input name="comercio" placeholder="Comercio" required />
-              <Input name="email" type="email" placeholder="Email" required />
-              <Input name="telefono" placeholder="Teléfono" />
-            </div>
-            <Textarea name="mensaje" className="mt-4 min-h-32" placeholder="Contanos qué necesitás gestionar" required />
-            <Button type="submit" className="mt-5 w-full sm:w-auto">
-              Enviar consulta
-              <Mail className="h-4 w-4" />
-            </Button>
-          </form>
+          <LandingContactForm />
         </div>
       </section>
 
@@ -286,8 +280,10 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex flex-col flex-wrap gap-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:gap-6 md:justify-end">
             <a href="#funciones" className="hover:text-white">Funciones</a>
+            <a href="#modulos" className="hover:text-white">Módulos</a>
+            <a href="#clientes" className="hover:text-white">Clientes</a>
             <a href="#precios" className="hover:text-white">Precios</a>
             <a href="#contacto" className="hover:text-white">Contacto</a>
             <span>© 2026 Marcos Abella</span>
