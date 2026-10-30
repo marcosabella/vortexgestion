@@ -199,6 +199,14 @@ try {
     test(`Venta de taller con pago ${method} conserva el medio elegido`,actor+check(`SELECT count(*)=${payments.length} AND sum(monto)=181.5 FROM pagos_venta WHERE venta_id='${paidSale}'`,'pagos completos')+payments.map(payment=>check(`SELECT count(*)=1 FROM pagos_venta WHERE venta_id='${paidSale}' AND tipo_pago='${payment.tipo_pago}' AND monto=${payment.monto}${payment.banco_id?` AND banco_id='${payment.banco_id}'`:''}${payment.cheque_id?` AND cheque_id='${payment.cheque_id}'`:''}`,'medio correcto')).join('')+check(`SELECT coalesce(sum(monto),0)=${debt} FROM cuenta_corriente WHERE venta_id='${paidSale}'`,'solo deuda elegida'));
   }
   sql(migration('20261022140000_taller_venta_directa_sin_presupuesto.sql'));
+  // Incorpora el esquema fiscal real sobre el fixture local, sin datos remotos.
+  sql(`CREATE ROLE service_role; CREATE TABLE afip_cae_intentos(venta_id uuid);
+    DO $$ DECLARE c record; BEGIN FOR c IN SELECT conname FROM pg_constraint WHERE conrelid='ventas'::regclass AND contype='u' LOOP EXECUTE format('ALTER TABLE ventas DROP CONSTRAINT %I',c.conname); END LOOP; END $$;`);
+  const numbering = migration('20260907150000_ventas_transaccionales_numeracion.sql');
+  sql(numbering.slice(numbering.indexOf('CREATE OR REPLACE FUNCTION public.ventas_punto_venta_canonico'),numbering.indexOf('-- Preflight:')));
+  sql(numbering.slice(numbering.indexOf('CREATE UNIQUE INDEX ventas_numeracion_canonica_unica'),numbering.indexOf('CREATE UNIQUE INDEX ventas_idempotency_key_unica')));
+  sql(migration('20261014130000_emisores_fiscales_estructura.sql'));
+  sql(migration('20261029130000_taller_facturacion_emisor.sql'));
   const financialFingerprint=`md5(jsonb_build_object('ventas',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM ventas t),'pagos',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM pagos_venta t),'deuda',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM cuenta_corriente t),'ordenes',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM taller_ordenes t),'stock',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM producto_variantes t))::text)`;
   const fingerprint=sql(`SELECT ${financialFingerprint}`).trim();
   sql(migration('20261022141000_taller_clasificar_presupuestos_automaticos.sql'));
@@ -234,6 +242,49 @@ try {
   const explicitBudget=sql(actor+`SELECT taller_generar_presupuesto('${quoted}',2);`).trim();
   sql(actor+`SELECT taller_cambiar_estado('${quoted}',3,'en_reparacion',''); SELECT taller_finalizar_orden('${quoted}',4,'Service con presupuesto',''); SELECT taller_facturar_orden('${quoted}','recibo_x',${json([{tipo_pago:'contado',monto:181.5}])});`);
   test('Conserva confirmacion de presupuestos emitidos explicitamente',actor+check(`SELECT estado='confirmado' AND venta_id IS NOT NULL AND NOT origen_taller_automatico FROM presupuestos WHERE id='${explicitBudget}'`,'presupuesto verdadero'));
+  const e1='70000000-0000-0000-0000-000000000001',e2='70000000-0000-0000-0000-000000000002',foreignEmisor='70000000-0000-0000-0000-000000000003',inactiveEmisor='70000000-0000-0000-0000-000000000004';
+  sql(`UPDATE producto_variantes SET stock=100 WHERE id='${variant}';`);
+  sql(`UPDATE comercio_parametrizacion SET parametros=jsonb_set(parametros,'{funciones}','{"multiples_cuit":true}') WHERE comercio_id='${tenant}';
+    INSERT INTO emisores_fiscales(id,comercio_id,cuit_emisor,razon_social,punto_venta,ambiente,situacion_afip,activo) VALUES
+    ('${e1}','${tenant}','20111111112','Emisor uno',2,'homologacion','Responsable Inscripto',true),
+    ('${e2}','${tenant}','20222222223','Emisor dos',2,'homologacion','Responsable Inscripto',true),
+    ('${foreignEmisor}','${other}','20333333334','Ajeno',2,'homologacion','Responsable Inscripto',true),
+    ('${inactiveEmisor}','${tenant}','20444444445','Inactivo',2,'homologacion','Responsable Inscripto',false);`);
+  for (const emitter of [e1,e2]) {
+    let expectedNumber=0;
+    for (const withBudget of [false,true]) for (const delivered of [false,true]) {
+      const id=sql(actor+createOrder({...orderData,kilometraje:1006})).trim();
+      const ver=()=>Number(sql(`SELECT version FROM taller_ordenes WHERE id='${id}'`).trim());
+      sql(actor+`SELECT taller_guardar_item('${id}',${ver()},NULL,${json(part)},false);`);
+      if(withBudget)sql(actor+`SELECT taller_generar_presupuesto('${id}',${ver()});`);
+      sql(actor+`SELECT taller_cambiar_estado('${id}',${ver()},'en_reparacion','');`);
+      sql(actor+`SELECT taller_finalizar_orden('${id}',${ver()},'Reparacion finalizada','');`);
+      if(delivered)sql(actor+`SELECT taller_cambiar_estado('${id}',${ver()},'entregado','');`);
+      const payments=[{tipo_pago:'contado',monto:100},{tipo_pago:'cta_cte',monto:142}];
+      const invoice=emitterId=>`SELECT taller_facturar_orden('${id}','factura_b',${json(payments)},${emitterId?`'${emitterId}'`:'NULL'});`;
+      const salesBefore=Number(sql('SELECT count(*) FROM ventas').trim());
+      const stockBefore=Number(sql(`SELECT stock FROM producto_variantes WHERE id='${variant}'`).trim());
+      test('Multi CUIT rechaza emisor faltante, ajeno e inactivo sin efectos parciales',actor+
+        fails(`SELECT taller_facturar_orden('${id}','factura_b',${json(payments)});`,'emisor_fiscal_requerido')+
+        fails(invoice(null),'emisor_fiscal_requerido')+fails(invoice(foreignEmisor),'emisor_fiscal_no_disponible')+fails(invoice(inactiveEmisor),'emisor_fiscal_no_disponible')+
+        check(`SELECT count(*)=${salesBefore} FROM ventas`,'sin venta parcial')+check(`SELECT stock=${stockBefore} FROM producto_variantes WHERE id='${variant}'`,'sin stock parcial'));
+      test('Multi CUIT exige administrador',`SET app.test_user='${operator}'; SET ROLE authenticated;`+fails(invoice(emitter),'taller_sin_permisos'));
+      const sale=sql(actor+invoice(emitter)).trim();expectedNumber++;
+      const label=`${withBudget?'presupuesto':'directa'} ${delivered?'entregada':'lista'}`;
+      test(`Multi CUIT ${label}: emisor, snapshot, numeracion propia, pagos, deuda y stock`,actor+
+        check(`SELECT emisor_fiscal_id='${emitter}' AND punto_venta=2 AND numero_secuencial=${expectedNumber} AND emisor_snapshot->>'id'='${emitter}' FROM ventas WHERE id='${sale}'`,'identidad fiscal')+
+        check(`SELECT count(*)=2 AND sum(monto)=242 FROM pagos_venta WHERE venta_id='${sale}'`,'pagos reales')+
+        check(`SELECT count(*)=1 AND sum(monto)=142 FROM cuenta_corriente WHERE venta_id='${sale}'`,'solo deuda pendiente')+
+        check(`SELECT stock=${stockBefore-2} FROM producto_variantes WHERE id='${variant}'`,'stock una vez')+
+        check(`SELECT venta_id='${sale}' FROM taller_ordenes WHERE id='${id}'`,'orden vinculada'));
+      test(`Multi CUIT ${label}: reintento conserva venta, pagos y stock`,actor+
+        check(`${invoice(emitter).replace(/;$/,'')}='${sale}'::uuid`,'misma venta')+
+        check(`SELECT count(*)=${salesBefore+1} FROM ventas`,'venta unica')+
+        check(`SELECT count(*)=2 FROM pagos_venta WHERE venta_id='${sale}'`,'sin duplicar pagos')+
+        check(`SELECT stock=${stockBefore-2} FROM producto_variantes WHERE id='${variant}'`,'sin duplicar stock'));
+    }
+  }
+  test('Multi CUIT helpers privados y anon bloqueado',check("SELECT NOT has_function_privilege('authenticated','taller_facturar_directa(uuid,tipo_comprobante,jsonb,uuid)','EXECUTE') AND NOT has_function_privilege('authenticated','taller_confirmar_presupuesto_emisor(uuid,uuid)','EXECUTE') AND NOT has_function_privilege('authenticated','taller_reservar_numero(uuid,tipo_comprobante,integer,uuid)','EXECUTE') AND NOT has_function_privilege('anon','taller_facturar_orden(uuid,tipo_comprobante,jsonb,uuid)','EXECUTE')",'helpers privados'));
   console.log(`${passed} pruebas PostgreSQL locales correctas.`);
 } finally {
   if(started)checked(command('pg_ctl',['-D',dataDir,'-m','immediate','-w','stop']));

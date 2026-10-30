@@ -11,15 +11,19 @@ import WebSocket from 'ws';
 
 const require = createRequire(import.meta.url), repo = process.cwd();
 const fixtures = `
+const emisores=[{id:'emisor-uno',razon_social:'Primero',cuit_emisor:'20111111112',punto_venta:2,activo:true},{id:'emisor-dos',razon_social:'Segundo',cuit_emisor:'20222222223',punto_venta:3,activo:true}];
+export const useComercioParametrizacion=()=>({data:{funciones:{multiples_cuit:location.search.includes('multi')}}});
+export const useEmisoresFiscales=()=>({data:location.search.includes('vacio')?[]:emisores,isLoading:false,error:location.search.includes('error')?Error('No se pudieron cargar los emisores'):null});
 export const useTarjetas=()=>({tarjetas:[]});export const useTarjetaCuotas=()=>({tarjetaCuotas:[]});
 export const useBancos=()=>({bancos:[{id:'banco-local',nombre_banco:'Banco de prueba',numero_cuenta:'001'}]});
 export const useToast=()=>({toast:()=>{}});export const useTaller=()=>({});export const tallerError=e=>e.message;export const tallerJson=d=>d;
 export const supabase={from:name=>{if(name!=='cheques')throw Error('Tabla inesperada');return {insert:values=>{window.chequeCalls.push(values);return {select:()=>({single:async()=>({data:{id:'cheque-local'},error:null})})}}}}};
 `;
 const entry = `import React from 'react';import {createRoot} from 'react-dom/client';import {FacturarOrdenForm} from './src/components/taller/FacturarOrdenForm';
+import {PeriodoNotaCae} from './src/components/PeriodoNotaCae';
 window.fetch=()=>{throw Error('Conexiones externas prohibidas')};window.itemCalls=[];window.chequeCalls=[];window.closedCount=0;
 const data={isPending:false,run:async args=>{window.itemCalls.push(args)}};
-createRoot(document.getElementById('root')).render(<FacturarOrdenForm data={data} orden={{id:'orden-local',cliente_id:'cliente-local'}} total={423.5} onClose={()=>window.closedCount++}/>);`;
+createRoot(document.getElementById('root')).render(location.pathname==='/nota'?<PeriodoNotaCae fechaNota="2026-10-06T01:00:00Z" pending={false} onSolicitar={periodo=>window.itemCalls.push(periodo)}/>:<FacturarOrdenForm data={data} orden={{id:'orden-local',cliente_id:'cliente-local'}} total={423.5} onClose={()=>window.closedCount++}/>);`;
 const bundle = await build({ stdin: { contents: entry, loader: 'tsx', resolveDir: repo }, write: false, bundle: true,
   platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'local-fixtures', setup(builder) {
@@ -83,6 +87,22 @@ try {
   result=await generate();assert.equal(result.args.p_pagos[0].tipo_pago,'cheque');assert.equal(result.args.p_pagos[0].cheque_id,'cheque-local');assert.equal(await evaluate('window.chequeCalls[0][0].monto'),423.5);
   await navigate('/nuevo');await set('input[type=number]','100');await click('Agregar Pago');await wait('Boolean(document.querySelector("tbody"))');assert.equal(await saleDisabled(),true,'Pago parcial requiere completar el saldo');
   await choose(0,'Cuenta Corriente');await click('Agregar Pago');await wait('document.querySelectorAll("tbody tr").length===2');result=await generate();assert.deepEqual(result.args.p_pagos.map(p=>[p.tipo_pago,p.monto]),[['contado',100],['cta_cte',323.5]]);
+  await navigate('/nuevo?multi');await click('Agregar Pago');await wait('Boolean(document.querySelector("tbody"))');
+  assert.equal(await saleDisabled(),true,'Exige emisor aunque estén completos los pagos');
+  await evaluate(`(()=>{const el=document.querySelector('select');el.value='emisor-dos';el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await wait('[...document.querySelectorAll("button")].some(b=>b.textContent.startsWith("Generar venta por")&&!b.disabled)');
+  result=await generate();assert.equal(result.args.p_emisor_fiscal_id,'emisor-dos');
+  for(const route of ['/nuevo?multi&vacio','/nuevo?multi&error']){
+    await navigate(route);await click('Agregar Pago');await wait('Boolean(document.querySelector("tbody"))');
+    assert.equal(await saleDisabled(),true,'Sin emisor disponible no factura');
+  }
+  await send('Page.navigate',{url:origin+'/nota'},sessionId);await wait('Boolean(document.getElementById("nota-periodo-desde"))');
+  assert.equal(await evaluate('document.querySelector("button").disabled'),true);
+  await set('#nota-periodo-desde','2026-09-01');await set('#nota-periodo-hasta','2026-09-30');
+  await wait('!document.querySelector("button").disabled');await click('Obtener CAE de la nota');
+  await wait('window.itemCalls.length===1');assert.deepEqual(await evaluate('window.itemCalls[0]'),{desde:'2026-09-01',hasta:'2026-09-30'});
+  await set('#nota-periodo-hasta','2026-08-31');assert.equal(await evaluate('document.querySelector("button").disabled'),true);
+  await set('#nota-periodo-hasta','2026-10-07');assert.equal(await evaluate('document.querySelector("button").disabled'),true);
   assert.deepEqual(errors,[],'Sin excepciones JavaScript');
-  console.log('OK cobro real en navegador: contado, transferencia con banco, cheque con monto y datos, pago mixto y cuenta corriente solo por el saldo elegido. Sin servicios externos.');
+  console.log('OK navegador: medios de pago reales, selección y bloqueo de emisor fiscal, y período asociado obligatorio con fechas válidas. Sin servicios externos.');
 } finally { socket?.close(); browser?.kill(); await new Promise(resolve => server.close(resolve)); }

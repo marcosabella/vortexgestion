@@ -16,6 +16,7 @@ const load = (file, require = () => ({}), extras = {}) => {
 };
 const cache = load('supabase/functions/_shared/wsaa-cache.ts');
 const caeHelpers = load('supabase/functions/obtener-cae-afip/cae.ts');
+const periodoHelpers = load('supabase/functions/obtener-cae-afip/periodo-asociado.ts');
 const commerce = 'tenant';
 const saleId = 'sale';
 const config = { punto_venta: 3, cuit_emisor: '20300323872', ambiente: 'produccion', certificado_crt: 'TEST CERT', certificado_key: 'TEST KEY' };
@@ -89,7 +90,8 @@ const fakeFetch = async (_url, options) => {
   }
   if (action.endsWith('FECompConsultar')) {
     if (options.body.includes('<ar:CbteNro>125</ar:CbteNro>')) {
-      return new Response(state.lastXml || consultXml().replaceAll('126','125'));
+      const tipo = { factura_c: 11, nota_credito_a: 3, nota_credito_b: 8, nota_credito_c: 13, nota_debito_a: 2, nota_debito_b: 7, nota_debito_c: 12 }[state.sale.tipo_comprobante];
+      return new Response(state.lastXml || consultXml().replaceAll('126','125').replace('<CbteTipo>11</CbteTipo>', `<CbteTipo>${tipo}</CbteTipo>`));
     }
     return new Response(state.consultXml || consultXml());
   }
@@ -101,15 +103,50 @@ load('supabase/functions/obtener-cae-afip/index.ts', name => {
   if (name.includes('wsaa-cache')) return cache;
   if (name.includes('emisor-fiscal')) return { resolverConfiguracionFiscal: async () => config };
   if (name === './cae.ts') return caeHelpers;
+  if (name === './periodo-asociado.ts') return periodoHelpers;
   throw new Error('Import inesperado: ' + name);
 }, { fetch: fakeFetch, Deno: { env: { get: () => 'test' }, serve: fn => { handler = fn; } } });
 const reset = () => { state = { sale: structuredClone(original), attempt: null, calls: [] }; };
-const request = async () => {
-  const response = await handler(new Request('https://test.local', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify({ ventaId: saleId }) }));
+const request = async (extra = {}) => {
+  const response = await handler(new Request('https://test.local', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify({ ventaId: saleId, ...extra }) }));
   return { status: response.status, body: await response.json() };
 };
 let passed = 0;
 const test = async (label, run) => { reset(); await run(); passed++; console.log('OK ' + label); };
+for (const tipo of ['nota_credito_a', 'nota_credito_b', 'nota_credito_c', 'nota_debito_a', 'nota_debito_b', 'nota_debito_c']) {
+  await test(`${tipo}: envía y conserva el período asociado declarado`, async () => {
+    state.sale.tipo_comprobante = tipo;
+    const response = await request({ periodoAsociado: { desde: '2026-09-01', hasta: '2026-09-30' } });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.ok(state.solicitudSoap.includes('<ar:PeriodoAsoc><ar:FchDesde>20260901</ar:FchDesde><ar:FchHasta>20260930</ar:FchHasta></ar:PeriodoAsoc>'));
+    assert.equal(state.attempt.solicitud.FeDetReq.FECAEDetRequest.PeriodoAsoc.FchDesde, '20260901');
+  });
+}
+await test('Nota sin asociación o con fechas inválidas no reserva ni llama a ARCA', async () => {
+  state.sale.tipo_comprobante = 'nota_credito_c';
+  for (const periodoAsociado of [undefined, {}, { desde: '2026-02-30', hasta: '2026-03-01' }, { desde: '2026-09-30', hasta: '2026-09-01' }, { desde: '2026-10-01', hasta: '2026-10-06' }, { desde: '2006-01-01', hasta: '2026-09-30' }, { desde: '<xml>', hasta: '2026-09-30' }]) {
+    assert.equal((await request({ periodoAsociado })).status, 400);
+    assert.equal(state.attempt, null); assert.equal(state.calls.length, 0);
+  }
+});
+await test('Factura no admite período asociado', async () => {
+  assert.equal((await request({ periodoAsociado: { desde: '2026-09-01', hasta: '2026-09-30' } })).status, 400);
+  assert.equal(state.calls.length, 0);
+});
+await test('Nota: rechazo permite corregir período, respuesta perdida impide cambiarlo', async () => {
+  state.sale.tipo_comprobante = 'nota_credito_c';
+  const first = { periodoAsociado: { desde: '2026-09-01', hasta: '2026-09-30' } };
+  const corrected = { periodoAsociado: { desde: '2026-09-02', hasta: '2026-09-30' } };
+  state.rejected = true; assert.equal((await request(first)).status, 400);
+  state.rejected = false; state.failNetwork = true; assert.equal((await request(corrected)).status, 400);
+  const before = state.calls.length;
+  const changed = await request(first); assert.equal(changed.status, 400); assert.match(changed.body.error, /cambio/);
+  assert.equal(state.calls.length, before);
+  state.failNetwork = false;
+  state.consultXml = consultXml().replace('<CbteTipo>11</CbteTipo>', '<CbteTipo>13</CbteTipo>');
+  assert.equal((await request(corrected)).status, 200);
+  assert.equal(state.calls.filter(x => x.endsWith('FECAESolicitar')).length, 2);
+});
 await test('Guarda CAE junto con punto de venta y secuencia fiscal', async () => {
   const response = await request(); assert.equal(response.status, 200, JSON.stringify(response.body));
   assert.equal(state.sale.numero_comprobante, '0003-00000126'); assert.equal(state.sale.punto_venta, 3);

@@ -32,6 +32,7 @@ import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmisoresFiscales } from "@/hooks/useEmisoresFiscales";
 import { datosFiscalesVenta } from "@/utils/emisorFiscal";
+import { PeriodoNotaCae } from './PeriodoNotaCae';
 
 const automaticWhatsAppEnabled = import.meta.env.VITE_WHATSAPP_API_ENABLED === "true";
 const ventasPageSizes = [12, 24, 48, 96];
@@ -170,10 +171,10 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
     }
   };
 
-  const handleObtenerCAE = (venta: Venta) => {
+  const handleObtenerCAE = (venta: Venta, periodoAsociado?: { desde: string; hasta: string }) => {
     if (!venta.id) return;
 
-    obtenerCAE(venta.id, {
+    obtenerCAE(periodoAsociado ? { ventaId: venta.id, periodoAsociado } : venta.id, {
       onSuccess: (data) => {
         setSelectedVenta((current) => {
           if (!current || current.id !== venta.id) return current;
@@ -649,8 +650,9 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                     {whatsappEnvios[0].error_detalle && <span className="text-destructive">{whatsappEnvios[0].error_detalle}</span>}
                   </div>
                 )}
+                {!selectedVenta.cae && /^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) && hasAfipCertificates && <PeriodoNotaCae key={selectedVenta.id} fechaNota={selectedVenta.fecha_venta} pending={isObteniendoCAE} onSolicitar={periodo => handleObtenerCAE(selectedVenta, periodo)} />}
                 <div className="flex justify-end gap-2">
-                  {!selectedVenta.cae && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
+                  {!selectedVenta.cae && !/^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
                       onClick={() => handleObtenerCAE(selectedVenta)}
                       disabled={isObteniendoCAE}

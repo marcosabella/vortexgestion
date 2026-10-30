@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
+import { camposPeriodoAsociado, xmlPeriodoAsociado } from './periodo-asociado.ts';
 import { CaeRechazado, camposAutorizacionCae, camposServicioArca, validarComprobanteRecuperado, validarFechaContraUltimo } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
@@ -448,6 +449,7 @@ async function solicitarCAE(
                 <ar:Importe>${formatearImporteAfip(alicuota.Importe)}</ar:Importe>
               </ar:AlicIva>`).join('')}
             </ar:Iva>` : ''}
+            ${xmlPeriodoAsociado(solicitud.FeDetReq.FECAEDetRequest.PeriodoAsoc)}
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
       </ar:FeCAEReq>
@@ -521,6 +523,7 @@ interface SolicitudCae {
     DocTipo: number; DocNro: number; CbteDesde: number; CbteHasta: number; CbteFch: string;
     ImpTotal: number; ImpTotConc: number; ImpNeto: number; ImpOpEx: number; ImpIVA: number; ImpTrib: number;
     MonId: string; MonCotiz: number; Iva?: { AlicIva: Array<{ Id: number; BaseImp: number; Importe: number }> };
+    PeriodoAsoc?: { FchDesde: string; FchHasta: string };
   } };
 }
 
@@ -768,6 +771,7 @@ Deno.serve(async (req) => {
         FeDetReq: {
           FECAEDetRequest: {
             ...camposServicioArca(venta),
+            ...camposPeriodoAsociado(venta.tipo_comprobante, fechaFormateada, requestBody.periodoAsociado),
             DocTipo: documentoReceptor.docTipo,
             DocNro: documentoReceptor.docNro,
             CbteDesde: 0,
@@ -808,6 +812,7 @@ Deno.serve(async (req) => {
       const detallePrevio = intentoPrevio.solicitud?.FeDetReq?.FECAEDetRequest;
       if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
           || intentoPrevio.punto_venta !== afipConfig.punto_venta || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
+          || JSON.stringify(detallePrevio.PeriodoAsoc) !== JSON.stringify(detalleActual.PeriodoAsoc)
           || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA', 'Concepto', 'FchServDesde', 'FchServHasta', 'FchVtoPago'].some(campo =>
             String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {
         throw new Error('La venta cambio desde la solicitud fiscal anterior. Revise el comprobante autorizado antes de continuar.');

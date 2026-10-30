@@ -414,11 +414,12 @@ export const useObtenerCAE = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (ventaId: string) => {
+    mutationFn: async (solicitud: string | { ventaId: string; periodoAsociado: { desde: string; hasta: string } }) => {
+      const { ventaId, ...asociacion } = typeof solicitud === 'string' ? { ventaId: solicitud } : solicitud;
       console.log('Solicitando CAE para venta:', ventaId);
       
       const { data, error } = await supabase.functions.invoke('obtener-cae-afip', {
-        body: { ventaId },
+        body: { ventaId, ...asociacion },
       });
 
       if (error) {

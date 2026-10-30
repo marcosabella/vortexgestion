@@ -14,6 +14,8 @@ const db = supabase as unknown as SupabaseClient<TallerDatabase>;
 export function tallerError(error: unknown): string {
   const message = error instanceof Error ? error.message : String((error as { message?: string })?.message || '');
   const messages: Record<string, string> = {
+    emisor_fiscal_requerido: 'Seleccioná un emisor fiscal para generar la venta.',
+    emisor_fiscal_no_disponible: 'El emisor fiscal no está activo o no pertenece a este comercio.',
     version_desactualizada: 'Otra persona modificó la orden. Actualizá los datos y volvé a intentar.',
     sin_permisos_o_deshabilitado: 'El módulo no está habilitado o no tenés permisos de administrador.',
     detalle_congelado: 'La orden está cerrada o ya tiene una venta. Sus conceptos están protegidos.',

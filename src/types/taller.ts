@@ -63,7 +63,7 @@ export type TallerDatabase = Omit<Database, 'public'> & {
       taller_cambiar_estado: Rpc<{ p_orden_id: string; p_version: number; p_estado: string; p_detalle: string }, undefined>;
       taller_finalizar_orden: Rpc<{ p_orden_id: string; p_version: number; p_trabajo_realizado: string; p_detalle: string }, undefined>;
       taller_generar_presupuesto: Rpc<{ p_orden_id: string; p_version: number }, string>;
-      taller_facturar_orden: Rpc<{ p_orden_id: string; p_tipo: Database['public']['Enums']['tipo_comprobante']; p_pagos: Json }, string>;
+      taller_facturar_orden: Rpc<{ p_orden_id: string; p_tipo: Database['public']['Enums']['tipo_comprobante']; p_pagos: Json; p_emisor_fiscal_id?: string }, string>;
     };
   };
 };
