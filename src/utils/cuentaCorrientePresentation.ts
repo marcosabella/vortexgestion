@@ -1,4 +1,10 @@
 import { CONCEPTOS_MOVIMIENTO, type CuentaCorriente } from "@/types/cuenta-corriente";
+import { TIPOS_COMPROBANTE } from "@/types/venta";
+
+// Un comprobante a favor del cliente no es un cobro ni tiene un recibo de pago.
+export const esComprobanteCuentaCorriente = (movimiento: Pick<CuentaCorriente, "venta_id" | "tipo_movimiento" | "concepto">) =>
+  Boolean(movimiento.venta_id) && (movimiento.tipo_movimiento === "debito"
+    || /^(?:nota[_\s](?:de[_\s])?cr[eé]dito|nota[_\s](?:de[_\s])?d[eé]bito|venta_credito|pago_cuenta_corriente)(?:[_\s]|$)/i.test(movimiento.concepto));
 
 const MEDIOS_PAGO: Record<string, string> = {
   contado: "CONTADO",
@@ -15,7 +21,13 @@ export const formatCuentaCorrienteComprobante = (
   prefijoVenta = "Venta:",
 ) => {
   const concepto = formatCuentaCorrienteMovimiento(movimiento).concepto;
-  if (!numero || (movimiento.tipo_movimiento === "credito" && /^pago(?:[_\s-]|$)/i.test(movimiento.concepto.trim()))) return concepto;
+  if (!numero || (movimiento.tipo_movimiento === "credito" && movimiento.concepto !== "pago_cuenta_corriente"
+    && /^pago(?:[_\s-]|$)/i.test(movimiento.concepto.trim()))) return concepto;
+  const tipo = movimiento.venta?.tipo_comprobante;
+  if (tipo?.startsWith("nota_credito_") || tipo?.startsWith("nota_debito_")) {
+    const label = TIPOS_COMPROBANTE.find((item) => item.value === tipo)?.label;
+    if (label) return `${label}: ${numero}`;
+  }
   return `${prefijoVenta} ${numero}`;
 };
 
