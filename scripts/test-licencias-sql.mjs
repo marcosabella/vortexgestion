@@ -33,8 +33,15 @@ try{
    ALTER TABLE comercio ADD COLUMN nombre_comercio text DEFAULT 'Comercio prueba',ADD COLUMN cuit text DEFAULT '30545766678',ADD COLUMN calle text DEFAULT 'Calle',ADD COLUMN numero text DEFAULT '123',ADD COLUMN codigo_postal text DEFAULT '5000',ADD COLUMN localidad text DEFAULT 'Ciudad',ADD COLUMN provincia text DEFAULT 'Córdoba',ADD COLUMN telefono text,ADD COLUMN situacion_afip text DEFAULT 'Responsable Inscripto';
    ALTER TABLE clientes ALTER COLUMN id SET DEFAULT gen_random_uuid(),ADD COLUMN nombre text,ADD COLUMN apellido text,ADD COLUMN calle text,ADD COLUMN numero text,ADD COLUMN codigo_postal text,ADD COLUMN localidad text,ADD COLUMN provincia text,ADD COLUMN telefono text,ADD COLUMN situacion_afip text,ADD COLUMN tipo_persona text;
    ALTER TABLE ventas ADD COLUMN idempotency_key uuid,ADD COLUMN emisor_fiscal_id uuid;
+   ALTER TABLE cuenta_corriente ADD COLUMN cheque_id uuid;
+   ALTER TABLE clientes ALTER COLUMN cuit SET NOT NULL;
+   CREATE UNIQUE INDEX clientes_comercio_cuit_unique ON clientes(comercio_id,btrim(cuit)) WHERE btrim(cuit)<>'';
    CREATE UNIQUE INDEX ventas_idempotencia ON ventas(comercio_id,idempotency_key);
    CREATE TABLE comercio_parametrizacion(comercio_id uuid PRIMARY KEY,parametros jsonb);
+   CREATE TABLE comercio_usuarios(comercio_id uuid,user_id uuid,rol text,activo boolean,solo_restaurante boolean);
+   CREATE TABLE app_admins(user_id uuid);
+   INSERT INTO comercio_usuarios VALUES('${issuer}','${client}','admin',true,false);
+   INSERT INTO app_admins VALUES('${client}');
    CREATE TABLE afip_config(comercio_id uuid,activo boolean,punto_venta integer);
    CREATE TABLE emisores_fiscales(id uuid PRIMARY KEY,comercio_id uuid,activo boolean,punto_venta integer);
    CREATE TABLE ventas_numeradores(comercio_id uuid,tipo_comprobante tipo_comprobante,punto_venta integer,ultimo_numero bigint DEFAULT 0,updated_at timestamptz DEFAULT now(),PRIMARY KEY(comercio_id,tipo_comprobante,punto_venta));
@@ -47,6 +54,8 @@ try{
  const numbers=migration('20260907150000_ventas_transaccionales_numeracion.sql');sql(numbers.slice(numbers.indexOf('CREATE OR REPLACE FUNCTION public.ventas_punto_venta_canonico'),numbers.indexOf('-- Preflight:')));
  sql(functionSql('registrar_venta_transaccional'));sql(functionSql('registrar_venta_emisor_transaccional'));
  sql(migration('20261022100000_licencias_mensuales_comercios.sql'));
+ sql(migration('20261031100000_licencias_cliente_cuit_generico.sql'));
+ sql(migration('20261102120000_licencias_cliente_sin_documento.sql'));
  fail(`SET ROLE anon;${save()}`,'permission denied');
  fail(`SET app.platform_admin='off';SET ROLE authenticated;${save()}`,'No tiene permisos');
  fail(`SET app.test_comercio='${recipient}';SET ROLE authenticated;${save()}`,'No tiene permisos');
@@ -82,7 +91,39 @@ try{
  const before=sql('SELECT count(*) FROM clientes;');
  sql(actor+save(other));sql(`UPDATE comercio_parametrizacion SET parametros='{}' WHERE comercio_id='${issuer}';UPDATE afip_config SET activo=false;UPDATE comercio SET cuit='20300323872' WHERE id='${other}';`);
  fail(emit('2027-02-01','factura_c',0,null,other),'Configurá ARCA');assert.equal(sql('SELECT count(*) FROM clientes;'),before,'Fallo revierte creación del cliente');
- console.log('OK licencias SQL: RLS, roles, tarifa, concepto, venta/cuenta corriente reales, IVA, período, multi CUIT, concurrencia, idempotencia e integridad/rollback. PostgreSQL local.');
+ // Regresión: un CUIT de relleno no debe imputar la licencia a Sergio Flores.
+ sql(`UPDATE comercio SET cuit='00000000000',nombre_comercio='BERRA EXTINTORES' WHERE id='${other}';
+   INSERT INTO clientes(id,comercio_id,nombre,apellido,cuit) VALUES('${client}','${issuer}','SERGIO','FLORES','00000000000');
+   UPDATE licencias_comercios SET cliente_id='${client}' WHERE destinatario_comercio_id='${other}';`);
+ const berra=JSON.parse(sql(actor+emit('2027-03-01','recibo_x',0,null,other)));
+ check(`SELECT v.cliente_id<>'${client}' AND c.nombre='BERRA EXTINTORES' AND cc.cliente_id=v.cliente_id AND cc.monto=v.total FROM ventas v JOIN clientes c ON c.id=v.cliente_id JOIN cuenta_corriente cc ON cc.venta_id=v.id WHERE v.id='${berra.venta_id}'`,'Vínculo anterior genérico se reemplaza; deuda corresponde a Berra');
+ check(`SELECT nombre='SERGIO' AND apellido='FLORES' FROM clientes WHERE id='${client}'`,'Conserva al cliente ajeno');
+ const nextBerra=JSON.parse(sql(actor+emit('2027-04-01','recibo_x',0,null,other)));
+ check(`SELECT a.cliente_id=b.cliente_id FROM ventas a,ventas b WHERE a.id='${berra.venta_id}' AND b.id='${nextBerra.venta_id}'`,'Reutiliza vínculo propio sin duplicar cliente');
+ fail(emit('2027-05-01','factura_c',0,null,other),'CUIT real');
+ sql(`UPDATE licencias_comercios SET cliente_id=NULL WHERE destinatario_comercio_id='${other}';`);
+ const unlinked=JSON.parse(sql(actor+emit('2027-06-01','recibo_x',0,null,other)));
+ check(`SELECT cliente_id<>'${client}' FROM ventas WHERE id='${unlinked.venta_id}'`,'Sin vínculo tampoco reutiliza CUIT de relleno');
+ // Ejecutar tambien el SQL puntual de reparacion, adaptando solo los IDs de produccion.
+ const berraClient=sql(`SELECT cliente_id FROM ventas WHERE id='${berra.venta_id}'`);
+ const berraMovement=sql(`SELECT id FROM cuenta_corriente WHERE venta_id='${berra.venta_id}'`);
+ sql(`UPDATE clientes SET nombre='OTRO CLIENTE' WHERE id=(SELECT cliente_id FROM ventas WHERE id='${unlinked.venta_id}');
+   UPDATE ventas SET cliente_id='${client}',total=55000,numero_comprobante='0003-00000005',fecha_venta='2026-11-02T12:00:00Z' WHERE id='${berra.venta_id}';
+   UPDATE cuenta_corriente SET cliente_id='${client}',monto=55000 WHERE id='${berraMovement}';
+   UPDATE pagos_venta SET monto=55000 WHERE venta_id='${berra.venta_id}';
+   UPDATE licencias_comercios SET cliente_id='${client}' WHERE destinatario_comercio_id='${other}';
+   UPDATE licencias_comprobantes SET periodo='2026-11-01',importe=55000 WHERE venta_id='${berra.venta_id}';`);
+ let repair=readFileSync('docs/sql/reparar-licencia-berra.sql','utf8');
+ for(const [live,local] of [
+   ['037c362e-555b-4b19-b257-5fd9c3a82203',issuer],['ba927680-6870-4eca-a795-f5b72d51e7d9',other],
+   ['37cae314-f5e7-43fd-ac02-5f887a25a2c3',client],['e9fb04ae-0b81-4c43-a874-24a614fe3046',berra.venta_id],
+   ['5731287f-f9a4-461a-b04e-8e5c9255d331',berraMovement]
+ ]) repair=repair.replaceAll(live,local);
+ const repairContext=`SET app.test_comercio='${issuer}';SET app.test_admin='on';SET app.platform_admin='on';`;
+ sql(repairContext+repair);sql(repairContext+repair);
+ check(`SELECT v.cliente_id='${berraClient}' AND cc.cliente_id=v.cliente_id AND cc.monto=55000 FROM ventas v JOIN cuenta_corriente cc ON cc.venta_id=v.id WHERE v.id='${berra.venta_id}'`,'Reparacion real e idempotente imputa a Berra');
+ check(`SELECT count(*)=0 FROM cuenta_corriente WHERE cliente_id='${client}'`,'Reparacion elimina deuda ajena de Sergio sin eliminar movimientos');
+ console.log('OK licencias SQL: RLS, roles, venta/cuenta corriente reales, concurrencia, rollback y regresión de CUIT genérico/vínculos previos. PostgreSQL local.');
 }catch(error){console.error(error);throw error;}finally{
  if(started)command('pg_ctl',['-D',data,'-m','immediate','-w','stop']);
  const resolved=realpathSync(cluster);if(!resolved.startsWith(root+path.sep)||!path.basename(resolved).startsWith('vortex-licencias-sql-'))throw Error('Ruta temporal no segura');
