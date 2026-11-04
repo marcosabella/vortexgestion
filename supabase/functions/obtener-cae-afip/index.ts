@@ -3,6 +3,7 @@ import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
 import { camposPeriodoAsociado, xmlPeriodoAsociado } from './periodo-asociado.ts';
+import { asociarFacturaOriginal, xmlComprobantesAsociados, type ComprobanteAsociado } from './comprobante-asociado.ts';
 import { CaeRechazado, camposAutorizacionCae, camposServicioArca, validarComprobanteRecuperado, validarFechaContraUltimo } from './cae.ts';
 
 function formatearFechaArgentinaYYYYMMDD(value: string): string {
@@ -440,6 +441,7 @@ async function solicitarCAE(
             <ar:FchVtoPago>${solicitud.FeDetReq.FECAEDetRequest.FchVtoPago}</ar:FchVtoPago>` : ''}
             <ar:MonId>${solicitud.FeDetReq.FECAEDetRequest.MonId}</ar:MonId>
             <ar:MonCotiz>${solicitud.FeDetReq.FECAEDetRequest.MonCotiz}</ar:MonCotiz>
+            ${xmlComprobantesAsociados(solicitud.FeDetReq.FECAEDetRequest.CbtesAsoc)}
             ${solicitud.FeDetReq.FECAEDetRequest.Iva?.AlicIva?.length ? `
             <ar:Iva>
               ${solicitud.FeDetReq.FECAEDetRequest.Iva.AlicIva.map((alicuota) => `
@@ -524,6 +526,7 @@ interface SolicitudCae {
     ImpTotal: number; ImpTotConc: number; ImpNeto: number; ImpOpEx: number; ImpIVA: number; ImpTrib: number;
     MonId: string; MonCotiz: number; Iva?: { AlicIva: Array<{ Id: number; BaseImp: number; Importe: number }> };
     PeriodoAsoc?: { FchDesde: string; FchHasta: string };
+    CbtesAsoc?: { CbteAsoc: ComprobanteAsociado[] };
   } };
 }
 
@@ -674,6 +677,7 @@ Deno.serve(async (req) => {
     if (venta.comercio_id !== ventaPre.comercio_id) {
       throw new Error('La venta no pertenece al comercio autorizado');
     }
+    if (venta.anulado_at) throw new Error('El comprobante fue anulado internamente');
 
     console.log('Venta encontrada:', {
       numero_comprobante: venta.numero_comprobante,
@@ -709,7 +713,25 @@ Deno.serve(async (req) => {
 
     // Preparar fecha en formato YYYYMMDD
     const fechaFormateada = formatearFechaArgentinaYYYYMMDD(venta.fecha_venta);
-    const documentoReceptor = obtenerDocumentoReceptor(venta);
+    let documentoReceptor: { docTipo: number; docNro: number };
+    let asociacionOriginal: ReturnType<typeof asociarFacturaOriginal> | undefined;
+    if (venta.comprobante_asociado_id) {
+      const { data: original, error: originalError } = await supabase.from('ventas').select('*')
+        .eq('id', venta.comprobante_asociado_id).eq('comercio_id', ventaPre.comercio_id).single();
+      const { data: intentoOriginal, error: intentoOriginalError } = await supabase.from('afip_cae_intentos').select('*')
+        .eq('venta_id', venta.comprobante_asociado_id).eq('comercio_id', ventaPre.comercio_id).single();
+      if (originalError || intentoOriginalError || !original?.cae || intentoOriginal?.cae !== original.cae
+        || original.origen_pedido_online_id !== venta.origen_pedido_online_id || !venta.origen_pedido_online_id
+        || original.cliente_id !== venta.cliente_id || Number(original.total) !== Number(venta.total)
+        || original.emisor_fiscal_id !== venta.emisor_fiscal_id || intentoOriginal.cuit_emisor !== cuitEmisor
+        || intentoOriginal.ambiente !== afipConfig.ambiente) throw new Error('No se pudo verificar la identidad fiscal de la factura original');
+      const receptorOriginal = intentoOriginal.solicitud?.FeDetReq?.FECAEDetRequest;
+      if (!receptorOriginal || !Number.isFinite(Number(receptorOriginal.DocNro))) throw new Error('Falta el receptor fiscal del comprobante original');
+      documentoReceptor = { docTipo: Number(receptorOriginal.DocTipo), docNro: Number(receptorOriginal.DocNro) };
+      asociacionOriginal = asociarFacturaOriginal(venta.tipo_comprobante, { tipo: original.tipo_comprobante,
+        puntoVenta: Number(intentoOriginal.punto_venta), numero: Number(intentoOriginal.numero_secuencial),
+        fecha: formatearFechaArgentinaYYYYMMDD(original.fecha_venta), cuit: cuitEmisor });
+    } else documentoReceptor = obtenerDocumentoReceptor(venta);
     const comprobanteClaseC = esComprobanteClaseC(venta.tipo_comprobante);
 
     // Calcular importes por alícuota de IVA
@@ -771,7 +793,7 @@ Deno.serve(async (req) => {
         FeDetReq: {
           FECAEDetRequest: {
             ...camposServicioArca(venta),
-            ...camposPeriodoAsociado(venta.tipo_comprobante, fechaFormateada, requestBody.periodoAsociado),
+            ...(asociacionOriginal || camposPeriodoAsociado(venta.tipo_comprobante, fechaFormateada, requestBody.periodoAsociado)),
             DocTipo: documentoReceptor.docTipo,
             DocNro: documentoReceptor.docNro,
             CbteDesde: 0,
@@ -813,6 +835,7 @@ Deno.serve(async (req) => {
       if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
           || intentoPrevio.punto_venta !== afipConfig.punto_venta || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
           || JSON.stringify(detallePrevio.PeriodoAsoc) !== JSON.stringify(detalleActual.PeriodoAsoc)
+          || JSON.stringify(detallePrevio.CbtesAsoc) !== JSON.stringify('CbtesAsoc' in detalleActual ? detalleActual.CbtesAsoc : undefined)
           || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA', 'Concepto', 'FchServDesde', 'FchServHasta', 'FchVtoPago'].some(campo =>
             String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {
         throw new Error('La venta cambio desde la solicitud fiscal anterior. Revise el comprobante autorizado antes de continuar.');

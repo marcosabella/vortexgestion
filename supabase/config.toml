@@ -27,6 +27,9 @@ verify_jwt = false
 [functions.mercadopago-metodos]
 verify_jwt = false
 
+[functions.mercadopago-reembolsar-pedido]
+verify_jwt = false
+
 [functions.membresia-checkout]
 verify_jwt = false
 

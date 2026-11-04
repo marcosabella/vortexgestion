@@ -24,7 +24,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useActualizarCierreCaja, useCajasDiarias, useEliminarCaja, useReabrirCaja } from "@/hooks/useCaja";
 import { useToast } from "@/hooks/use-toast";
 import { CajaDiaria, esMovimientoManual, getCajaMovimientoLabel } from "@/types/caja";
-import { esImputacionCuentaCorriente, getPagosVenta, getPagosVentaEfectivos, getTipoPagoLabel, getVentaTipoPagoLabel, getVentaTotalFinal, PagoVenta } from "@/types/venta";
+import { esImputacionCuentaCorriente, getPagosVenta, getPagosVentaEfectivos, getTipoPagoLabel, getVentaTipoPagoLabel, getVentaImporteContable, getVentaTotalFinal, PagoVenta } from "@/types/venta";
 import { buildCajaDiariaPdfFile, buildCajaPdfFile } from "@/utils/cajaPdf";
 
 const formatCurrency = (amount: number) =>
@@ -119,7 +119,7 @@ const ListadoCaja = () => {
         acc.cierreSistema += Number(caja.monto_cierre_sistema || 0);
         acc.cierreReal += Number(caja.monto_cierre_real || 0);
         acc.diferencia += Number(caja.diferencia || 0);
-        acc.totalVentas += ventas.reduce((sum, venta) => sum + getVentaTotalFinal(venta), 0);
+        acc.totalVentas += ventas.reduce((sum, venta) => sum + getVentaImporteContable(venta), 0);
 
         ventas.forEach((venta) => {
           getPagosVentaEfectivos(venta).forEach((pago) => {
@@ -621,7 +621,7 @@ const ListadoCaja = () => {
                               ))}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(getVentaTotalFinal(venta))}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(getVentaImporteContable(venta))}</TableCell>
                         </TableRow>
                       ))
                     )}

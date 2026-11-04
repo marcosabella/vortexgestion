@@ -1,4 +1,6 @@
 export interface PagoVenta {
+  es_reembolso?: boolean;
+  reembolso_confirmado?: number;
   id?: string;
   comercio_id?: string;
   venta_id?: string;
@@ -35,6 +37,9 @@ export interface PagoVenta {
 }
 
 export interface Venta {
+  origen_pedido_online_id?: string | null;
+  comprobante_asociado_id?: string | null;
+  anulado_at?: string | null;
   emisor_fiscal_id?: string | null;
   emisor_snapshot?: import("@/types/emisorFiscal").EmisorFiscalSnapshot | null;
   punto_venta?: number | null;
@@ -212,6 +217,14 @@ export const getVentaTotalFinal = (venta: Pick<Venta, "total" | "pagos_venta">) 
   return Number(venta.total || 0);
 };
 
+// Importe comercial neto; los documentos conservan sus importes originales para imprimir/ARCA.
+export const getVentaImporteContable = (venta: Pick<Venta, "total" | "pagos_venta" | "origen_pedido_online_id" | "comprobante_asociado_id" | "anulado_at" | "cae">) => {
+  if (venta.origen_pedido_online_id && venta.anulado_at) return 0;
+  const total = getVentaTotalFinal(venta);
+  if (venta.origen_pedido_online_id && venta.comprobante_asociado_id) return venta.cae?.trim() ? -total : 0;
+  return total;
+};
+
 type VentaConPagos = Pick<Venta, "tipo_pago" | "total" | "pagos_venta" | "banco_id" | "tarjeta_id" | "cuotas" | "recargo_cuotas">;
 
 export const esImputacionCuentaCorriente = (pago: Pick<PagoVenta, "tipo_pago">) =>
@@ -240,7 +253,10 @@ export const esVentaCuentaCorriente = (venta: VentaConPagos) => {
 };
 
 export const getPagosVentaEfectivos = (venta: VentaConPagos) =>
-  getPagosVenta(venta).filter(esPagoIngresoEfectivo);
+  getPagosVenta(venta).filter(esPagoIngresoEfectivo).map(pago => ({
+    ...pago,
+    monto: pago.es_reembolso ? -Number(pago.reembolso_confirmado || 0) : Number(pago.monto || 0) - Number(pago.reembolso_confirmado || 0),
+  }));
 
 export const getVentaMontoContado = (venta: Pick<Venta, "tipo_pago" | "total" | "pagos_venta">) => {
   if (venta.pagos_venta?.length) {

@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     if (eventError) throw eventError;
     eventId = event.id;
     const cred = await credential(db, op.comercio_id);
-    let remote: any;
+    let remote;
     if (op.order_id) {
       remote = await mpFetch(
         `/v1/orders/${op.order_id}`,
@@ -76,7 +76,15 @@ Deno.serve(async (req) => {
       localStatus = mapStatus(status);
     const payment = remote.transactions?.payments?.[0] || remote;
     const paymentId = String(payment.id || dataId || "");
-    if (localStatus === "aprobado") {
+    if (op.modalidad === "checkout_pro" && op.pedido_online_id
+      && (localStatus === "reembolsado" || Number(payment.transaction_amount_refunded) > 0)) {
+      const { error } = await db.rpc("sincronizar_reembolso_pedido_online", {
+        p_operacion_id: op.id,
+        p_payment_id: paymentId,
+        p_total: Number(payment.transaction_amount_refunded ?? (localStatus === "reembolsado" ? payment.transaction_amount : 0)),
+      });
+      if (error) throw error;
+    } else if (localStatus === "aprobado") {
       await db.rpc("registrar_pago_mercadopago_aprobado", {
         p_operacion_id: op.id,
         p_payment_id: paymentId,
@@ -88,7 +96,7 @@ Deno.serve(async (req) => {
       await db.rpc("notificar_pedido_online_pagado", {
         p_operacion_id: op.id,
       });
-    } else {
+    } else if (!op.approved_at && !Number(op.importe_reembolsado)) {
       await db.from("mercadopago_operaciones").update({
         estado: localStatus,
         estado_detalle: remote.status_detail || status,

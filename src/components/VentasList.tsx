@@ -559,12 +559,12 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {venta.cae?.trim() ? (
+                        {venta.cae?.trim() || venta.origen_pedido_online_id ? (
                           <Button
                             variant="outline"
                             size="sm"
                             disabled
-                            title="La venta tiene CAE y no puede editarse"
+                            title="El comprobante se conserva; gestione su cancelación desde el pedido si es online"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -578,8 +578,8 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                         <Button
                           variant="destructive"
                           size="sm"
-                          disabled={Boolean(venta.cae?.trim())}
-                          title={venta.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : undefined}
+                          disabled={Boolean(venta.cae?.trim() || venta.origen_pedido_online_id)}
+                          title={venta.origen_pedido_online_id ? "Gestione la cancelación desde Pedidos online" : venta.cae?.trim() ? "La venta tiene CAE y no puede eliminarse" : undefined}
                           onClick={() => deleteVenta(venta.id!)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -642,6 +642,9 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                   <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
                 <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
+                {selectedVenta.origen_pedido_online_id && <p className="text-sm text-muted-foreground">Comprobante de pedido online. Su cancelación se gestiona desde Pedidos online.</p>}
+                {selectedVenta.anulado_at && <Badge variant="destructive">Anulado internamente · sin CAE</Badge>}
+                {selectedVenta.comprobante_asociado_id && <p className="text-sm">Nota de crédito vinculada a la factura original.</p>}
                 {whatsappEnvios[0] && (
                   <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                     <span>Último envío WhatsApp:</span>
@@ -650,9 +653,9 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                     {whatsappEnvios[0].error_detalle && <span className="text-destructive">{whatsappEnvios[0].error_detalle}</span>}
                   </div>
                 )}
-                {!selectedVenta.cae && /^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) && hasAfipCertificates && <PeriodoNotaCae key={selectedVenta.id} fechaNota={selectedVenta.fecha_venta} pending={isObteniendoCAE} onSolicitar={periodo => handleObtenerCAE(selectedVenta, periodo)} />}
+                {!selectedVenta.cae && !selectedVenta.comprobante_asociado_id && /^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) && hasAfipCertificates && <PeriodoNotaCae key={selectedVenta.id} fechaNota={selectedVenta.fecha_venta} pending={isObteniendoCAE} onSolicitar={periodo => handleObtenerCAE(selectedVenta, periodo)} />}
                 <div className="flex justify-end gap-2">
-                  {!selectedVenta.cae && !/^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
+                  {!selectedVenta.cae && !selectedVenta.anulado_at && (!/^nota_(credito|debito)_/.test(selectedVenta.tipo_comprobante) || selectedVenta.comprobante_asociado_id) && !['ticket_fiscal', 'recibo_x'].includes(selectedVenta.tipo_comprobante) && hasAfipCertificates && (
                     <Button
                       onClick={() => handleObtenerCAE(selectedVenta)}
                       disabled={isObteniendoCAE}
@@ -737,7 +740,8 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
 
               {selectedVenta.pagos_venta && selectedVenta.pagos_venta.length > 0 && (
                 <div>
-                  <h4 className="font-semibold mb-2">Métodos de Pago</h4>
+                  <h4 className="font-semibold mb-2">{selectedVenta.comprobante_asociado_id ? "Devolución del pago" : "Métodos de Pago"}</h4>
+                  {selectedVenta.pagos_venta.some(pago => pago.es_reembolso || Number(pago.reembolso_confirmado) > 0) && <p className="mb-2 text-sm text-muted-foreground">Dinero devuelto confirmado: ${selectedVenta.pagos_venta.reduce((sum, pago) => sum + Number(pago.reembolso_confirmado || 0), 0).toFixed(2)}</p>}
                   <Table>
                     <TableHeader>
                       <TableRow>

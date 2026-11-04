@@ -17,6 +17,7 @@ const load = (file, require = () => ({}), extras = {}) => {
 const cache = load('supabase/functions/_shared/wsaa-cache.ts');
 const caeHelpers = load('supabase/functions/obtener-cae-afip/cae.ts');
 const periodoHelpers = load('supabase/functions/obtener-cae-afip/periodo-asociado.ts');
+const asociadosHelpers = load('supabase/functions/obtener-cae-afip/comprobante-asociado.ts');
 const commerce = 'tenant';
 const saleId = 'sale';
 const config = { punto_venta: 3, cuit_emisor: '20300323872', ambiente: 'produccion', certificado_crt: 'TEST CERT', certificado_key: 'TEST KEY' };
@@ -43,9 +44,9 @@ const supabase = {
     return { data: { estado: 'vigente', token: 'test-token', sign: 'test-sign', expirationTime: '2099-01-01T00:00:00Z' }, error: null };
   },
   from: table => {
-    let action = 'select'; let payload;
+    let action = 'select'; let payload; const filters = {};
     const builder = {
-      select() { return builder; }, eq() { return builder; }, order() { return builder; }, limit() { return builder; },
+      select() { return builder; }, eq(key, value) { filters[key] = value; return builder; }, order() { return builder; }, limit() { return builder; },
       insert(value) { action = 'insert'; payload = value; return builder; },
       delete() { action = 'delete'; return builder; },
       update(value) { action = 'update'; payload = value; return builder; },
@@ -54,7 +55,7 @@ const supabase = {
         if (table === 'comercio_usuarios') return { data: state.denyAdmin ? null : { activo: true }, error: null };
         if (table === 'afip_config') return { data: config, error: null };
         if (table === 'ventas') {
-          if (action === 'select') return { data: structuredClone(state.sale), error: null };
+          if (action === 'select') return { data: structuredClone(state.originalSale?.id === filters.id ? state.originalSale : state.sale), error: null };
           if (payload.cae && state.failFinal) { state.failFinal = false; return { data: null, error: { message: 'fallo de guardado simulado' } }; }
           // Reproduce la coherencia exigida por el trigger de numeracion.
           if (payload.cae && (payload.punto_venta !== 3 || payload.numero_secuencial !== 126)) {
@@ -64,7 +65,7 @@ const supabase = {
         }
         if (table === 'afip_cae_intentos') {
           if (action === 'delete') { state.attempt = null; return { data: { venta_id: saleId }, error: null }; }
-          if (action === 'select') return { data: structuredClone(state.attempt), error: null };
+          if (action === 'select') return { data: structuredClone(state.originalAttempt?.venta_id === filters.venta_id ? state.originalAttempt : state.attempt), error: null };
           if (action === 'insert') {
             if (state.attempt) return { data: null, error: { message: 'duplicate key' } };
             state.attempt = structuredClone(payload); return { data: null, error: null };
@@ -104,6 +105,7 @@ load('supabase/functions/obtener-cae-afip/index.ts', name => {
   if (name.includes('emisor-fiscal')) return { resolverConfiguracionFiscal: async () => config };
   if (name === './cae.ts') return caeHelpers;
   if (name === './periodo-asociado.ts') return periodoHelpers;
+  if (name === './comprobante-asociado.ts') return asociadosHelpers;
   throw new Error('Import inesperado: ' + name);
 }, { fetch: fakeFetch, Deno: { env: { get: () => 'test' }, serve: fn => { handler = fn; } } });
 const reset = () => { state = { sale: structuredClone(original), attempt: null, calls: [] }; };
@@ -256,5 +258,31 @@ await test('Ticket previo perdido: explica el error y no confunde TA con CAE', a
   await assert.rejects(cache.obtenerTicketWsaaCacheado(client, commerce, 'TEST CERT', 'wsfe', 'produccion', async () => {
     throw new Error('El CEE ya posee un TA valido para el acceso al WSN solicitado');
   }), /no indica si la factura tiene CAE/);
+});
+function originalOnline() {
+  Object.assign(state.sale, { tipo_comprobante: 'nota_credito_c', origen_pedido_online_id: 'order', comprobante_asociado_id: 'original', cliente_id: 'customer', emisor_fiscal_id: null });
+  state.originalSale = { ...structuredClone(original), id: 'original', cae: '12345678901234', origen_pedido_online_id: 'order', cliente_id: 'customer', emisor_fiscal_id: null };
+  state.originalAttempt = { venta_id: 'original', cae: '12345678901234', cuit_emisor: config.cuit_emisor, ambiente: config.ambiente, punto_venta: 1, numero_secuencial: 27, solicitud: { FeDetReq: { FECAEDetRequest: { DocTipo: 80, DocNro: 30545766678 } } } };
+}
+await test('NC online asocia la factura exacta sin periodo e informa receptor fiscal original', async () => {
+  originalOnline();state.sale.cliente.cuit = 'otra ficha editada';
+  const response = await request();assert.equal(response.status, 200, JSON.stringify(response.body));
+  assert.ok(state.solicitudSoap.includes('<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>11</ar:Tipo><ar:PtoVta>1</ar:PtoVta><ar:Nro>27</ar:Nro>'));
+  assert.ok(state.solicitudSoap.includes('<ar:DocNro>30545766678</ar:DocNro>'));
+  assert.equal(state.solicitudSoap.includes('<ar:PeriodoAsoc>'), false);
+});
+await test('NC online rechaza otro emisor sin reservar ni emitir', async () => {
+  originalOnline();state.originalAttempt.cuit_emisor = '20999999999';
+  assert.equal((await request()).status, 400);assert.equal(state.calls.length, 0);
+});
+await test('NC online no ajusta un cliente o importe ajeno', async () => {
+  originalOnline();state.originalSale.cliente_id = 'other';assert.equal((await request()).status, 400);
+  state.originalSale.cliente_id = 'customer';state.originalSale.total = 1;assert.equal((await request()).status, 400);assert.equal(state.calls.length, 0);
+});
+await test('NC online respuesta perdida recupera el mismo CAE sin emitir otra nota', async () => {
+  originalOnline();state.failNetwork = true;await request();state.failNetwork = false;
+  state.consultXml = consultXml().replace('<CbteTipo>11</CbteTipo>', '<CbteTipo>13</CbteTipo>');
+  assert.equal((await request()).status, 200);
+  assert.equal(state.calls.filter(action => action.endsWith('FECAESolicitar')).length, 1);
 });
 console.log(`${passed} pruebas fiscales con servicios simulados correctas. No se emitieron comprobantes reales.`);

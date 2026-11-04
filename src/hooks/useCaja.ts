@@ -239,7 +239,7 @@ export const useCajaDiaria = (fecha: string) => {
       return ventasDelDia.filter((venta) => {
         if (!venta.id || movimientosVentaIds.has(venta.id)) return false;
         if (esVentaCuentaCorriente(venta)) return false;
-        if (getVentaTotalFinal(venta) <= 0) return false;
+        if (getVentaTotalFinal(venta) <= 0 || (venta.origen_pedido_online_id && (venta.comprobante_asociado_id || venta.anulado_at))) return false;
 
         const fechaVenta = new Date(venta.fecha_venta).getTime();
         const incluidaEnCaja = cajasDelDia.some((cajaDelDia) => {

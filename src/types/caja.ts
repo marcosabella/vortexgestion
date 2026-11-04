@@ -1,4 +1,4 @@
-import { getPagosVentaEfectivos, getVentaTotalFinal, TipoPago, Venta } from "@/types/venta";
+import { getPagosVentaEfectivos, getVentaImporteContable, TipoPago, Venta } from "@/types/venta";
 
 export type CajaEstado = "abierta" | "cerrada";
 export type CajaMovimientoTipo = "ingreso" | "egreso";
@@ -114,7 +114,7 @@ export const buildCajaResumen = (
 
   return {
     ventas,
-    totalVentas: ventas.reduce((sum, venta) => sum + getVentaTotalFinal(venta), 0),
+    totalVentas: ventas.reduce((sum, venta) => sum + getVentaImporteContable(venta), 0),
     cantidadVentas: ventas.length,
     pagosPorTipo,
     totalContado,

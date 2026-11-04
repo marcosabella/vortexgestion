@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
-import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getVentaTipoPagoLabel, getVentaTotalFinal } from '@/types/venta';
+import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getVentaTipoPagoLabel, getVentaImporteContable } from '@/types/venta';
 import { useComercio } from '@/hooks/useComercio';
 import { useAfipConfig } from '@/hooks/useAfipConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -65,7 +65,7 @@ const ListadoVentas = () => {
 
   // Resumen general
   const resumenGeneral = useMemo(() => {
-    const totalVentas = ventasFiltradas.reduce((sum, v) => sum + getVentaTotalFinal(v), 0);
+    const totalVentas = ventasFiltradas.reduce((sum, v) => sum + getVentaImporteContable(v), 0);
     const cantidadVentas = ventasFiltradas.length;
     const ticketPromedio = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
     
@@ -84,12 +84,12 @@ const ListadoVentas = () => {
       
       if (clientesMap.has(clienteId)) {
         const cliente = clientesMap.get(clienteId)!;
-        cliente.total += getVentaTotalFinal(venta);
+        cliente.total += getVentaImporteContable(venta);
         cliente.cantidad += 1;
       } else {
         clientesMap.set(clienteId, {
           nombre: clienteNombre,
-          total: getVentaTotalFinal(venta),
+          total: getVentaImporteContable(venta),
           cantidad: 1
         });
       }
@@ -109,12 +109,12 @@ const ListadoVentas = () => {
       
       if (comprobantesMap.has(tipo)) {
         const comp = comprobantesMap.get(tipo)!;
-        comp.total += getVentaTotalFinal(venta);
+        comp.total += getVentaImporteContable(venta);
         comp.cantidad += 1;
       } else {
         comprobantesMap.set(tipo, {
           label: tipoLabel,
-          total: getVentaTotalFinal(venta),
+          total: getVentaImporteContable(venta),
           cantidad: 1
         });
       }
@@ -430,7 +430,7 @@ const ListadoVentas = () => {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        ${getVentaTotalFinal(venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${getVentaImporteContable(venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))

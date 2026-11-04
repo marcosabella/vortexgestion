@@ -8,7 +8,7 @@ import {
   discriminaIvaEnComprobante,
   formatNumeroComprobante,
   getVentaTipoPagoLabel,
-  getVentaTotalFinal,
+  getVentaImporteContable,
 } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
@@ -247,7 +247,7 @@ const buildDetalleRows = (ventas: Venta[]) => {
       formaPago: getVentaTipoPagoLabel(venta),
       subtotal: muestraIva ? formatMoney(venta.subtotal) : "-",
       iva: muestraIva ? formatMoney(venta.total_iva) : "-",
-      total: formatMoney(getVentaTotalFinal(venta)),
+      total: formatMoney(getVentaImporteContable(venta)),
     };
   });
 };
@@ -262,7 +262,7 @@ const buildComprobanteRows = (ventas: Venta[]) => {
       total: 0,
     };
     current.cantidad += 1;
-    current.total += getVentaTotalFinal(venta);
+    current.total += getVentaImporteContable(venta);
     comprobantes.set(venta.tipo_comprobante, current);
   });
 
@@ -284,7 +284,7 @@ const buildClienteRows = (ventas: Venta[]) => {
     const clienteId = venta.cliente_id || "sin-cliente";
     const current = clientes.get(clienteId) || { cliente: getClienteVenta(venta), cantidad: 0, total: 0 };
     current.cantidad += 1;
-    current.total += getVentaTotalFinal(venta);
+    current.total += getVentaImporteContable(venta);
     clientes.set(clienteId, current);
   });
 
