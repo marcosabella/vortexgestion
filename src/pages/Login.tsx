@@ -1,13 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { LockKeyhole, LogIn, Mail } from "lucide-react";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowRight, ArrowUpRight, Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import "./Login.css";
 
 type LoginLocationState = {
   from?: {
@@ -32,6 +32,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [comercio, setComercio] = useState<ComercioLoginData | null>(null);
   const [isComercioLoading, setIsComercioLoading] = useState(Boolean(comercioId));
 
@@ -72,6 +74,7 @@ export default function Login() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setLoginError("");
     setIsSubmitting(true);
     localStorage.removeItem("selectedComercioId");
 
@@ -83,6 +86,7 @@ export default function Login() {
     setIsSubmitting(false);
 
     if (error) {
+      setLoginError("Revisá el email y la contraseña e intentá nuevamente.");
       toast({
         title: "No se pudo iniciar sesion",
         description: "Revise el email y la contrasena ingresados.",
@@ -100,106 +104,77 @@ export default function Login() {
     navigate(redirectTo, { replace: true });
   };
 
-  const comercioName = comercio?.nombre_comercio ?? "VORTEX";
-  const comercioLocation = comercio ? `${comercio.localidad}, ${comercio.provincia}` : "Gestion comercial multi comercio";
+  const comercioName = comercio?.nombre_comercio ?? "Vortex Gestión";
+  const comercioLocation = comercio ? [comercio.localidad, comercio.provincia].filter(Boolean).join(", ").toLocaleUpperCase("es-AR") : "Tu espacio de trabajo";
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="grid min-h-screen lg:grid-cols-[1fr_460px]">
-        <section className="flex min-h-[320px] flex-col justify-between bg-[linear-gradient(135deg,#0f172a_0%,#164e63_52%,#f59e0b_100%)] p-8 sm:p-10 lg:p-12">
-          <div className="flex items-center gap-4">
-            <div className="flex h-24 w-24 items-center justify-center rounded-md bg-white/15 ring-1 ring-white/25">
-              <img src="/logo.png" alt="VORTEX" className="h-20 w-20 object-contain" />
-            </div>
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/70">Acceso comercio</p>
-              <h1 className="text-2xl font-semibold">{comercioName}</h1>
-            </div>
-          </div>
+    <main className="vortex-login">
+      <div className="login-background-art" aria-hidden="true">
+        <svg className="login-decoration login-decoration-top" viewBox="0 0 520 520" fill="none">
+          <circle cx="260" cy="260" r="180" />
+          <circle cx="260" cy="260" r="218" />
+          <circle cx="260" cy="260" r="256" />
+          <path d="M75 445 445 75" />
+          <circle className="login-decoration-node" cx="414" cy="106" r="4" />
+          <circle className="login-decoration-node" cx="80" cy="260" r="3" />
+        </svg>
+        <svg className="login-decoration login-decoration-bottom" viewBox="0 0 600 600" fill="none">
+          <ellipse cx="300" cy="300" rx="270" ry="170" transform="rotate(-32 300 300)" />
+          <ellipse cx="300" cy="300" rx="270" ry="208" transform="rotate(-32 300 300)" />
+          <ellipse cx="300" cy="300" rx="270" ry="246" transform="rotate(-32 300 300)" />
+          <circle className="login-decoration-node" cx="530" cy="176" r="4" />
+          <circle className="login-decoration-node" cx="92" cy="440" r="3" />
+        </svg>
+        <span className="login-decoration-cross login-decoration-cross-one" />
+        <span className="login-decoration-cross login-decoration-cross-two" />
+        <span className="login-decoration-square" />
+      </div>
+      <div className="login-content">
+      <section className="login-access" aria-labelledby="login-title">
+        <header className="login-header">
+          <h1 id="login-title">BIENVENIDO A</h1>
+          <div className="login-wordmark"><img src="/logo.png" alt="Vortex, tu negocio en movimiento" /></div>
+        </header>
+        <div className="login-form-wrap">
+          {comercioId && <div className="login-commerce" aria-live="polite">
+            {comercio?.logo_url ? <img src={comercio.logo_url} alt="" /> : <span className="login-commerce-icon"><LockKeyhole size={18} /></span>}
+            <div><strong>{isComercioLoading ? "Cargando comercio…" : comercioName}</strong><span>{comercioLocation}</span></div>
+          </div>}
 
-          <div className="max-w-2xl">
-            <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-amber-200">Panel privado</p>
-            <h2 className="max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
-              Ventas, clientes, productos y cuenta corriente para cada negocio.
-            </h2>
-            <p className="mt-5 max-w-xl text-base leading-7 text-white/78">
-              Cada persona ingresa con su cuenta y los permisos asignados en su comercio.
-            </p>
-          </div>
-
-          <div className="grid gap-3 text-sm text-white/80 sm:grid-cols-3">
-            <div className="border-t border-white/25 pt-3">Ventas</div>
-            <div className="border-t border-white/25 pt-3">Clientes</div>
-            <div className="border-t border-white/25 pt-3">Stock</div>
-          </div>
-        </section>
-
-        <section className="flex items-center justify-center bg-background px-5 py-10 text-foreground">
-          <Card className="w-full max-w-sm rounded-lg shadow-lg">
-            <CardHeader className="space-y-4">
-              <div className="flex items-center gap-3">
-                {comercio?.logo_url ? (
-                  <img
-                    src={comercio.logo_url}
-                    alt={comercio.nombre_comercio}
-                    className="h-12 w-12 rounded-md border object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-background">
-                    <img src="/logo.png" alt="VORTEX" className="h-9 w-9 object-contain" />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <CardTitle className="truncate text-xl">
-                    {isComercioLoading ? "Cargando comercio" : comercioName}
-                  </CardTitle>
-                  <CardDescription className="truncate">{comercioLocation}</CardDescription>
-                </div>
+          <form className="login-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+            <div className="login-field">
+              <Label htmlFor="email">Email</Label>
+              <div className="login-input-wrap">
+                <Mail className="login-input-icon" size={18} aria-hidden="true" />
+                <Input id="email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+                  placeholder="nombre@tucomercio.com" value={email} onChange={event => setEmail(event.target.value)}
+                  aria-invalid={Boolean(loginError)} aria-describedby={loginError ? "login-error" : undefined} required />
               </div>
-            </CardHeader>
-
-            <CardContent>
-              <form className="space-y-5" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      className="pl-9"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contrasena</Label>
-                  <div className="relative">
-                    <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete="current-password"
-                      className="pl-9"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
-                  <LogIn className="h-4 w-4" />
-                  {isSubmitting ? "Ingresando..." : "Ingresar"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </section>
+            </div>
+            <div className="login-field">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="login-input-wrap">
+                <LockKeyhole className="login-input-icon" size={18} aria-hidden="true" />
+                <Input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password"
+                  placeholder="Ingresá tu contraseña" value={password} onChange={event => setPassword(event.target.value)}
+                  aria-invalid={Boolean(loginError)} aria-describedby={loginError ? "login-error" : undefined} required />
+                <button className="login-password-toggle" type="button" onClick={() => setShowPassword(value => !value)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            {loginError && <p id="login-error" className="login-error" role="alert">{loginError}</p>}
+            <Button type="submit" className="login-submit" disabled={isSubmitting || isLoading}>
+              {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Ingresando…</> : <>Ingresar <ArrowRight size={18} /></>}
+            </Button>
+          </form>
+        </div>
+      </section>
+      <footer className="login-footer">
+        <Link to="/" className="login-landing-link">Conocé Vortex Gestión <ArrowUpRight size={14} aria-hidden="true" /></Link>
+        <p><span>VORTEX GESTIÓN</span><span aria-hidden="true"> — </span>© 2026 Marcos Abella</p>
+      </footer>
       </div>
     </main>
   );
