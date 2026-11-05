@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Calculator, Eye, Pencil, Printer, Search, Trash2, Unlock } from "lucide-react";
@@ -610,7 +611,7 @@ const ListadoCaja = () => {
                         <TableRow key={venta.id}>
                           <TableCell>{format(new Date(venta.fecha_venta), "HH:mm")}</TableCell>
                           <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
-                          <TableCell>{venta.cliente_nombre || "Consumidor Final"}</TableCell>
+                          <TableCell>{mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final"}</TableCell>
                           <TableCell>{getVentaTipoPagoLabel(venta)}</TableCell>
                           <TableCell className="max-w-[280px]">
                             <div className="space-y-1">

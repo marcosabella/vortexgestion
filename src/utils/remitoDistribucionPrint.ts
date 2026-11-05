@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { Comercio } from "@/types/comercio";
 import type {
@@ -60,7 +61,7 @@ export function buildRemitosDistribucionPrintHtml(
           html(comercio.cuit)
         }</div></div></div></div>
       <div class="cliente-section"><div class="cliente-row full"><div><strong>Cliente:</strong> ${
-          html(m.cliente_nombre)
+          html(mostrarEnMayusculas(m.cliente_nombre))
         }</div></div><div class="cliente-row full"><div><strong>Domicilio:</strong> ${
           html(m.direccion)
         }</div></div><div><strong>CUIT:</strong> ${

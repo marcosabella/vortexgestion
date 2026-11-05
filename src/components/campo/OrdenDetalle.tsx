@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { CalendarCheck, Pencil, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export function OrdenDetalle({ orden, canEdit, onEdit, canPlan, canReopen, onPla
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <DetailField label="Cliente">{clienteNombre(orden)}</DetailField>
+          <DetailField label="Cliente">{mostrarEnMayusculas(clienteNombre(orden))}</DetailField>
           <DetailField label="Establecimiento">{orden.establecimiento?.nombre ?? "Establecimiento no disponible"}</DetailField>
           <DetailField label="Fechas planificadas">{fechas}</DetailField>
           <DetailField label="Descripción">{orden.descripcion || "Sin descripción"}</DetailField>

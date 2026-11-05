@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Camera, FileDown, Printer } from "lucide-react";
@@ -383,7 +384,7 @@ export function EntregaRemito(
       <div className="flex flex-wrap justify-between gap-2">
         <div>
           <h3 className="font-semibold">
-            Remito #{remito.numero} · {remito.cliente_nombre}
+            Remito #{remito.numero} · {mostrarEnMayusculas(remito.cliente_nombre)}
           </h3>
           <p className="text-sm">{remito.direccion}</p>
           {remito.telefono && (
@@ -599,7 +600,7 @@ export function EntregaRemito(
         <DialogContent className="max-h-[90dvh] max-w-4xl overflow-auto">
           <DialogHeader>
             <DialogTitle>Remito firmado #{remito.numero}</DialogTitle>
-            <DialogDescription>{remito.cliente_nombre}</DialogDescription>
+            <DialogDescription>{mostrarEnMayusculas(remito.cliente_nombre)}</DialogDescription>
           </DialogHeader>
           {fotoUrl && (
             <img
@@ -718,7 +719,7 @@ export function FacturacionRemitos({ data }: { data: ResumenDistribucion }) {
               <TableRow key={m.id}>
                 <TableCell>#{m.numero}</TableCell>
                 <TableCell className="font-medium">
-                  {m.cliente_nombre}
+                  {mostrarEnMayusculas(m.cliente_nombre)}
                 </TableCell>
                 <TableCell>{m.fecha}</TableCell>
                 <TableCell>
@@ -788,7 +789,7 @@ export function FacturacionRemitos({ data }: { data: ResumenDistribucion }) {
           <DialogHeader>
             <DialogTitle>Facturar remito #{seleccion?.numero}</DialogTitle>
             <DialogDescription>
-              {seleccion?.cliente_nombre}. Los productos, cantidades y precios
+              {mostrarEnMayusculas(seleccion?.cliente_nombre)}. Los productos, cantidades y precios
               vienen de la entrega confirmada. La factura no vuelve a descontar
               stock.
             </DialogDescription>

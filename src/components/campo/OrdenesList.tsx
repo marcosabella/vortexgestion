@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { Eye, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -136,7 +137,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                   <p className="text-sm text-muted-foreground">{orden.codigo_interno || "Sin código"}</p>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                  <div><span className="block text-muted-foreground">Cliente</span>{nombreCliente(orden)}</div>
+                  <div><span className="block text-muted-foreground">Cliente</span>{mostrarEnMayusculas(nombreCliente(orden))}</div>
                   <div><span className="block text-muted-foreground">Establecimiento</span>{orden.establecimiento?.nombre ?? "Establecimiento no disponible"}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Fechas planificadas</span>{fechasLabel(orden)}</div>
                   <div className="sm:col-span-2"><span className="block text-muted-foreground">Descripción</span><p className="line-clamp-2 whitespace-pre-wrap">{orden.descripcion || "Sin descripción"}</p></div>
@@ -155,7 +156,7 @@ export function OrdenesList({ ordenes }: OrdenesListProps) {
                     <TableRow key={orden.id}>
                       <TableCell className="whitespace-nowrap font-medium">Orden N.º {numeroFormatter.format(orden.numero)}</TableCell>
                       <TableCell>{orden.codigo_interno || "Sin código"}</TableCell>
-                      <TableCell>{nombreCliente(orden)}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(nombreCliente(orden))}</TableCell>
                       <TableCell>{orden.establecimiento?.nombre ?? "Establecimiento no disponible"}</TableCell>
                       <TableCell><EstadoBadge estado={orden.estado} /></TableCell>
                       <TableCell className="whitespace-nowrap">{fechasLabel(orden)}</TableCell>

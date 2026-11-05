@@ -103,6 +103,10 @@ export interface VentaItem {
   venta_id?: string;
   producto_id?: string | null;
   producto_variante_id?: string | null;
+  variante?: {
+    color?: { nombre: string } | null;
+    talle?: { nombre: string } | null;
+  } | null;
   descripcion_manual?: string | null;
   codigo_manual?: string | null;
   cantidad: number;
@@ -129,6 +133,12 @@ export const getVentaItemCodigo = (item: Pick<VentaItem, "producto" | "codigo_ma
   const codigo = item.producto?.cod_producto || item.codigo_manual?.trim() || "";
 
   return codigo.toUpperCase() === "MANUAL" ? "" : codigo;
+};
+
+export const getVentaItemDescripcion = (item: Pick<VentaItem, "producto" | "producto_id" | "producto_variante_id" | "variante" | "descripcion_manual">) => {
+  const descripcion = item.producto?.descripcion || (item.producto_id ? item.producto?.cod_producto : item.descripcion_manual) || "Item manual";
+  const detalle = [item.variante?.color?.nombre, item.variante?.talle?.nombre].filter(Boolean).join(" ");
+  return detalle ? `${descripcion} - ${detalle}` : descripcion;
 };
 
 export type TipoPago = 'contado' | 'transferencia' | 'tarjeta' | 'cheque' | 'cta_cte' | 'mercado_pago';

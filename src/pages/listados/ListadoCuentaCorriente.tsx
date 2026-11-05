@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { FileText, Printer, Search } from 'lucide-react';
@@ -298,7 +299,7 @@ const ListadoCuentaCorriente = () => {
                     filteredClientes.map((cliente) => (
                       <TableRow key={cliente.cliente_id}>
                         <TableCell className="font-medium">
-                          {cliente.cliente_nombre} {cliente.cliente_apellido}
+                          {mostrarEnMayusculas(cliente.cliente_nombre)} {mostrarEnMayusculas(cliente.cliente_apellido)}
                         </TableCell>
                         <TableCell>{cliente.cliente_cuit}</TableCell>
                         <TableCell className="text-right">{formatCurrency(cliente.total_debitos)}</TableCell>

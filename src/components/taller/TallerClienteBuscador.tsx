@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from 'react';
 import { ArrowLeft, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export function TallerClienteBuscador({ clienteId, disabled, onSelect }: {
       className="h-auto min-h-10 w-full justify-between text-left"
       onClick={() => { setBuscar(''); setCreando(false); setOpen(true); }}>
       <span className="min-w-0 whitespace-normal break-words" aria-live="polite">
-        {seleccionado ? `${nombreCliente(seleccionado)} · ${seleccionado.cuit}` : clienteId ? isLoading ? 'Cargando cliente...' : 'Cliente no disponible · Buscar cliente' : 'Buscar cliente'}
+        {seleccionado ? `${mostrarEnMayusculas(nombreCliente(seleccionado))} · ${seleccionado.cuit}` : clienteId ? isLoading ? 'Cargando cliente...' : 'Cliente no disponible · Buscar cliente' : 'Buscar cliente'}
       </span><Search className="ml-2 h-4 w-4 shrink-0" />
     </Button>
     <Dialog open={open} onOpenChange={value => { if (!guardando) setOpen(value); }}>
@@ -66,8 +67,8 @@ export function TallerClienteBuscador({ clienteId, disabled, onSelect }: {
           {error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>No se pudieron cargar los clientes.</p><Button type="button" size="sm" variant="outline" onClick={() => void refetch()}>Reintentar</Button></div>}
           {!isLoading && !error && <div className="max-h-96 space-y-2 overflow-y-auto">
             {resultados.map(cliente => <div key={cliente.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-              <div className="min-w-0 flex-1 break-words"><p className="font-semibold">{nombreCliente(cliente)}</p><p className="text-sm text-muted-foreground">DNI / CUIT: {cliente.cuit}</p></div>
-              <Button type="button" variant="outline" disabled={disabled} aria-label={`Elegir cliente ${nombreCliente(cliente)}`} onClick={() => elegir(cliente)}>Elegir</Button>
+              <div className="min-w-0 flex-1 break-words"><p className="font-semibold">{mostrarEnMayusculas(nombreCliente(cliente))}</p><p className="text-sm text-muted-foreground">DNI / CUIT: {cliente.cuit}</p></div>
+              <Button type="button" variant="outline" disabled={disabled} aria-label={`Elegir cliente ${mostrarEnMayusculas(nombreCliente(cliente))}`} onClick={() => elegir(cliente)}>Elegir</Button>
             </div>)}
             {!resultados.length && <p className="p-6 text-center text-sm text-muted-foreground">{buscar.trim() ? 'No se encontraron clientes. Podés crear uno con Nuevo cliente.' : 'No hay clientes cargados. Podés crear el primero con Nuevo cliente.'}</p>}
           </div>}

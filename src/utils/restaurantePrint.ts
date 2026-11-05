@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { FormatoComprobante } from "@/config/parametrizacion";
 import type { Comercio } from "@/types/comercio";
@@ -63,7 +64,7 @@ export function restauranteCuentaHtml(data: ResumenRestaurante, p: PedidoRestaur
   const filas = items.map(i => `<tr><td>${detalle(i)}</td><td class="text-right">${escape(i.cantidad)}</td><td class="text-right">${escape(money(Number(i.precio)))}</td><td class="text-right">${escape(money(Math.round(i.cantidad * Number(i.precio) * 100) / 100))}</td></tr>`);
   if (p.costo_envio > 0) filas.push(`<tr><td>Servicio de delivery</td><td class="text-right">1</td><td class="text-right">${escape(money(p.costo_envio))}</td><td class="text-right">${escape(money(p.costo_envio))}</td></tr>`);
   return documento({ comercio, formato, titulo: "DETALLE DE CUENTA", numero: `Pedido #${p.numero}`, letra: "CC", creado: p.created_at, copia: "DETALLE DE CUENTA", pie: "DETALLE DE CUENTA · NO VÁLIDO COMO FACTURA", contenido: `
-    <div class="cliente-section"><div class="cliente-row full"><div><strong>Cliente:</strong> ${escape(p.cliente_nombre || "Consumidor final")}</div></div>
+    <div class="cliente-section"><div class="cliente-row full"><div><strong>Cliente:</strong> ${escape(mostrarEnMayusculas(p.cliente_nombre) || "Consumidor final")}</div></div>
     <div class="cliente-row"><div><strong>Modalidad:</strong> ${escape(modalidad(p))}</div><div><strong>Mesa:</strong> ${escape(mesas || "—")} · ${escape(p.comensales)} comensales</div></div>
     ${p.telefono ? `<div class="cliente-row full"><div><strong>Teléfono:</strong> ${escape(p.telefono)}</div></div>` : ""}
     ${p.direccion ? `<div class="cliente-row full"><div><strong>Domicilio:</strong> ${escape(p.direccion)}</div></div>` : ""}</div>

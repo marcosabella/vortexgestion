@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { Check, ChefHat, Play, Ban, Eye, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ export function RestauranteMesasGrilla({ data, buscar, abrir, ocupar, estado }: 
   return <RestauranteGrilla label="Salón y mesas" columnas={[{ titulo: "Mesa" }, { titulo: "Capacidad", derecha: true }, { titulo: "Comensales", derecha: true }, { titulo: "Pedido / cliente" }, { titulo: "Estado" }, { titulo: "Cuenta" }, { titulo: "Total", derecha: true }, { titulo: "Acciones", derecha: true }]} vacia={!mesas.length ? "No hay mesas para mostrar." : undefined}>
     {mesas.map(m => <TableRow key={m.id}>
       <TableCell className="font-medium">{m.nombre}</TableCell><TableCell className="text-right">{m.capacidad}</TableCell><TableCell className="text-right">{m.pedido?.comensales || "—"}</TableCell>
-      <TableCell>{m.pedido ? `#${m.pedido.numero} · ${m.pedido.cliente_nombre}` : "—"}</TableCell><TableCell>{m.pedido ? estado(m.pedido) : <Badge variant="secondary">Libre</Badge>}</TableCell>
+      <TableCell>{m.pedido ? `#${m.pedido.numero} · ${mostrarEnMayusculas(m.pedido.cliente_nombre)}` : "—"}</TableCell><TableCell>{m.pedido ? estado(m.pedido) : <Badge variant="secondary">Libre</Badge>}</TableCell>
       <TableCell>{m.pedido?.cuenta || "—"}</TableCell><TableCell className="whitespace-nowrap text-right">{m.pedido ? money(m.pedido.total) : "—"}</TableCell>
       <TableCell><div className="flex justify-end">{m.pedido ? <RestauranteAccion icon={Eye} onClick={() => abrir(m.pedido!.id)}>Abrir cuenta</RestauranteAccion> : <RestauranteAccion icon={Plus} onClick={() => ocupar(m.id)}>Ocupar mesa</RestauranteAccion>}</div></TableCell>
     </TableRow>)}

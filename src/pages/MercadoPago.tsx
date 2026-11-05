@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import {
@@ -463,7 +464,7 @@ export default function MercadoPago() {
                 <SelectContent>
                   {ventas.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      #{v.numero_comprobante} · {v.cliente_nombre} ·{" "}
+                      #{v.numero_comprobante} · {mostrarEnMayusculas(v.cliente_nombre)} ·{" "}
                       {money(v.total)}
                     </SelectItem>
                   ))}

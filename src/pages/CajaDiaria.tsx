@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -643,7 +644,7 @@ const CajaDiaria = () => {
                         <TableRow key={venta.id}>
                           <TableCell>{format(new Date(venta.fecha_venta), "HH:mm")}</TableCell>
                           <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
-                          <TableCell>{venta.cliente_nombre || "Consumidor Final"}</TableCell>
+                          <TableCell>{mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final"}</TableCell>
                           <TableCell>{getVentaTipoPagoLabel(venta)}</TableCell>
                           <TableCell className="text-right font-medium">{formatCurrency(getVentaImporteContable(venta))}</TableCell>
                         </TableRow>

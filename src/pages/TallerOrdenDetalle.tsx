@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from 'react';
 import { TallerLineaTiempo } from '@/components/taller/TallerLineaTiempo';
 import { Link, useParams } from 'react-router-dom';
@@ -39,7 +40,7 @@ function OrdenDetalle({ data, orden }: { data: TallerData; orden: TallerOrden })
   const [finalizar, setFinalizar] = useState(false);
   const vehiculo = data.vehiculos.find(row => row.id === orden.vehiculo_id);
   const cliente = clientes.find(row => row.id === orden.cliente_id);
-  const nombreCliente = cliente ? `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente no disponible';
+  const nombreCliente = cliente ? mostrarEnMayusculas(`${cliente.nombre} ${cliente.apellido || ''}`.trim()) : 'Cliente no disponible';
   const tecnico = data.tecnicos.find(row => row.id === orden.tecnico_id);
   const items = data.items.filter(row => row.orden_id === orden.id);
   const total = totalTaller(items);

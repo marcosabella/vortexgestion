@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, Search, CalendarDays, Car, ClipboardList, Wrench, Eye, Pencil, History, Power, RotateCcw } from 'lucide-react';
@@ -60,7 +61,7 @@ function TallerContenido({ data, seccion }: { data: TallerData; seccion: Seccion
       <TableCell className="whitespace-nowrap font-medium">{numeroOrdenTaller(orden.numero)}</TableCell>
       <TableCell className="whitespace-nowrap">{fechaTaller(orden.fecha_ingreso)}</TableCell>
       <TableCell className="whitespace-nowrap">{vehiculo(orden.vehiculo_id)?.patente || '—'}</TableCell>
-      <TableCell>{titular(orden.cliente_id)}</TableCell>
+      <TableCell>{mostrarEnMayusculas(titular(orden.cliente_id))}</TableCell>
       <TableCell className="whitespace-nowrap text-right">{orden.kilometraje.toLocaleString('es-AR')} km</TableCell>
       <TableCell className="max-w-64 truncate" title={orden.motivo}>{orden.motivo}</TableCell>
       <TableCell><TallerEstado estado={orden.estado} /></TableCell>
@@ -82,7 +83,7 @@ function TallerContenido({ data, seccion }: { data: TallerData; seccion: Seccion
     {seccion === 'vehiculos' && <>
       <TallerSectionTitle title="Vehículos">{data.isAdmin && <Button asChild variant="new"><Link to="/taller/vehiculos/nuevo"><Plus className="mr-2 h-4 w-4" />Nuevo vehículo</Link></Button>}</TallerSectionTitle>
       <TablaTaller columnas={['Patente', 'Cliente', 'Marca', 'Modelo', 'Año', 'Kilometraje', 'Estado', 'Acciones']} count={vehiculos.length} empty="No hay vehículos para esta búsqueda.">
-        {vehiculos.map(row => <TableRow key={row.id}><TableCell className="font-medium">{row.patente}</TableCell><TableCell>{titular(row.cliente_id)}</TableCell><TableCell>{row.marca}</TableCell><TableCell>{row.modelo}</TableCell><TableCell>{row.anio || '—'}</TableCell><TableCell className="whitespace-nowrap text-right">{row.kilometraje.toLocaleString('es-AR')} km</TableCell><TableCell><Badge variant={row.activo ? 'success' : 'secondary'}>{row.activo ? 'Activo' : 'Inactivo'}</Badge></TableCell><TableCell>{accionesCatalogo('vehiculo', row)}</TableCell></TableRow>)}
+        {vehiculos.map(row => <TableRow key={row.id}><TableCell className="font-medium">{row.patente}</TableCell><TableCell>{mostrarEnMayusculas(titular(row.cliente_id))}</TableCell><TableCell>{row.marca}</TableCell><TableCell>{row.modelo}</TableCell><TableCell>{row.anio || '—'}</TableCell><TableCell className="whitespace-nowrap text-right">{row.kilometraje.toLocaleString('es-AR')} km</TableCell><TableCell><Badge variant={row.activo ? 'success' : 'secondary'}>{row.activo ? 'Activo' : 'Inactivo'}</Badge></TableCell><TableCell>{accionesCatalogo('vehiculo', row)}</TableCell></TableRow>)}
       </TablaTaller>
     </>}
     {seccion === 'tecnicos' && <>
@@ -98,11 +99,11 @@ function TallerContenido({ data, seccion }: { data: TallerData; seccion: Seccion
     {seccion === 'agenda' && <>
       <TallerSectionTitle title="Agenda de trabajos">{data.isAdmin && <Button asChild variant="new"><Link to="/taller/ordenes/nueva"><Plus className="mr-2 h-4 w-4" />Nuevo ingreso / turno</Link></Button>}</TallerSectionTitle>
       <TablaTaller columnas={['Turno', 'Orden', 'Patente', 'Cliente', 'Técnico', 'Estado', 'Acciones']} count={turnos.length} empty="No hay turnos asignados a trabajos abiertos.">
-        {turnos.map(orden => <TableRow key={orden.id}><TableCell className="whitespace-nowrap">{fechaTaller(orden.turno)}</TableCell><TableCell className="whitespace-nowrap font-medium">{numeroOrdenTaller(orden.numero)}</TableCell><TableCell>{vehiculo(orden.vehiculo_id)?.patente || '—'}</TableCell><TableCell>{titular(orden.cliente_id)}</TableCell><TableCell>{data.tecnicos.find(tecnico => tecnico.id === orden.tecnico_id)?.nombre || 'Sin asignar'}</TableCell><TableCell><TallerEstado estado={orden.estado} /></TableCell><TableCell className="text-right"><VerOrden orden={orden} /></TableCell></TableRow>)}
+        {turnos.map(orden => <TableRow key={orden.id}><TableCell className="whitespace-nowrap">{fechaTaller(orden.turno)}</TableCell><TableCell className="whitespace-nowrap font-medium">{numeroOrdenTaller(orden.numero)}</TableCell><TableCell>{vehiculo(orden.vehiculo_id)?.patente || '—'}</TableCell><TableCell>{mostrarEnMayusculas(titular(orden.cliente_id))}</TableCell><TableCell>{data.tecnicos.find(tecnico => tecnico.id === orden.tecnico_id)?.nombre || 'Sin asignar'}</TableCell><TableCell><TallerEstado estado={orden.estado} /></TableCell><TableCell className="text-right"><VerOrden orden={orden} /></TableCell></TableRow>)}
       </TablaTaller>
       <TallerSectionTitle title="Próximos servicios" />
       <TablaTaller columnas={['Fecha', 'Patente', 'Cliente', 'Kilometraje', 'Estado', 'Acciones']} count={services.length} empty="Las órdenes entregadas con fecha de próximo servicio aparecerán aquí.">
-        {services.map(orden => <TableRow key={orden.id}><TableCell className="whitespace-nowrap">{fechaTaller(orden.proximo_service)}</TableCell><TableCell className="font-medium">{vehiculo(orden.vehiculo_id)?.patente || '—'}</TableCell><TableCell>{titular(orden.cliente_id)}</TableCell><TableCell className="whitespace-nowrap text-right">{orden.proximo_service_km != null ? `${orden.proximo_service_km.toLocaleString('es-AR')} km` : '—'}</TableCell><TableCell><Badge variant={orden.proximo_service! <= hoy ? 'destructive' : 'secondary'}>{orden.proximo_service! <= hoy ? 'Fecha alcanzada' : 'Programado'}</Badge></TableCell><TableCell className="text-right"><VerOrden orden={orden} /></TableCell></TableRow>)}
+        {services.map(orden => <TableRow key={orden.id}><TableCell className="whitespace-nowrap">{fechaTaller(orden.proximo_service)}</TableCell><TableCell className="font-medium">{vehiculo(orden.vehiculo_id)?.patente || '—'}</TableCell><TableCell>{mostrarEnMayusculas(titular(orden.cliente_id))}</TableCell><TableCell className="whitespace-nowrap text-right">{orden.proximo_service_km != null ? `${orden.proximo_service_km.toLocaleString('es-AR')} km` : '—'}</TableCell><TableCell><Badge variant={orden.proximo_service! <= hoy ? 'destructive' : 'secondary'}>{orden.proximo_service! <= hoy ? 'Fecha alcanzada' : 'Programado'}</Badge></TableCell><TableCell className="text-right"><VerOrden orden={orden} /></TableCell></TableRow>)}
       </TablaTaller>
     </>}
   </div>;

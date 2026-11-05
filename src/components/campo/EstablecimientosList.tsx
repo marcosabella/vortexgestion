@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { Eye, Pencil, Plus, Search, Sprout } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -281,8 +282,8 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                   <p className="text-sm text-muted-foreground">{establecimiento.codigo_interno || "Sin código interno"}</p>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="block text-muted-foreground">Cliente</span>{clienteNombre(establecimiento)}</div>
-                  <div><span className="block text-muted-foreground">Localidad</span>{establecimiento.localidad || "Sin informar"}</div>
+                  <div><span className="block text-muted-foreground">Cliente</span>{mostrarEnMayusculas(clienteNombre(establecimiento))}</div>
+                  <div><span className="block text-muted-foreground">Localidad</span>{mostrarEnMayusculas(establecimiento.localidad) || "Sin informar"}</div>
                   <div className="col-span-2"><span className="block text-muted-foreground">Superficie total</span>{superficieLabel(establecimiento.superficie_total_ha)}</div>
                   <div className="col-span-2 pt-2">
                     <EstablecimientoActions
@@ -318,8 +319,8 @@ export function EstablecimientosList({ comercioId, comercioNombre, isComercioLoa
                     <TableRow key={establecimiento.id}>
                       <TableCell className="font-medium">{establecimiento.nombre}</TableCell>
                       <TableCell>{establecimiento.codigo_interno || "—"}</TableCell>
-                      <TableCell>{clienteNombre(establecimiento)}</TableCell>
-                      <TableCell>{establecimiento.localidad || "Sin informar"}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(clienteNombre(establecimiento))}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(establecimiento.localidad) || "Sin informar"}</TableCell>
                       <TableCell>{superficieLabel(establecimiento.superficie_total_ha)}</TableCell>
                       <TableCell><EstadoBadge activo={establecimiento.activo} /></TableCell>
                       <TableCell>

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -115,6 +116,7 @@ export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorri
                         <Input 
                           value={selectedClient ? `${selectedClient.nombre} ${selectedClient.apellido}` : ""}
                           readOnly 
+                          className="uppercase"
                           placeholder="Seleccionar cliente..."
                         />
                       </FormControl>
@@ -159,7 +161,7 @@ export const CuentaCorrienteForm = ({ onSuccess, showTitle = true }: CuentaCorri
                                   }}
                                 >
                                   <div className="text-left">
-                                    <div className="font-medium">{cliente.nombre} {cliente.apellido}</div>
+                                    <div className="font-medium">{mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}</div>
                                     <div className="text-sm text-muted-foreground">CUIT: {cliente.cuit}</div>
                                   </div>
                                 </Button>

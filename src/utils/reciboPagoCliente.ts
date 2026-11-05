@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import type { ReciboPagoCliente } from "@/types/recibo-pago-cliente";
 import { getFacturaPrintStyles } from "@/utils/facturaPrint";
 import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
@@ -45,7 +46,7 @@ export function buildReciboPagoHtml(r: ReciboPagoCliente) {
       </div></div></div>
     <div class="recibo-cuerpo">
       ${r.anulado_en ? '<div class="recibo-anulado">RECIBO ANULADO - COBRO REVERTIDO O MODIFICADO</div>' : ""}
-      <p><strong>Recibido del cliente:</strong> ${escape(r.cliente_snapshot.nombre)}<br>
+      <p><strong>Recibido del cliente:</strong> ${escape(mostrarEnMayusculas(r.cliente_snapshot.nombre))}<br>
       <strong>CUIT / DNI:</strong> ${escape(r.cliente_snapshot.cuit || "N/A")}</p>
       <p>La suma de <strong>${escape(dineroRecibo(r, r.importe))}</strong>, en concepto de pago de su cuenta corriente.</p>
       <h2>Medios de pago</h2><table><thead><tr><th>Medio / detalle</th><th>Importe</th></tr></thead><tbody>${r.pagos.length ? r.pagos.map((p) => `<tr><td>${medios[p.tipo]}${p.cheque ? ` - N° ${escape(p.cheque.numero_cheque)} - ${escape(p.cheque.banco_emisor)}` : ""}${p.observaciones ? ` - ${escape(p.observaciones)}` : ""}</td><td>${escape(dineroRecibo(r, p.monto))}</td></tr>`).join("") : `<tr><td>Medio no informado en el movimiento</td><td>${escape(dineroRecibo(r, r.importe))}</td></tr>`}</tbody></table>

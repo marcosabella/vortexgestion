@@ -119,7 +119,8 @@ export const useVentas = ({ ventaId }: { ventaId?: string } = {}) => {
           tarjeta:tarjetas_credito(nombre),
           venta_items(
             *,
-            producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva)
+            producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva),
+            variante:producto_variantes(color:producto_colores(nombre), talle:producto_talles(nombre))
           ),
           pagos_venta(
             *,

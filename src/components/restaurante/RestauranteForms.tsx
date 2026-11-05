@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,8 +42,8 @@ export function NuevoPedido({ data, operar, trabajando, errorOperacion, close, a
     </div>
     <fieldset className="grid gap-3 border-t pt-3"><legend className="pr-2 text-sm font-semibold">Datos del cliente</legend>
       <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_12rem]">
-        <RestauranteBusqueda compacto label="Cliente de Vortex (opcional)" value={watch("cliente_id")} opciones={[{ id: "", nombre: "Consumidor final / nombre libre" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: [c.apellido, c.nombre].filter(Boolean).join(" "), detalle: [c.cuit, c.telefono, c.localidad].filter(Boolean).join(" · ") }))]} cambiar={id => { setValue("cliente_id", id, { shouldDirty: true }); const c = clientes.find(c => c.id === id); if (c) { setValue("cliente_nombre", [c.nombre, c.apellido].filter(Boolean).join(" ")); setValue("direccion", [[c.calle, c.numero].filter(Boolean).join(" "), c.localidad].filter(Boolean).join(", ")); setValue("telefono", c.telefono || ""); } }} disabled={trabajando} />
-        <Field label="Nombre (opcional)"><Input {...register("cliente_nombre")} /></Field>
+        <RestauranteBusqueda compacto label="Cliente de Vortex (opcional)" value={watch("cliente_id")} opciones={[{ id: "", nombre: "Consumidor final / nombre libre" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: mostrarEnMayusculas([c.apellido, c.nombre].filter(Boolean).join(" ")), detalle: [c.cuit, c.telefono, mostrarEnMayusculas(c.localidad)].filter(Boolean).join(" · ") }))]} cambiar={id => { setValue("cliente_id", id, { shouldDirty: true }); const c = clientes.find(c => c.id === id); if (c) { setValue("cliente_nombre", [c.nombre, c.apellido].filter(Boolean).join(" ")); setValue("direccion", [[c.calle, c.numero].filter(Boolean).join(" "), c.localidad].filter(Boolean).join(", ")); setValue("telefono", c.telefono || ""); } }} disabled={trabajando} />
+        <Field label="Nombre (opcional)"><Input className="uppercase" {...register("cliente_nombre")} /></Field>
         <Field label="Teléfono (opcional)"><Input type="tel" {...register("telefono")} /></Field>
       </div>
     {clientesQuery.error && <p role="alert" className="text-sm text-destructive">No se pudieron cargar los clientes. <button type="button" className="underline" onClick={() => void clientesQuery.refetch()}>Reintentar</button></p>}

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Info, Plus, Rows3 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -141,7 +142,7 @@ export default function CampoLotes() {
             <h2 className="mt-2 break-words text-xl font-semibold">{establecimiento.nombre}</h2>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {establecimiento.codigo_interno && <span>Código: {establecimiento.codigo_interno}</span>}
-              <span>Cliente: {clienteNombre(establecimiento)}</span>
+              <span>Cliente: {mostrarEnMayusculas(clienteNombre(establecimiento))}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">

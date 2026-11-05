@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { identidadComercioHtml, telefonoComercioHtml } from "@/utils/comercioEncabezado";
 import type { Comercio } from "@/types/comercio";
 import type { FormatoComprobante } from "@/config/parametrizacion";
@@ -134,7 +135,7 @@ export function buildHojaRepartoPrintHtml(
       const resumen = resumenes[index];
       return `<div class="cliente-section"><div class="cliente-row full"><div><strong>${parada.orden}. Pedido #${
         escapeHtml(pedido?.numero)
-      } · ${escapeHtml(pedido?.cliente_nombre)}</strong></div></div>
+      } · ${escapeHtml(mostrarEnMayusculas(pedido?.cliente_nombre))}</strong></div></div>
           <div class="cliente-row full"><div><strong>Domicilio:</strong> ${
         escapeHtml(pedido?.direccion)
       }</div></div>

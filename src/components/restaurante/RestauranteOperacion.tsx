@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { RestauranteBusqueda } from "./RestauranteBusqueda";
 
 function ClienteCierre({ value, cambiar }: { value: string; cambiar: (value: string) => void }) {
   const { data: clientes = [] } = useClientes();
-  return <RestauranteBusqueda label="Cliente para el comprobante / cuenta corriente" value={value} opciones={[{ id: "", nombre: "Consumidor final", detalle: "Requiere saldo pagado" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: `${c.apellido} ${c.nombre}`, detalle: [c.cuit, c.telefono, c.localidad].filter(Boolean).join(" · ") }))]} cambiar={cambiar} />;
+  return <RestauranteBusqueda label="Cliente para el comprobante / cuenta corriente" value={value} opciones={[{ id: "", nombre: "Consumidor final", detalle: "Requiere saldo pagado" }, ...clientes.filter(c => c.id).map(c => ({ id: c.id!, nombre: mostrarEnMayusculas(`${c.apellido || ""} ${c.nombre || ""}`), detalle: [c.cuit, c.telefono, mostrarEnMayusculas(c.localidad)].filter(Boolean).join(" · ") }))]} cambiar={cambiar} />;
 }
 
 export type OperacionElegida = { accion: AccionRestaurante; pedido?: PedidoRestaurante; item_id?: string; cobro_id?: string };
@@ -53,7 +54,7 @@ export function RestauranteOperacion({ data, operar, trabajando, elegida, close 
     const result = await operar(accion, payload);
     if (result) { if (accion === "cerrar") { setVenta(result); setVerVenta(true); } else close(); }
   }}>
-    {p && <p>Pedido #{p.numero} · {p.cliente_nombre} · Total {money(p.total)} · Saldo {money(restauranteSaldo(data, p).saldo)}</p>}
+    {p && <p>Pedido #{p.numero} · {mostrarEnMayusculas(p.cliente_nombre)} · Total {money(p.total)} · Saldo {money(restauranteSaldo(data, p).saldo)}</p>}
     {cobroBloqueado && <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">La cuenta ya no está disponible para cobrar. En mesas, primero deben estar servidos los productos y solicitada la cuenta. Cerrá esta ventana y revisá el pedido.</p>}
     {["asignar_envio", "rendir"].includes(accion) && <RestauranteBusqueda label={accion === "asignar_envio" ? "Repartidor" : "Usuario que rinde"} value={seleccion} opciones={usuarios.map(u => ({ id: u.id, nombre: u.nombre }))} cambiar={id => { setSeleccion(id); setCobroIds([]); }} disabled={trabajando} />}
     {accion === "mover_mesa" && <RestauranteBusqueda label="Mesa destino libre" value={seleccion} opciones={data.mesas.filter(m => m.activo && !data.cuenta_mesas.some(c => c.activa && c.mesa_id === m.id)).map(m => ({ id: m.id, nombre: m.nombre, detalle: `${m.capacidad} personas` }))} cambiar={setSeleccion} disabled={trabajando} />}

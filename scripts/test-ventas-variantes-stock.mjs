@@ -65,6 +65,17 @@ try {
   console.log('OK reproducción: la función previa descuenta el total y deja talles disponibles');
 
   sql(migration('20261015140000_ventas_conservar_variante_stock.sql'));
+  // Reproduce exactamente la funcion activa observada en produccion el 05/11:
+  // coincide con la definicion de la migracion de cantidades decimales.
+  const decimalStock = migration('20260908120000_venta_items_cantidad_decimal.sql');
+  sql(decimalStock.slice(decimalStock.indexOf('CREATE OR REPLACE FUNCTION public.apply_venta_item_stock()'), decimalStock.indexOf('CREATE TRIGGER apply_venta_item_stock_update')));
+  const brokenSale = sql(actor + sale([item()])).trim();
+  check(`SELECT producto_variante_id='${v2}' FROM venta_items WHERE venta_id='${brokenSale}'`, 'La venta guarda la variante aunque no la descuenta');
+  check(`SELECT stock=1 FROM producto_variantes WHERE id='${v2}'`, 'Reproduce variante vendida todavia disponible');
+  check(`SELECT stock=2 FROM productos WHERE id='${product}'`, 'Reproduce total descontado y variantes desajustadas');
+  sql(`DELETE FROM cuenta_corriente WHERE venta_id='${brokenSale}'; DELETE FROM pagos_venta WHERE venta_id='${brokenSale}'; DELETE FROM venta_items WHERE venta_id='${brokenSale}'; DELETE FROM ventas WHERE id='${brokenSale}';`);
+  sql(migration('20261105120000_restaurar_descuento_ventas_por_variante.sql'));
+  console.log('OK regresion 397: reproduce la funcion activa y aplica la correccion integrada');
   const idem = key(), saved = sql(actor + sale([item()], idem)).trim();
   check(`SELECT producto_variante_id='${v2}' FROM venta_items WHERE venta_id='${saved}'`, 'Guarda talle/color');
   check(`SELECT stock=0 FROM producto_variantes WHERE id='${v2}'`, 'Descuenta la última unidad del talle');
@@ -97,6 +108,18 @@ try {
   check(`SELECT stock=0 FROM productos WHERE id='${product}'`, 'Venta manual agota el producto');
   sql(actor + sale([item(null, 1, plain)]));
   check(`SELECT stock=4 FROM productos WHERE id='${plain}'`, 'Sin variantes conserva el funcionamiento');
+  sql(`BEGIN; ${actor} DELETE FROM venta_items WHERE venta_id='${saved}';` +
+    `SELECT test_assert((SELECT stock=1 FROM producto_variantes WHERE id='${v1}'),'Eliminar repone variante');` +
+    `SELECT test_assert((SELECT stock=1 FROM productos WHERE id='${product}'),'Eliminar repone total una vez'); ROLLBACK;`);
+  sql(actor + sale([{ descripcion_manual: 'Servicio fraccionado', cantidad: 1.5, precio_unitario: 100, porcentaje_iva: 0, afecta_stock: false }]));
+  check(`SELECT stock=4 FROM productos WHERE id='${plain}'`, 'Concepto decimal no modifica stock');
+  sql(`BEGIN; SET LOCAL app.skip_stock_movements='on'; ${actor}` + sale([item(v1)]) +
+    `SELECT test_assert((SELECT stock=0 FROM productos WHERE id='${product}'),'Operacion sin movimiento conserva total');` +
+    `SELECT test_assert((SELECT stock=0 FROM producto_variantes WHERE id='${v1}'),'Operacion sin movimiento conserva variante'); ROLLBACK;`);
+  sql(`BEGIN; ${actor} UPDATE ventas SET origen_orden_trabajo=true WHERE id='${saved}';
+    INSERT INTO venta_items(venta_id,comercio_id,producto_id,cantidad,precio_unitario,porcentaje_iva,afecta_stock)
+    VALUES('${saved}','${tenant}','${plain}',5,100,0,true);
+    SELECT test_assert((SELECT stock=-1 FROM productos WHERE id='${plain}'),'Orden permite stock negativo sin variantes'); ROLLBACK;`);
   console.log('OK multi-CUIT, numeración manual, agotamiento y productos sin variantes');
 
   // Usa la definición real de la vista pública con tablas auxiliares mínimas.

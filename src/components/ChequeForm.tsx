@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -190,7 +191,7 @@ export const ChequeForm = ({ cheque, onSubmit, onCancel }: ChequeFormProps) => {
             <SelectContent>
               {clientes?.map((cliente) => (
                 <SelectItem key={cliente.id} value={cliente.id}>
-                  {cliente.nombre} {cliente.apellido} - {cliente.cuit}
+                  {mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)} - {cliente.cuit}
                 </SelectItem>
               ))}
             </SelectContent>

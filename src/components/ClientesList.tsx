@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
@@ -106,7 +107,7 @@ export function ClientesList() {
                 {pagination.items.map((cliente) => (
                   <TableRow key={cliente.id}>
                     <TableCell className="font-medium">
-                      {cliente.nombre} {cliente.apellido}
+                      {mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}
                     </TableCell>
                     <TableCell>{cliente.cuit}</TableCell>
                     <TableCell>
@@ -115,13 +116,13 @@ export function ClientesList() {
                       </Badge>
                     </TableCell>
                     <TableCell>{cliente.situacion_afip}</TableCell>
-                    <TableCell>{cliente.localidad}</TableCell>
+                    <TableCell>{mostrarEnMayusculas(cliente.localidad)}</TableCell>
                     <TableCell>{cliente.telefono || '-'}</TableCell>
                     {mostrarCuentaOnline && <TableCell>{cliente.cliente_usuarios?.length ? <Badge>Vinculada</Badge> : <Badge variant="outline">Sin vincular</Badge>}</TableCell>}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/clientes/${cliente.id}/editar`} aria-label={`Editar cliente ${cliente.nombre} ${cliente.apellido}`}>
+                          <Link to={`/clientes/${cliente.id}/editar`} aria-label={`Editar cliente ${mostrarEnMayusculas(cliente.nombre)} ${mostrarEnMayusculas(cliente.apellido)}`}>
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -137,7 +138,7 @@ export function ClientesList() {
                               <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Esta acción no se puede deshacer. Se eliminará permanentemente
-                                la información de {cliente.nombre} {cliente.apellido}.
+                                la información de {mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Download, Eye, Flame, MessageCircle, Pencil, Plus, Printer, Search, Trash2 } from "lucide-react";
@@ -254,7 +255,7 @@ export default function Extintores() {
               {extintoresFiltrados.map((e) => (
                 <TableRow key={e.id}>
                   <TableCell>
-                    {e.cliente?.nombre} {e.cliente?.apellido}
+                    {mostrarEnMayusculas(e.cliente?.nombre)} {mostrarEnMayusculas(e.cliente?.apellido)}
                   </TableCell>
                   <TableCell>{e.numero_extintor} / {e.numero_serie}</TableCell>
                   <TableCell>
@@ -421,9 +422,9 @@ export default function Extintores() {
                 <TableBody>
                   {clientesFiltrados.map((c) => (
                     <TableRow key={c.id}>
-                      <TableCell>{c.nombre} {c.apellido}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(c.nombre)} {mostrarEnMayusculas(c.apellido)}</TableCell>
                       <TableCell>{c.cuit}</TableCell>
-                      <TableCell>{c.localidad || "-"}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(c.localidad) || "-"}</TableCell>
                       <TableCell>
                         <Button
                           size="sm"
@@ -489,8 +490,8 @@ export default function Extintores() {
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-1 gap-x-10 gap-y-2 sm:grid-cols-2 lg:grid-cols-4">
               <p>
-                <strong>Cliente:</strong> {ver.cliente?.nombre}{" "}
-                {ver.cliente?.apellido}
+                <strong>Cliente:</strong> {mostrarEnMayusculas(ver.cliente?.nombre)}{" "}
+                {mostrarEnMayusculas(ver.cliente?.apellido)}
               </p>
               </div>
               <div className="rounded-md bg-muted/30 p-4">
@@ -528,7 +529,7 @@ export default function Extintores() {
             </div>
             </div>
           )}
-          {ver && <div className="space-y-4 text-sm"><div className="mb-4 space-y-3"><div className="grid grid-cols-1 gap-x-10 gap-y-2 sm:grid-cols-2 lg:grid-cols-4"><p><strong>Número:</strong> {ver.numero_extintor}</p><p><strong>Serie:</strong> {ver.numero_serie}</p><p><strong>Sector:</strong> {ver.sector || "-"}</p><p><strong>Clase:</strong> {ver.clase?.nombre || "-"}</p></div><p><strong>Cliente:</strong> {ver.cliente?.nombre} {ver.cliente?.apellido}</p></div><div><h4 className="mb-2 font-semibold">Datos del extintor</h4><Table><TableHeader><TableRow><TableHead>Marca</TableHead><TableHead>Clase</TableHead><TableHead>Año de fabricación</TableHead><TableHead>Año prueba hidráulica</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell>{ver.marca?.nombre || "-"}</TableCell><TableCell>{ver.clase?.nombre || "-"}</TableCell><TableCell>{ver.anio_fabricacion || "-"}</TableCell><TableCell>{ver.anio_prueba_hidraulica || "-"}</TableCell></TableRow></TableBody></Table></div><div><h4 className="mb-2 font-semibold">Recargas y vencimientos</h4><Table><TableHeader><TableRow><TableHead>Última recarga</TableHead><TableHead>Próxima recarga</TableHead><TableHead>Vencimiento</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell>{fecha(ver.fecha_ultima_recarga)}</TableCell><TableCell>{fecha(ver.fecha_proxima_recarga)}</TableCell><TableCell>{fecha(ver.fecha_vencimiento)}</TableCell></TableRow></TableBody></Table></div></div>}
+          {ver && <div className="space-y-4 text-sm"><div className="mb-4 space-y-3"><div className="grid grid-cols-1 gap-x-10 gap-y-2 sm:grid-cols-2 lg:grid-cols-4"><p><strong>Número:</strong> {ver.numero_extintor}</p><p><strong>Serie:</strong> {ver.numero_serie}</p><p><strong>Sector:</strong> {ver.sector || "-"}</p><p><strong>Clase:</strong> {ver.clase?.nombre || "-"}</p></div><p><strong>Cliente:</strong> {mostrarEnMayusculas(ver.cliente?.nombre)} {mostrarEnMayusculas(ver.cliente?.apellido)}</p></div><div><h4 className="mb-2 font-semibold">Datos del extintor</h4><Table><TableHeader><TableRow><TableHead>Marca</TableHead><TableHead>Clase</TableHead><TableHead>Año de fabricación</TableHead><TableHead>Año prueba hidráulica</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell>{ver.marca?.nombre || "-"}</TableCell><TableCell>{ver.clase?.nombre || "-"}</TableCell><TableCell>{ver.anio_fabricacion || "-"}</TableCell><TableCell>{ver.anio_prueba_hidraulica || "-"}</TableCell></TableRow></TableBody></Table></div><div><h4 className="mb-2 font-semibold">Recargas y vencimientos</h4><Table><TableHeader><TableRow><TableHead>Última recarga</TableHead><TableHead>Próxima recarga</TableHead><TableHead>Vencimiento</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell>{fecha(ver.fecha_ultima_recarga)}</TableCell><TableCell>{fecha(ver.fecha_proxima_recarga)}</TableCell><TableCell>{fecha(ver.fecha_vencimiento)}</TableCell></TableRow></TableBody></Table></div></div>}
         </DialogContent>
       </Dialog>
     </div>

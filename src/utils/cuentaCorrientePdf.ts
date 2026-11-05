@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
 import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format, subDays } from "date-fns";
@@ -206,7 +207,7 @@ const buildListadoRows = (clientes: CuentaCorrienteResumen[]): ListadoCuentaCorr
   }
 
   return clientes.map((cliente) => ({
-    cliente: `${cliente.cliente_nombre} ${cliente.cliente_apellido}`.trim() || "Cliente",
+    cliente: `${mostrarEnMayusculas(cliente.cliente_nombre)} ${mostrarEnMayusculas(cliente.cliente_apellido)}`.trim() || "Cliente",
     cuit: cliente.cliente_cuit || "N/A",
     debitos: formatMoney(cliente.total_debitos),
     creditos: formatMoney(cliente.total_creditos),
@@ -285,7 +286,7 @@ const drawHeader = (
   comercio?: Comercio | null,
   logoImage?: PdfImage | null
 ) => {
-  const cliente = `${resumen.cliente_nombre} ${resumen.cliente_apellido}`.trim() || "Cliente";
+  const cliente = `${mostrarEnMayusculas(resumen.cliente_nombre)} ${mostrarEnMayusculas(resumen.cliente_apellido)}`.trim() || "Cliente";
   const fechaEmision = formatDate(new Date().toISOString());
   const ultimoMovimiento = resumen.ultimo_movimiento ? formatDate(resumen.ultimo_movimiento) : fechaEmision;
   const comercioDireccion = getComercioDireccionLineas(comercio);
@@ -690,7 +691,7 @@ export const buildCuentaCorrientePdfFile = (
 
   return loadLogoImage(getLogoUrl(options.comercio)).then((logoImage) => {
     const blob = createPdfBlob(buildResumenPages(resumen, movimientos, options, logoImage), logoImage);
-    const clienteFilename = sanitizeFilename(`${resumen.cliente_nombre}-${resumen.cliente_apellido}`) || "cliente";
+    const clienteFilename = sanitizeFilename(`${mostrarEnMayusculas(resumen.cliente_nombre)}-${mostrarEnMayusculas(resumen.cliente_apellido)}`) || "cliente";
     const periodFilename = options.fechaDesde || options.fechaHasta
       ? `-${options.fechaDesde || "inicio"}-${options.fechaHasta || "actual"}`
       : "";
@@ -745,7 +746,7 @@ export const buildCuentaCorrienteWhatsAppMessage = (
   movimientos: CuentaCorriente[],
   options: CuentaCorrientePdfOptions = {}
 ) => {
-  const cliente = `${resumen.cliente_nombre} ${resumen.cliente_apellido}`.trim() || "Cliente";
+  const cliente = `${mostrarEnMayusculas(resumen.cliente_nombre)} ${mostrarEnMayusculas(resumen.cliente_apellido)}`.trim() || "Cliente";
   const saldoLabel =
     resumen.saldo_actual > 0 ? "Debe" : resumen.saldo_actual < 0 ? "A favor" : "Sin saldo";
 

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCheques } from '@/hooks/useCheques';
@@ -278,7 +279,7 @@ export const ChequesList = () => {
                     <TableCell>
                       {cheque.cliente ? (
                         <div className="text-sm">
-                          {cheque.cliente.nombre} {cheque.cliente.apellido}
+                          {mostrarEnMayusculas(cheque.cliente.nombre)} {mostrarEnMayusculas(cheque.cliente.apellido)}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>

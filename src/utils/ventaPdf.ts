@@ -1,6 +1,7 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { format } from "date-fns";
 import { Comercio } from "@/types/comercio";
-import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
+import { TIPOS_COMPROBANTE, Venta, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemDescripcion, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -93,7 +94,7 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
       ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante)
       : venta.numero_comprobante}`,
     `Fecha: ${formatDateTime(venta.fecha_venta)}`,
-    `Cliente: ${venta.cliente_nombre || "Consumidor Final"}`,
+    `Cliente: ${mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final"}`,
     `Condicion de venta: ${getVentaTipoPagoLabel(venta)}`,
     "",
     "Detalle de la venta",
@@ -105,7 +106,7 @@ const buildSaleLines = (venta: Venta, comercio?: Comercio | null) => {
 
   if (venta.venta_items?.length) {
     venta.venta_items.forEach((item) => {
-      const descripcion = item.producto?.descripcion || item.descripcion_manual || item.producto?.cod_producto || "Producto";
+      const descripcion = getVentaItemDescripcion(item);
       const cantidad = Number(item.cantidad || 0).toLocaleString("es-AR");
       const porcentajeIva = Number(item.porcentaje_iva || 0);
       const precioUnitarioSinIva = porcentajeIva > 0

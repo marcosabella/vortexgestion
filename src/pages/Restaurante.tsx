@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Plus, PackageCheck, Truck, Check, LogOut, AlertTriangle, CreditCard, Receipt, Phone } from "lucide-react";
@@ -66,7 +67,7 @@ export default function Restaurante({ vista }: { vista: VistaRestaurante }) {
   const mostrarPrometido = visibles.some(p => p.prometido_at);
   const filaPedido = (p: PedidoRestaurante) => <TableRow key={p.id}>
     <TableCell className="font-medium">#{p.numero}{p.prioridad && <div className="mt-1"><Badge variant="destructive">Prioridad</Badge></div>}</TableCell>
-    <TableCell>{p.cliente_nombre}<p className="text-xs text-muted-foreground">{p.telefono}</p></TableCell>
+    <TableCell>{mostrarEnMayusculas(p.cliente_nombre)}<p className="text-xs text-muted-foreground">{p.telefono}</p></TableCell>
     <TableCell>{p.modalidad === "mesa" ? "Salón / mesa" : p.modalidad === "retiro" ? "Retiro" : "Delivery"}<p className="text-xs text-muted-foreground">{restauranteMesas(data, p.id)}</p></TableCell>
     {mostrarDireccion && <TableCell>{p.direccion || "—"}</TableCell>}<TableCell title={p.modalidad === "mesa" ? "Desde la apertura del pedido hasta el cierre de la cuenta" : "Desde el registro del pedido hasta su cierre"}>{restauranteTiempo(data, p, ahora).minutos === null ? "Sin dato" : `${restauranteTiempo(data, p, ahora).minutos} min`}<p className="text-xs text-muted-foreground">{restauranteTiempo(data, p, ahora).finalizado ? "Finalizado" : "En curso"}</p></TableCell>{mostrarPrometido && <TableCell>{p.prometido_at ? new Date(p.prometido_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>}
     <TableCell><Etapa p={p} items={itemsPedido(p)} envio={envioPedido(p)?.estado} /></TableCell>

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState, useMemo } from 'react';
 import { useVentas } from '@/hooks/useVentas';
 import { useClientes } from '@/hooks/useClientes';
@@ -228,7 +229,7 @@ const ListadoVentas = () => {
                     <SelectItem value="todos">Todos los clientes</SelectItem>
                     {clientes?.map((cliente) => (
                       <SelectItem key={cliente.id} value={cliente.id!}>
-                        {cliente.nombre} {cliente.apellido}
+                        {mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -305,7 +306,7 @@ const ListadoVentas = () => {
                   rankingClientes.map((cliente, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell>{cliente.nombre}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(cliente.nombre)}</TableCell>
                       <TableCell className="text-right">{cliente.cantidad}</TableCell>
                       <TableCell className="text-right">
                         ${cliente.total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -410,12 +411,12 @@ const ListadoVentas = () => {
                         <div
                           className="truncate"
                           title={venta.cliente
-                            ? `${venta.cliente.nombre} ${venta.cliente.apellido}`
-                            : venta.cliente_nombre || 'Consumidor Final'}
+                            ? `${mostrarEnMayusculas(venta.cliente.nombre)} ${mostrarEnMayusculas(venta.cliente.apellido)}`
+                            : mostrarEnMayusculas(venta.cliente_nombre) || 'Consumidor Final'}
                         >
                           {venta.cliente
-                            ? `${venta.cliente.nombre} ${venta.cliente.apellido}`
-                            : venta.cliente_nombre || 'Consumidor Final'}
+                            ? `${mostrarEnMayusculas(venta.cliente.nombre)} ${mostrarEnMayusculas(venta.cliente.apellido)}`
+                            : mostrarEnMayusculas(venta.cliente_nombre) || 'Consumidor Final'}
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{getVentaTipoPagoLabel(venta)}</TableCell>

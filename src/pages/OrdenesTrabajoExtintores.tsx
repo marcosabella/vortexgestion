@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -327,7 +328,7 @@ export default function OrdenesTrabajoExtintores() {
                 <TableRow key={orden.id}>
                   <TableCell>{fecha(orden.fecha_orden)}</TableCell>
                   <TableCell>
-                    {orden.cliente?.nombre} {orden.cliente?.apellido}
+                    {mostrarEnMayusculas(orden.cliente?.nombre)} {mostrarEnMayusculas(orden.cliente?.apellido)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={estadoColor[orden.estado]}>
@@ -394,6 +395,7 @@ export default function OrdenesTrabajoExtintores() {
                 <Input
                   readOnly
                   value={clienteNombre(form.cliente_id)}
+                  className="uppercase"
                   placeholder="Seleccionar cliente..."
                 />
                 <Button variant="outline" onClick={() => setClienteOpen(true)}>
@@ -613,7 +615,7 @@ export default function OrdenesTrabajoExtintores() {
               <TableBody>
                 {clientesFiltrados.map((cliente) => (
                   <TableRow key={cliente.id}>
-                    <TableCell>{cliente.nombre} {cliente.apellido}</TableCell>
+                    <TableCell>{mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}</TableCell>
                     <TableCell>{cliente.cuit}</TableCell>
                     <TableCell>
                       <Button
@@ -651,7 +653,7 @@ export default function OrdenesTrabajoExtintores() {
         <DialogContent className="max-h-[90vh] w-[calc(100%-1rem)] overflow-y-auto sm:w-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>
-              Seleccionar extintor de {clienteNombre(form.cliente_id)}
+              Seleccionar extintor de {mostrarEnMayusculas(clienteNombre(form.cliente_id))}
             </DialogTitle>
           </DialogHeader>
           <Input
@@ -728,8 +730,8 @@ export default function OrdenesTrabajoExtintores() {
                   </p>
                 </div>
                 <p>
-                  <strong>Cliente:</strong> {ver.cliente?.nombre}{" "}
-                  {ver.cliente?.apellido}
+                  <strong>Cliente:</strong> {mostrarEnMayusculas(ver.cliente?.nombre)}{" "}
+                  {mostrarEnMayusculas(ver.cliente?.apellido)}
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button

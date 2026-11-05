@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { Eye, FileDown, MessageCircle, Plus, Printer, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -191,7 +192,7 @@ export default function CuentaCorrienteClienteDetalle() {
   const clientName = `${resumen.cliente_nombre} ${resumen.cliente_apellido}`.trim();
   return <div className="container mx-auto space-y-6 p-4 sm:p-6">
     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-      <div><h1 className="text-3xl font-bold">Cuenta corriente — {clientName}</h1><p className="text-muted-foreground">Movimientos y pagos asociados al cliente.</p></div>
+      <div><h1 className="text-3xl font-bold">Cuenta corriente — {mostrarEnMayusculas(clientName)}</h1><p className="text-muted-foreground">Movimientos y pagos asociados al cliente.</p></div>
       <div className="flex flex-wrap gap-2"><Button size="sm" variant="print" onClick={openPdf} disabled={rangoInvalido}><Printer className="mr-2 h-4 w-4" />Imprimir</Button><Button size="sm" className="bg-red-600 text-white hover:bg-red-700" onClick={exportPdf} disabled={rangoInvalido}><FileDown className="mr-2 h-4 w-4" />PDF</Button><Button size="sm" className="bg-[#25D366] text-white hover:bg-[#1DA851]" onClick={sendWhatsApp} disabled={rangoInvalido}><MessageCircle className="mr-2 h-4 w-4" />WhatsApp</Button><Button size="sm" variant="outline" onClick={() => navigate("/cuenta-corriente")}>Volver al listado</Button></div>
     </div>
 

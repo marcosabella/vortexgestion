@@ -254,6 +254,7 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
               </Label>
               <Input
                 id="nombre"
+                className="uppercase"
                 {...register('nombre')}
                 placeholder={watchedTipoPersona === 'juridica' ? 'Ingrese la razón social' : 'Ingrese el nombre'}
               />
@@ -267,6 +268,7 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
                 <Label htmlFor="apellido">Apellido *</Label>
                 <Input
                   id="apellido"
+                  className="uppercase"
                   {...register('apellido')}
                   placeholder="Ingrese el apellido"
                 />
@@ -358,6 +360,7 @@ export function ClienteForm({ cliente, onSuccess, onSaved, onPendingChange, show
                 <Label htmlFor="localidad">Localidad</Label>
                 <Input
                   id="localidad"
+                  className="uppercase"
                   {...register('localidad')}
                   placeholder="Ciudad"
                 />

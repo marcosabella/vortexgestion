@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +121,7 @@ export const TarjetasConciliacion = () => {
               const seleccionable = pago.estado_conciliacion === "pendiente";
               return <TableRow key={pago.id}>
                 <TableCell><Checkbox disabled={!seleccionable} checked={seleccionados.includes(pago.id)} onCheckedChange={(checked) => setSeleccionados((actuales) => checked ? [...actuales, pago.id] : actuales.filter((id) => id !== pago.id))} /></TableCell>
-                <TableCell className="font-medium">{pago.venta?.numero_comprobante || "-"}<div className="text-xs font-normal text-muted-foreground">{pago.venta?.cliente_nombre}</div></TableCell>
+                <TableCell className="font-medium">{pago.venta?.numero_comprobante || "-"}<div className="text-xs font-normal text-muted-foreground">{mostrarEnMayusculas(pago.venta?.cliente_nombre)}</div></TableCell>
                 <TableCell>{pago.venta?.fecha_venta ? format(new Date(pago.venta.fecha_venta), "dd/MM/yyyy") : "-"}</TableCell>
                 <TableCell>{pago.tarjeta?.nombre || "-"}</TableCell><TableCell>{pago.cuotas || 1}</TableCell>
                 <TableCell className="text-right">{currency(pago.monto)}</TableCell>

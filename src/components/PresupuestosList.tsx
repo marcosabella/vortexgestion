@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -118,7 +119,7 @@ export function PresupuestosList() {
                 <TableRow key={item.id}>
                   <TableCell>{format(new Date(item.fecha_venta), "dd/MM/yyyy HH:mm")}</TableCell>
                   <TableCell className="font-medium">{item.numero_comprobante}</TableCell>
-                  <TableCell>{item.cliente_nombre}</TableCell>
+                  <TableCell>{mostrarEnMayusculas(item.cliente_nombre)}</TableCell>
                   <TableCell><Badge variant={item.estado === "confirmado" ? "default" : "secondary"}>{item.estado}</Badge></TableCell>
                   <TableCell className="font-semibold">${getVentaTotalFinal(item).toFixed(2)}</TableCell>
                   <TableCell><div className="flex gap-2">
@@ -140,7 +141,7 @@ export function PresupuestosList() {
           {selected && <div className="min-h-0 space-y-5 overflow-y-auto">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p><strong>Cliente:</strong> {selected.cliente_nombre}</p>
+                <p><strong>Cliente:</strong> {mostrarEnMayusculas(selected.cliente_nombre)}</p>
                 <p><strong>Estado:</strong> {selected.estado}</p>
                 {selected.taller_vehiculo && <>
                   <p><strong>Vehículo:</strong> {selected.taller_vehiculo.patente} · {selected.taller_vehiculo.marca} {selected.taller_vehiculo.modelo}{selected.taller_vehiculo.anio ? ` · ${selected.taller_vehiculo.anio}` : ''}</p>

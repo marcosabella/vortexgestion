@@ -1,7 +1,8 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { format } from "date-fns";
 import { AfipConfig } from "@/types/afip";
 import { Comercio } from "@/types/comercio";
-import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
+import { discriminaIvaEnComprobante, getTotalRecargoPagos, getVentaItemCodigo, getVentaItemDescripcion, getVentaTipoPagoLabel, getVentaTotalFinal, Venta } from "@/types/venta";
 import { FormatoComprobante } from "@/config/parametrizacion";
 import type { TallerOrden } from "@/types/taller";
 import { ESTADOS_TALLER } from "@/types/taller";
@@ -544,7 +545,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
     venta.cliente?.piso ? `Piso: ${venta.cliente.piso}` : '',
     venta.cliente?.departamento ? `Dpto: ${venta.cliente.departamento}` : '',
     venta.cliente?.codigo_postal,
-    venta.cliente?.localidad,
+    mostrarEnMayusculas(venta.cliente?.localidad),
     venta.cliente?.provincia,
   ]
     .filter(isPrintableComercioValue)
@@ -560,7 +561,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
   const rows = venta.venta_items?.length
     ? venta.venta_items
         .map((item) => {
-          const descripcion = item.producto?.descripcion || item.descripcion_manual || "Item manual";
+          const descripcion = getVentaItemDescripcion(item);
           const recargo = Number(item.monto_recargo || 0) > 0
             ? ` (Recargo: $ ${formatMoney(item.monto_recargo)})`
             : "";
@@ -630,7 +631,7 @@ export const buildFacturaPrintBody = ({ venta, comercio, afipConfig, qrDataUrl =
       <div class="cliente-section">
         <div class="cliente-row">
           <div><strong>CUIT:</strong> ${escapeHtml(clienteCuit || "N/A")}</div>
-          <div><strong>Apellido y Nombre / Razon Social:</strong> ${escapeHtml(venta.cliente_nombre || "Consumidor Final")}</div>
+          <div><strong>Apellido y Nombre / Razon Social:</strong> ${escapeHtml(mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final")}</div>
         </div>
         <div class="cliente-row full">
           <div><strong>Domicilio:</strong> ${escapeHtml(clienteDireccion || "N/A")}</div>

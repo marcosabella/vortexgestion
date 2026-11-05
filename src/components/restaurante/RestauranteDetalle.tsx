@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import type { ReactNode } from "react";
 import { Ban, Check, CreditCard, Plus, Receipt, RotateCcw, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export function RestauranteDetalle({ data, pedido, trabajando, estado, entregado
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
       <div className="grid min-w-0 content-start gap-4">
         <section className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_auto]" aria-label="Datos del pedido">
-          <div className="min-w-0"><h3 className="break-words font-semibold">{pedido.cliente_nombre}</h3>{pedido.telefono && <p className="mt-1 text-sm text-muted-foreground">Teléfono: {pedido.telefono}</p>}{pedido.direccion && <p className="mt-1 break-words text-sm text-muted-foreground">{pedido.direccion}</p>}{pedido.instrucciones_envio && <p className="mt-1 break-words text-sm">Reparto: {pedido.instrucciones_envio}</p>}</div>
+          <div className="min-w-0"><h3 className="break-words font-semibold">{mostrarEnMayusculas(pedido.cliente_nombre)}</h3>{pedido.telefono && <p className="mt-1 text-sm text-muted-foreground">Teléfono: {pedido.telefono}</p>}{pedido.direccion && <p className="mt-1 break-words text-sm text-muted-foreground">{pedido.direccion}</p>}{pedido.instrucciones_envio && <p className="mt-1 break-words text-sm">Reparto: {pedido.instrucciones_envio}</p>}</div>
           <div className="grid content-start gap-2 sm:text-right">{pedido.modalidad === "mesa" && <p className="text-sm font-medium">{restauranteMesas(data, pedido.id)} · {pedido.comensales} comensales</p>}<div>{estado}</div>{pedido.prometido_at && <p className="text-xs text-muted-foreground">Prometido: {new Date(pedido.prometido_at).toLocaleString("es-AR")}</p>}</div>
           {pedido.observaciones && <p className="break-words border-t pt-2 text-sm sm:col-span-2"><span className="font-medium">Observaciones cocina: </span>{pedido.observaciones}</p>}
         </section>

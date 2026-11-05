@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import React, { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -39,7 +40,7 @@ import { emisorFiscalLabel, datosFiscalesVenta } from "@/utils/emisorFiscal"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { useAuth } from "@/contexts/AuthContext"
 import { useQuery } from "@tanstack/react-query"
-import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase } from "@/types/venta"
+import { Venta, VentaItem, PagoVenta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, getTotalPagosBase, getVentaItemDescripcion } from "@/types/venta"
 import { useToast } from "@/hooks/use-toast"
 import { generarQRAfip } from "@/utils/afipQr"
 import { buildFacturaWhatsAppPdfFile } from "@/utils/facturaWhatsAppPdf"
@@ -175,7 +176,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
     try {
       const { data: ventaCompleta, error } = await supabase.from("ventas").select(`
         *, cliente:clientes(nombre, apellido, cuit, calle, numero, codigo_postal, localidad, provincia, telefono, situacion_afip, tipo_persona),
-        venta_items(*, producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva)),
+        venta_items(*, producto:productos(cod_producto, descripcion, precio_venta, porcentaje_iva), variante:producto_variantes(color:producto_colores(nombre), talle:producto_talles(nombre))),
         pagos_venta(*)
       `).eq("id", ventaId).maybeSingle()
       if (error || !ventaCompleta || !(ventaCompleta as any).cliente?.telefono) return
@@ -482,6 +483,8 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         setVentaItems(venta.venta_items.map(item => ({
           producto_id: item.producto_id,
           producto_variante_id: item.producto_variante_id || null,
+          variante: item.variante,
+          producto: item.producto,
           descripcion_manual: item.descripcion_manual,
           codigo_manual: item.codigo_manual,
           cantidad: item.cantidad,
@@ -572,13 +575,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
   )
 
   const getItemDescripcion = (item: VentaItemDraft) => {
-    const producto = item.producto_id ? productos.find(p => p.id === item.producto_id) : null
-    if (producto) {
-      const variante = variantesProducto.find((itemVariante) => itemVariante.id === item.producto_variante_id)
-      const detalle = variante ? [variante.color, variante.talle].filter(Boolean).join(" / ") : item.descripcion_manual || ""
-      return `${producto.cod_producto} - ${producto.descripcion}${detalle ? ` (${detalle})` : ""}`
-    }
-    return item.descripcion_manual || "Item manual"
+    const producto = item.producto || (item.producto_id ? productos.find(p => p.id === item.producto_id) : undefined)
+    const descripcion = getVentaItemDescripcion({ ...item, producto })
+    return producto ? `${producto.cod_producto} - ${descripcion}` : descripcion
   }
 
   // Función para agregar producto
@@ -708,9 +707,15 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
       monto_recargo: montoRecargo,
     })
 
+    const varianteSeleccionada = variantesProducto.find(v => v.id === selectedVarianteId)
     const nuevoItem: VentaItemDraft = {
       producto_id: selectedProductoId || null,
       producto_variante_id: selectedVarianteId || null,
+      producto: selectedProducto || undefined,
+      variante: selectedVarianteId ? {
+        color: varianteSeleccionada?.color ? { nombre: varianteSeleccionada.color } : null,
+        talle: varianteSeleccionada?.talle ? { nombre: varianteSeleccionada.talle } : null,
+      } : null,
       descripcion_manual: selectedProductoId ? (selectedVarianteId ? [variantesProducto.find((variante) => variante.id === selectedVarianteId)?.color, variantesProducto.find((variante) => variante.id === selectedVarianteId)?.talle].filter(Boolean).join(" / ") : null) : descripcion,
       codigo_manual: null,
       cantidad: cantidadItem,
@@ -857,20 +862,26 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
         origen_orden_trabajo: Boolean(ordenTrabajoInicial),
       }
 
+      const itemsGuardar = ventaItems.map(item => {
+        const payload = { ...item }
+        delete payload.producto
+        delete payload.variante
+        return payload
+      })
       if (esPresupuesto && venta?.id) {
         await updatePresupuesto({
           presupuestoId: venta.id,
           venta: ventaData,
-          items: ventaItems,
+          items: itemsGuardar,
           pagos: pagosVenta,
         })
       } else if (esPresupuesto) {
-        await createPresupuesto({ venta: ventaData, items: ventaItems, pagos: pagosVenta })
+        await createPresupuesto({ venta: ventaData, items: itemsGuardar, pagos: pagosVenta })
       } else if (venta?.id) {
         await updateVenta({
           ventaId: venta.id,
           venta: ventaData,
-          items: ventaItems,
+          items: itemsGuardar,
           pagos: pagosVenta
         })
       } else {
@@ -879,7 +890,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
           ? { id: ventaMercadoPagoPendienteId }
           : await createVentaAsync({
               venta: ventaData,
-              items: ventaItems,
+              items: itemsGuardar,
               pagos: pagosConfirmados,
               idempotencyKey: idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID()),
               mercadoPago: Boolean(pagoMercadoPago),
@@ -1051,6 +1062,7 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                                 : "Consumidor Final"
                           }
                           readOnly
+                          className="uppercase"
                           placeholder="Seleccionar cliente..."
                         />
                       </FormControl>
@@ -1113,9 +1125,9 @@ const VentaForm: React.FC<VentaFormProps> = ({ venta, onSuccess, showTitle = tru
                                   </TableRow>
                                   {filteredClientes.map((cliente) => (
                                     <TableRow key={cliente.id}>
-                                      <TableCell className="font-medium">{cliente.nombre} {cliente.apellido}</TableCell>
+                                      <TableCell className="font-medium">{mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}</TableCell>
                                       <TableCell>{cliente.cuit}</TableCell>
-                                      <TableCell>{cliente.localidad || "-"}</TableCell>
+                                      <TableCell>{mostrarEnMayusculas(cliente.localidad) || "-"}</TableCell>
                                       <TableCell>{cliente.provincia || "-"}</TableCell>
                                       <TableCell className="text-right">
                                         <Button

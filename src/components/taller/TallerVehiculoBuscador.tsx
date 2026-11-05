@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ export function TallerVehiculoBuscador({ vehiculos, vehiculoId, disabled, onSele
 
   return <div className="space-y-3">
     <Button type="button" variant="outline" className="h-auto min-h-10 w-full justify-between text-left" aria-haspopup="dialog" disabled={disabled} onClick={() => { setBuscar(''); setOpen(true); }}>
-      <span className="min-w-0 whitespace-normal break-words" aria-live="polite">{seleccionado ? `${nombreCliente} - ${seleccionado.patente} · ${seleccionado.marca} ${seleccionado.modelo}` : 'Buscar vehículo'}</span><Search className="ml-2 h-4 w-4 shrink-0" />
+      <span className="min-w-0 whitespace-normal break-words" aria-live="polite">{seleccionado ? `${mostrarEnMayusculas(nombreCliente)} - ${seleccionado.patente} · ${seleccionado.marca} ${seleccionado.modelo}` : 'Buscar vehículo'}</span><Search className="ml-2 h-4 w-4 shrink-0" />
     </Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Seleccionar vehículo</DialogTitle><DialogDescription>Buscá por patente, marca, modelo, nombre del titular o CUIT.</DialogDescription></DialogHeader>
       <div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-8" aria-label="Buscar vehículo" placeholder="Patente, marca, modelo o titular..." value={buscar} onChange={event => setBuscar(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }} /></div>

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { telefonoComercio, tamanoNombreComercioPdf } from "@/utils/comercioEncabezado";
 import { LEYENDA_SISTEMA } from "@/config/marcaSistema";
 import { format } from "date-fns";
@@ -211,8 +212,8 @@ const drawHeader = (
 };
 
 const getClienteVenta = (venta: Venta) => {
-  const clienteRelacion = [venta.cliente?.nombre, venta.cliente?.apellido].filter(Boolean).join(" ").trim();
-  return clienteRelacion || venta.cliente_nombre || "Consumidor Final";
+  const clienteRelacion = [mostrarEnMayusculas(venta.cliente?.nombre), mostrarEnMayusculas(venta.cliente?.apellido)].filter(Boolean).join(" ").trim();
+  return clienteRelacion || mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final";
 };
 
 const getTipoComprobanteLabel = (tipo: string) =>

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { lazy, Suspense, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -31,7 +32,7 @@ export function PedidoOnlineComprobante({ pedido, puedeGenerar, trabajando, habi
     <Dialog open={open} onOpenChange={value => { if (!generar.isPending) setOpen(value); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Comprobante del pedido #{pedido.numero}</DialogTitle>
-          <DialogDescription>{pedido.cliente_nombre} · {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(pedido.total)}. Se usará el detalle y el pago registrado del pedido.</DialogDescription></DialogHeader>
+          <DialogDescription>{mostrarEnMayusculas(pedido.cliente_nombre)} · {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(pedido.total)}. Se usará el detalle y el pago registrado del pedido.</DialogDescription></DialogHeader>
         <div className="space-y-2"><label className="text-sm font-medium">Tipo de comprobante</label>
           <Select value={tipo} onValueChange={value => setTipo(value as TipoComprobante)} disabled={generar.isPending}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{tipos.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent></Select></div>
         {multi && <div className="space-y-2"><label className="text-sm font-medium">Emisor fiscal</label><Select value={emisorId} onValueChange={setEmisorId} disabled={generar.isPending || emisores.isLoading}><SelectTrigger><SelectValue placeholder="Seleccionar emisor" /></SelectTrigger><SelectContent>{emisores.data?.filter(e => e.activo).map(e => <SelectItem key={e.id} value={e.id}>{e.razon_social} · {e.cuit_emisor}</SelectItem>)}</SelectContent></Select></div>}

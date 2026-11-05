@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -183,7 +184,7 @@ export function EstablecimientoForm({ mode, comercioId, hasAccess, isAdmin, esta
                 <SelectContent>
                   {(clientesQuery.data ?? []).map((cliente) => (
                     <SelectItem key={cliente.id} value={cliente.id}>
-                      {clienteLabel(cliente)}
+                      {mostrarEnMayusculas(clienteLabel(cliente))}
                     </SelectItem>
                   ))}
                 </SelectContent>

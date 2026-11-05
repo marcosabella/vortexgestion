@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -180,7 +181,7 @@ export function OrdenForm({ mode, comercioId, hasAccess, isAdmin, onSuccess, onC
               <SelectTrigger id="campo-orden-cliente" aria-invalid={Boolean(errors.cliente_id)} aria-describedby={errors.cliente_id ? "campo-orden-cliente-error" : undefined}>
                 <SelectValue placeholder="Seleccionar cliente" />
               </SelectTrigger>
-              <SelectContent>{clientes.map((cliente) => <SelectItem key={cliente.id} value={cliente.id}>{clienteLabel(cliente)}</SelectItem>)}</SelectContent>
+              <SelectContent>{clientes.map((cliente) => <SelectItem key={cliente.id} value={cliente.id}>{mostrarEnMayusculas(clienteLabel(cliente))}</SelectItem>)}</SelectContent>
             </Select>
           )} />
           {errors.cliente_id && <p id="campo-orden-cliente-error" className="text-sm text-destructive">{errors.cliente_id.message}</p>}

@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useState, useMemo } from "react";
 import { useClientes } from "@/hooks/useClientes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,11 +79,11 @@ const ListadoClientes = () => {
 
     const headers = ["Nombre", "Apellido", "CUIT", "Dirección", "Localidad", "Provincia", "CP", "Teléfono", "Email", "Situación AFIP", "Tipo Persona"];
     const csvData = filteredClientes.map(cliente => [
-      cliente.nombre,
-      cliente.apellido,
+      mostrarEnMayusculas(cliente.nombre),
+      mostrarEnMayusculas(cliente.apellido),
       cliente.cuit,
       `${cliente.calle} ${cliente.numero}`,
-      cliente.localidad,
+      mostrarEnMayusculas(cliente.localidad),
       cliente.provincia,
       cliente.codigo_postal,
       cliente.telefono || "",
@@ -324,14 +325,14 @@ const ListadoClientes = () => {
                     {filteredClientes.map((cliente) => (
                       <TableRow key={cliente.id}>
                         <TableCell className="font-medium">
-                          {cliente.nombre} {cliente.apellido}
+                          {mostrarEnMayusculas(cliente.nombre)} {mostrarEnMayusculas(cliente.apellido)}
                         </TableCell>
                         <TableCell>{cliente.cuit}</TableCell>
                         <TableCell>
                           <div className="text-sm">
                             <div>{cliente.calle} {cliente.numero}</div>
                             <div className="text-muted-foreground">
-                              {cliente.localidad}, {cliente.provincia} ({cliente.codigo_postal})
+                              {mostrarEnMayusculas(cliente.localidad)}, {cliente.provincia} ({cliente.codigo_postal})
                             </div>
                           </div>
                         </TableCell>
@@ -370,7 +371,7 @@ const ListadoClientes = () => {
           <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                Informe Detallado - {selectedCliente?.nombre} {selectedCliente?.apellido}
+                Informe Detallado - {mostrarEnMayusculas(selectedCliente?.nombre)} {mostrarEnMayusculas(selectedCliente?.apellido)}
               </DialogTitle>
             </DialogHeader>
             {selectedCliente && <InformeCliente cliente={selectedCliente} />}

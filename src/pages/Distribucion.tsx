@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
@@ -454,7 +455,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
                           "es-AR",
                         )}
                       </TableCell>
-                      <TableCell>{p.cliente_nombre}</TableCell>
+                      <TableCell>{mostrarEnMayusculas(p.cliente_nombre)}</TableCell>
                       <TableCell>{p.direccion}</TableCell>
                       <TableCell>
                         <Badge
@@ -527,7 +528,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
                                 variant="outline"
                                 size="sm"
                                 title="Cuenta del cliente"
-                                aria-label={`Cuenta de ${p.cliente_nombre}`}
+                                aria-label={`Cuenta de ${mostrarEnMayusculas(p.cliente_nombre)}`}
                                 asChild
                               >
                                 <Link to={`/cuenta-corriente/${p.cliente_id}`}>
@@ -842,7 +843,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
                           <option value="">Agregar pedido preparado</option>
                           {disponibles.map((p) => (
                             <option key={p.id} value={p.id}>
-                              #{p.numero} {p.cliente_nombre}
+                              #{p.numero} {mostrarEnMayusculas(p.cliente_nombre)}
                             </option>
                           ))}
                         </select>
@@ -889,7 +890,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
                       const remito = data.remitos?.find(m => m.parada_id === p.id && m.estado !== "anulado");
                       const resumen = resumenParada(data, p.id);
                       return <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-0">
-                        <span>{data.pedidos.find(pedido => pedido.id === p.pedido_id)?.cliente_nombre}</span>
+                        <span>{mostrarEnMayusculas(data.pedidos.find(pedido => pedido.id === p.pedido_id)?.cliente_nombre)}</span>
                         <span className="text-sm">{r.circuito_remitos ? remito?.estado === "confirmado" ? "Despacho registrado" : "Visita pendiente" : "Circuito anterior"} · Entregado: {money(resumen.total)} · Cobrado: {money(resumen.cobrado)} · Saldo: {money(resumen.saldo)}</span>
                       </div>;
                     })}
@@ -1034,7 +1035,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
               ¿Eliminar el pedido #{pedidoEliminando?.numero}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará el pedido de {pedidoEliminando?.cliente_nombre}{" "}
+              Se eliminará el pedido de {mostrarEnMayusculas(pedidoEliminando?.cliente_nombre)}{" "}
               y se quitará de los repartos asignados. Se liberará el stock
               reservado, sin sumar unidades que no se descontaron. Los pedidos
               con entregas o rendiciones se conservan y se corrigen mediante
@@ -1090,7 +1091,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
             <div className="space-y-5">
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <p>
-                  <strong>Cliente:</strong> {pedidoDetalle.cliente_nombre}
+                  <strong>Cliente:</strong> {mostrarEnMayusculas(pedidoDetalle.cliente_nombre)}
                 </p>
                 <p>
                   <strong>Fecha:</strong>{" "}
@@ -1281,7 +1282,7 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
             <div className="flex gap-2">
               <Input
                 id="dis-cliente"
-                className="min-w-0 flex-1"
+                className="min-w-0 flex-1 uppercase"
                 readOnly
                 value={clienteSeleccionado
                   ? `${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido}`
@@ -1464,10 +1465,10 @@ function DistribucionContenido({ vista }: { vista: VistaDistribucion }) {
                 >
                   <div className="min-w-0">
                     <p className="break-words font-medium">
-                      {c.nombre} {c.apellido}
+                      {mostrarEnMayusculas(c.nombre)} {mostrarEnMayusculas(c.apellido)}
                     </p>
                     <p className="break-words text-sm text-muted-foreground">
-                      {[c.cuit && `CUIT: ${c.cuit}`, c.localidad, c.telefono]
+                      {[c.cuit && `CUIT: ${c.cuit}`, mostrarEnMayusculas(c.localidad), c.telefono]
                         .filter(Boolean).join(" · ")}
                     </p>
                   </div>
@@ -1836,7 +1837,7 @@ function ClientesReparto({
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold">{seleccionado.nombre}</h3>
+          <h3 className="text-lg font-semibold">{mostrarEnMayusculas(seleccionado.nombre)}</h3>
           <Button variant="outline" disabled={trabajando} onClick={() => setClienteId(null)}>Volver a clientes</Button>
         </div>
         {seleccionado.paradas.map(parada => (
@@ -1872,14 +1873,14 @@ function ClientesReparto({
                 <TableRow key={cliente.id}>
                   <TableCell>{cliente.paradas.map(p => p.orden).join(", ")}</TableCell>
                   <TableCell>
-                    <p className="font-medium">{cliente.nombre}</p>
+                    <p className="font-medium">{mostrarEnMayusculas(cliente.nombre)}</p>
                     {direcciones.map(direccion => <p key={direccion} className="text-xs text-muted-foreground">{direccion}</p>)}
                   </TableCell>
                   <TableCell>{pedidos.map((p, i) => p ? `#${p.numero}` : `Pedido ${i + 1}`).join(", ")}</TableCell>
                   <TableCell><Badge variant="outline">{reparto.estado === "cancelado" ? "Cancelado" : reparto.estado === "planificado" ? "Por salir" : reparto.circuito_remitos ? `${confirmados}/${cliente.paradas.length} registrados` : "Ver entregas"}</Badge></TableCell>
                   <TableCell className="text-right">{money(cobrado)}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant={reparto.estado === "en_reparto" && pendiente ? "default" : "outline"} aria-label={`Abrir despachos de ${cliente.nombre}`} onClick={() => setClienteId(cliente.id)}>
+                    <Button size="sm" variant={reparto.estado === "en_reparto" && pendiente ? "default" : "outline"} aria-label={`Abrir despachos de ${mostrarEnMayusculas(cliente.nombre)}`} onClick={() => setClienteId(cliente.id)}>
                       {reparto.estado === "planificado" ? "Ver pedidos" : reparto.estado === "en_reparto" && (pendiente || !reparto.circuito_remitos) ? "Registrar despachos" : "Ver despachos"}
                     </Button>
                   </TableCell>
@@ -1932,7 +1933,7 @@ function Parada({
     return (
       <section className="space-y-2 border-t pt-3">
         <h3 className="font-semibold">
-          Pedido #{pedido?.numero} · {pedido?.cliente_nombre}
+          Pedido #{pedido?.numero} · {mostrarEnMayusculas(pedido?.cliente_nombre)}
         </h3>
         <p>{pedido?.direccion}</p>
         <p className="text-sm text-muted-foreground">
@@ -1951,7 +1952,7 @@ function Parada({
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold">
-            {parada.orden}. #{pedido?.numero} · {pedido?.cliente_nombre}
+            {parada.orden}. #{pedido?.numero} · {mostrarEnMayusculas(pedido?.cliente_nombre)}
           </h3>
           <p className="text-sm text-muted-foreground">{pedido?.direccion}</p>
           {pedido?.telefono && (

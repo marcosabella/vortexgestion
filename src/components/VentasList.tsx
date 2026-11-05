@@ -1,3 +1,4 @@
+import { mostrarEnMayusculas } from "@/utils/textoPresentacion";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Eye, Edit, Trash2, FileCheck, MessageCircle, BellPlus, CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
 import { useVentas, useObtenerCAE } from "@/hooks/useVentas";
-import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
+import { Venta, TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getPagoMontoBase, getTipoPagoLabel, getTotalRecargoPagos, getVentaItemCodigo, getVentaItemDescripcion, getVentaTipoPagoLabel, getVentaTotalFinal } from "@/types/venta";
 import { format } from "date-fns";
 import { FacturaImpresion } from "./FacturaImpresion";
 import { useComercio } from "@/hooks/useComercio";
@@ -335,8 +336,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
     const items = venta.venta_items?.length
       ? venta.venta_items
           .map((item) => {
-            const descripcion = item.producto?.descripcion || item.producto?.cod_producto || "Producto";
-            const itemDescripcion = item.descripcion_manual || descripcion;
+            const itemDescripcion = getVentaItemDescripcion(item);
             const ajustes = [
               Number(item.monto_descuento || 0) > 0 ? `desc. ${formatCurrency(Number(item.monto_descuento))}` : "",
               Number(item.monto_recargo || 0) > 0 ? `recargo ${formatCurrency(Number(item.monto_recargo))}` : "",
@@ -529,8 +529,8 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                       {mostrarNumeroComprobante(venta)}
                     </TableCell>
                     <TableCell className="w-full min-w-[220px] max-w-0">
-                      <div className="truncate" title={venta.cliente_nombre || "Consumidor Final"}>
-                        {venta.cliente_nombre || "Consumidor Final"}
+                      <div className="truncate" title={mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final"}>
+                        {mostrarEnMayusculas(venta.cliente_nombre) || "Consumidor Final"}
                       </div>
                     </TableCell>
                     {multipleCuit && <TableCell className="whitespace-nowrap">{venta.emisor_snapshot?.razon_social || "—"}<p className="text-xs text-muted-foreground">{venta.emisor_snapshot?.cuit_emisor || ""}</p></TableCell>}
@@ -641,7 +641,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                   <p className="whitespace-nowrap"><strong>N° Comprobante:</strong> {mostrarNumeroComprobante(selectedVenta)}</p>
                   <p className="whitespace-nowrap"><strong>Tipo Pago:</strong> {getVentaTipoPagoLabel(selectedVenta)}</p>
                 </div>
-                <p><strong>Cliente:</strong> {selectedVenta.cliente_nombre}</p>
+                <p><strong>Cliente:</strong> {mostrarEnMayusculas(selectedVenta.cliente_nombre)}</p>
                 {selectedVenta.origen_pedido_online_id && <p className="text-sm text-muted-foreground">Comprobante de pedido online. Su cancelación se gestiona desde Pedidos online.</p>}
                 {selectedVenta.anulado_at && <Badge variant="destructive">Anulado internamente · sin CAE</Badge>}
                 {selectedVenta.comprobante_asociado_id && <p className="text-sm">Nota de crédito vinculada a la factura original.</p>}
@@ -723,7 +723,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                       {selectedVenta.venta_items.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>{getVentaItemCodigo(item) || "-"}</TableCell>
-                          <TableCell>{item.producto?.descripcion || item.descripcion_manual || "Item manual"}</TableCell>
+                          <TableCell>{getVentaItemDescripcion(item)}</TableCell>
                           <TableCell>{item.cantidad}</TableCell>
                           <TableCell>${item.precio_unitario.toFixed(2)}</TableCell>
                           <TableCell>${Number(item.monto_descuento || 0).toFixed(2)}</TableCell>
