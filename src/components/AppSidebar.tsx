@@ -145,6 +145,7 @@ const listadosItems: MenuItem[] = [
 const adminItems: MenuItem[] = [
   { title: "Comercios", url: "/admin", icon: Shield },
   { title: "Consultas de la landing", url: "/admin/consultas-landing", icon: Inbox },
+  { title: "Referidos y bonificaciones", url: "/admin/referidos", icon: Users },
   { title: "Incidentes", url: "/admin/incidentes", icon: Activity },
   { title: "Notificaciones administrativas", url: "/admin/notificaciones", icon: Bell },
   { title: "Migraciones", url: "/admin/migraciones", icon: Database },

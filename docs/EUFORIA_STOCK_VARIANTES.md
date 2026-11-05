@@ -111,8 +111,8 @@ La descripción representa la variante guardada, sin cambiarla.
 En la verificación previa, el comprobante `0001-00000186` estaba registrado como
 `BODY VARSOVIA - Negro S`, con general 7 y variantes 8. La diferencia histórica
 se reparó tras la confirmación posterior del usuario, como se detalla abajo.
-La nueva interfaz todavía no se publicó en Netlify;
-requiere pedido expreso según `AGENTS.md`.
+La nueva interfaz se publicó por pedido expreso el 05/11/2026 en Netlify,
+deploy `6aec7685426dee03a9b95063`, junto al programa de referidos y al nuevo login.
 
 Las pruebas locales de stock y del payload del hook pasaron. La comprobación de
 descripciones cubrió Marrón S, Negro S, producto sin variante, solo talle y

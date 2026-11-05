@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
+import { useProgramaReferidos } from "@/hooks/useReferidos";
 
 export type NotificacionCategoria = "general" | "sistema" | "abono" | "comprobante";
 export type NotificacionPrioridad = "baja" | "normal" | "alta";
@@ -75,6 +76,7 @@ export const prioridadLabels: Record<NotificacionPrioridad, string> = {
 };
 
 export function useNotificaciones(incluirPedidosOnline = false) {
+  const { data: programaReferidos } = useProgramaReferidos();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { comercio } = useComercio();
@@ -174,12 +176,13 @@ export function useNotificaciones(incluirPedidosOnline = false) {
   });
 
   const notificaciones = notificacionesQuery.data || [];
-  const noLeidas = notificaciones.filter((notificacion) => !notificacion.leida).length;
+  const noLeidas = notificaciones.filter((notificacion) => !notificacion.leida).length + (programaReferidos && !programaReferidos.notificacion_leida_at ? 1 : 0);
 
   return {
     notificacionesQuery,
     notificaciones,
     noLeidas,
+    tieneCampanaReferidos: Boolean(programaReferidos),
     marcarLeida,
   };
 }

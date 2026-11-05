@@ -17,6 +17,7 @@ import { generarQRAfip } from "@/utils/afipQr";
 import { buildFacturaPrintHtml } from "@/utils/facturaPrint";
 import { FacturaImpresion } from "@/components/FacturaImpresion";
 import { useToast } from "@/hooks/use-toast";
+import { NotificacionReferidos } from "@/components/referidos/CampanaReferidos";
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "short",
@@ -331,7 +332,7 @@ function NotificacionItem({
 }
 
 export default function Notificaciones() {
-  const { notificacionesQuery, notificaciones, noLeidas, marcarLeida } = useNotificaciones();
+  const { notificacionesQuery, notificaciones, noLeidas, marcarLeida, tieneCampanaReferidos } = useNotificaciones();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const toggleNotificacion = (notificacion: Notificacion) => {
@@ -357,13 +358,14 @@ export default function Notificaciones() {
         </Badge>
       </div>
 
+      <NotificacionReferidos />
       {notificacionesQuery.isLoading ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">Cargando notificaciones...</CardContent>
         </Card>
       ) : notificaciones.length === 0 ? (
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">No hay notificaciones disponibles.</CardContent>
+          <CardContent className="p-8 text-center text-muted-foreground">{tieneCampanaReferidos ? "No hay otros avisos disponibles." : "No hay notificaciones disponibles."}</CardContent>
         </Card>
       ) : (
         <div className="space-y-4">

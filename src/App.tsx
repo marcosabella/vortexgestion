@@ -57,6 +57,8 @@ import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
 import AdminIncidentes from "./pages/AdminIncidentes";
 import AdminConsultasLanding from "./pages/AdminConsultasLanding";
+import AdminReferidos from "./pages/AdminReferidos";
+import { ModalReferidos } from "@/components/referidos/CampanaReferidos";
 import { IncidentesMonitor } from "@/components/IncidentesMonitor";
 import { crearCachesIncidentes } from "@/utils/incidentesQuery";
 import Notificaciones from "./pages/Notificaciones";
@@ -105,8 +107,9 @@ import CuentaCorrienteClienteDetalle from "./pages/CuentaCorrienteClienteDetalle
 
 const queryClient = new QueryClient(crearCachesIncidentes());
 
-function MembershipReminder({ comercio }: { comercio: ComercioDatos | null }) {
+function MembershipReminder({ comercio, onVisibilityChange }: { comercio: ComercioDatos | null; onVisibilityChange: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => onVisibilityChange(open), [open, onVisibilityChange]);
   const vencimiento = comercio?.membresia_vigente_hasta || null;
 
   useEffect(() => {
@@ -161,6 +164,7 @@ function ParametrizedRoute({ modulo, children }: { modulo: ModuloSistema; childr
 }
 
 function AuthenticatedLayout() {
+  const [membershipOpen, setMembershipOpen] = useState(false);
   const { session, isLoading, signOut, user } = useAuth();
   const { comercio, comerciosDisponibles, isLoading: comercioLoading, error: comercioError, refetch: recargarComercio, isFetching: comercioFetching, selectComercio } = useComercio();
   const client = useQueryClient();
@@ -321,6 +325,7 @@ function AuthenticatedLayout() {
               <Route path="/admin/migraciones" element={<AdminMigraciones />} />
               <Route path="/admin/incidentes" element={<AdminIncidentes />} />
               <Route path="/admin/consultas-landing" element={<AdminConsultasLanding />} />
+              <Route path="/admin/referidos" element={<AdminReferidos />} />
               <Route path="/admin/comercios/:comercioId/parametrizacion" element={<AdminComercioParametrizacion />} />
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
@@ -368,7 +373,8 @@ function AuthenticatedLayout() {
               <Route path="*" element={<NotFound />} />
             </Routes></RestauranteAcceso>}
           </main>
-          {!terminalRestaurante && <MembershipReminder comercio={comercio} />}
+          {!terminalRestaurante && <MembershipReminder comercio={comercio} onVisibilityChange={setMembershipOpen} />}
+          <ModalReferidos bloqueado={terminalRestaurante || seleccionRequerida || membershipOpen} />
           <Dialog open={seleccionRequerida} onOpenChange={() => undefined}>
             <DialogContent className="sm:max-w-xl [&>button]:hidden" onEscapeKeyDown={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
               <DialogHeader>

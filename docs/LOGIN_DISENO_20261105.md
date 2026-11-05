@@ -65,4 +65,6 @@ Referencias consultadas:
 - Mostrar/ocultar contraseña y anuncio de error verificados.
 - Capturas del diseño anterior y de la propuesta en
   `private-backups/login-preview/` (directorio privado excluido de Git).
-- Sin publicación en Netlify ni cambios en Supabase.
+- Publicado por pedido expreso el 05/11/2026 junto al programa de referidos, en
+  https://vortexgestion.netlify.app, deploy `6aec7685426dee03a9b95063`.
+  El rediseño del login no modifica el backend de autenticación.

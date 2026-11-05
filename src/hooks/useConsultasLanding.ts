@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { referidosApi, vistaPreviaReferidos, programaDemo } from "@/hooks/useReferidos";
 
 export type EstadoConsulta = "nueva" | "contactada" | "archivada";
 export type ConsultaLanding = {
@@ -24,8 +25,12 @@ const api = supabase as unknown as SupabaseClient<ConsultasSchema>;
 
 export function useEnviarConsultaLanding() {
   return useMutation({
-    mutationFn: async (payload: EnvioConsulta) => {
-      const { error } = await api.rpc("enviar_consulta_landing", payload).abortSignal(AbortSignal.timeout(20000));
+    mutationFn: async (payload: EnvioConsulta & { p_codigo?: string }) => {
+      const { p_codigo, ...consulta } = payload;
+      if (vistaPreviaReferidos && p_codigo === programaDemo.codigo) return;
+      const { error } = p_codigo
+        ? await referidosApi.rpc("enviar_consulta_referida", { ...consulta, p_codigo }).abortSignal(AbortSignal.timeout(20000))
+        : await api.rpc("enviar_consulta_landing", consulta).abortSignal(AbortSignal.timeout(20000));
       if (error) throw new Error(error.code === "P0001" ? "Se alcanzó el límite de envíos. Intentá más tarde." : "No pudimos enviar tu consulta. Revisá los datos e intentá nuevamente, o escribinos por correo.");
     },
   });
