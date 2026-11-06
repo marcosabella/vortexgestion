@@ -4,6 +4,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 import { useProgramaReferidos } from "@/hooks/useReferidos";
+import { avisoCampanaVisible, metadataComunicacion } from "@/utils/comunicaciones";
 
 export type NotificacionCategoria = "general" | "sistema" | "abono" | "comprobante";
 export type NotificacionPrioridad = "baja" | "normal" | "alta";
@@ -141,7 +142,7 @@ export function useNotificaciones(incluirPedidosOnline = false) {
         const metadata = notificacion.metadata;
         const esPedidoOnline = typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) && metadata.tipo === "pedido_online";
         return incluirPedidosOnline || !esPedidoOnline;
-      }) as Notificacion[];
+      }).sort((a, b) => Number(metadataComunicacion(b.metadata).destacada === true) - Number(metadataComunicacion(a.metadata).destacada === true)) as Notificacion[];
     },
   });
 
@@ -176,13 +177,13 @@ export function useNotificaciones(incluirPedidosOnline = false) {
   });
 
   const notificaciones = notificacionesQuery.data || [];
-  const noLeidas = notificaciones.filter((notificacion) => !notificacion.leida).length + (programaReferidos && !programaReferidos.notificacion_leida_at ? 1 : 0);
+  const noLeidas = notificaciones.filter((notificacion) => !notificacion.leida).length + (programaReferidos && avisoCampanaVisible(programaReferidos) && !programaReferidos.notificacion_leida_at ? 1 : 0);
 
   return {
     notificacionesQuery,
     notificaciones,
     noLeidas,
-    tieneCampanaReferidos: Boolean(programaReferidos),
+    tieneCampanaReferidos: avisoCampanaVisible(programaReferidos),
     marcarLeida,
   };
 }

@@ -27,7 +27,7 @@ import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { compartirPdfWhatsApp } from "@/utils/compartirWhatsApp";
 import { ToastAction } from "@/components/ui/toast";
 import { useAdminComercios, useIsAppAdmin } from "@/hooks/useAdminComercios";
-import { useAdminNotificaciones } from "@/hooks/useNotificaciones";
+import { useGuardarComunicacion } from "@/hooks/useComunicaciones";
 import { useMercadoPago } from "@/hooks/useMercadoPago";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,13 +76,14 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
   const { status: mercadoPagoStatus, run: runMercadoPago, isWorking: mercadoPagoWorking } = useMercadoPago();
   const { data: isAppAdmin = false } = useIsAppAdmin();
   const { comerciosQuery } = useAdminComercios(isAppAdmin);
-  const { crearNotificacion } = useAdminNotificaciones(isAppAdmin);
+  const crearNotificacion = useGuardarComunicacion();
   const hasAfipCertificates = selectedVenta?.emisor_fiscal_id
     ? Boolean(emisoresQuery.data?.some((e) => e.id === selectedVenta.emisor_fiscal_id && e.activo && e.tiene_certificados))
     : Boolean(afipConfig?.tiene_certificados || (afipConfig?.certificado_crt?.trim() && afipConfig?.certificado_key?.trim()));
   const [showDetails, setShowDetails] = useState(Boolean(detalleId));
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [notificationComercioIds, setNotificationComercioIds] = useState<string[]>([]);
+  const [mostrarModalNotificacion, setMostrarModalNotificacion] = useState(false);
   const [habilitarPagoMembresia, setHabilitarPagoMembresia] = useState(false);
   const [cuentaCobroId, setCuentaCobroId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -230,6 +231,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
         comprobante_fecha: format(new Date(selectedVenta.fecha_venta), "yyyy-MM-dd"),
         comprobante_monto: getVentaTotalFinal(selectedVenta),
         metadata: {
+          mostrar_modal: mostrarModalNotificacion,
           venta_id: selectedVenta.id || null,
           comercio_emisor_id: selectedVenta.comercio_id || comercio?.id || null,
           tipo_comprobante: selectedVenta.tipo_comprobante,
@@ -245,6 +247,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
         onSuccess: () => {
           setShowNotificationDialog(false);
           setNotificationComercioIds([]);
+          setMostrarModalNotificacion(false);
           setHabilitarPagoMembresia(false);
           setCuentaCobroId("");
         },
@@ -673,6 +676,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        setMostrarModalNotificacion(false);
                         if (notificacionComercioIdInicial) setNotificationComercioIds([notificacionComercioIdInicial]);
                         setShowNotificationDialog(true);
                       }}
@@ -855,7 +859,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
       </AlertDialog>
 
       <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Enviar comprobante a notificaciones</DialogTitle>
           </DialogHeader>
@@ -890,6 +894,20 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
                   </div>
                 ))
               )}
+            </div>
+
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <Checkbox
+                id="mostrar-modal-comprobante"
+                checked={mostrarModalNotificacion}
+                onCheckedChange={checked => setMostrarModalNotificacion(checked === true)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="mostrar-modal-comprobante">Mostrar también como modal</Label>
+                <p className="text-xs text-muted-foreground">
+                  El aviso aparecerá a los administradores de los comercios seleccionados en Inicio, Caja o Notificaciones, incluso con la sesión abierta. Al cerrarlo queda registrado para no repetirlo.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-3 rounded-md border p-3">

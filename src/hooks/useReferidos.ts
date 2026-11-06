@@ -16,11 +16,68 @@ export function useProgramaReferidos() {
   return useQuery({
     queryKey: ["programa-referidos", comercio?.id, vistaPreviaReferidos], enabled: Boolean(comercio?.id),
     staleTime: 60000, retry: false,
+    // La campaña puede activarse mientras el comercio mantiene su sesión abierta.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
     queryFn: async (): Promise<ProgramaReferidos | null> => {
       if (vistaPreviaReferidos) return programaDemo;
       const { data, error } = await referidosApi.rpc("mi_programa_referidos", { p_comercio_id: comercio!.id });
       if (error) throw error;
       return data as ProgramaReferidos | null;
+    },
+  });
+}
+export interface ParticipacionCampana {
+  comercio_id: string;
+  modal_visto_at: string | null;
+  notificacion_leida_at: string | null;
+}
+export function useAdminCampanaReferidos(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin-campana-referidos"], enabled,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
+    queryFn: async () => {
+      const { data: campana, error } = await referidosApi.from("referidos_campanas")
+        .select("*").eq("activa", true).maybeSingle();
+      if (error) throw error;
+      if (!campana || campana.aviso_estado === "eliminado") return null;
+      const participaciones: ParticipacionCampana[] = [];
+      // Leer todas las páginas para no truncar el estado a 1000 comercios.
+      for (let desde = 0; ; desde += 500) {
+        const { data, error: participacionesError } = await referidosApi.from("referidos_participaciones")
+          .select("comercio_id,modal_visto_at,notificacion_leida_at")
+          .eq("campana_id", campana.id).order("comercio_id").range(desde, desde + 499);
+        if (participacionesError) throw participacionesError;
+        participaciones.push(...(data as ParticipacionCampana[]));
+        if (data.length < 500) break;
+      }
+      return { ...campana, participaciones } as { id: string; titulo: string; aviso_estado?: "activo" | "archivado" | "eliminado"; creada_en?: string; mensaje?: string | null; condiciones?: string | null; participaciones: ParticipacionCampana[] };
+    },
+  });
+}
+export function useEditarCampanaReferidos() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { p_id: string; p_titulo: string; p_mensaje: string; p_condiciones: string }) => {
+      const { error } = await referidosApi.rpc("admin_editar_campana_referidos", payload);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await Promise.all([client.invalidateQueries({ queryKey: ["admin-campana-referidos"] }), client.invalidateQueries({ queryKey: ["programa-referidos"] })]);
+    },
+  });
+}
+export function useEstadoAvisoReferidos() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { p_id: string; p_accion: "archivar" | "restaurar" | "eliminar" }) => {
+      const { error } = await referidosApi.rpc("admin_estado_aviso_referidos", payload);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await Promise.all([client.invalidateQueries({ queryKey: ["admin-campana-referidos"] }), client.invalidateQueries({ queryKey: ["programa-referidos"] })]);
     },
   });
 }

@@ -7,17 +7,17 @@ import{tmpdir}from'node:os';import path from'node:path';
 import{build}from'esbuild';import postcss from'postcss';import tailwindcss from'tailwindcss';import WebSocket from'ws';
 const root=process.cwd(),out=path.join(root,'private-backups/referidos-preview');mkdirSync(out,{recursive:true});
 const css=(await postcss([tailwindcss({config:path.join(root,'tailwind.config.ts')})]).process(readFileSync('src/index.css','utf8'),{from:path.join(root,'src/index.css')})).css;
-const states=new Map();let claims=0;
+const states=new Map();let claims=0,lateCampaignActive=false;
 const state=id=>{if(!states.has(id))states.set(id,{campana_id:'vortex-referidos-2026',titulo:'Recomendá Vortex y ganá un mes',codigo:'VX-ABCDEF123456',modal_visto_at:null,notificacion_leida_at:null,pendientes:2,meses_bonificados:1});return states.get(id);};
 const entry=`import React from'react';import{createRoot}from'react-dom/client';import{MemoryRouter}from'react-router-dom';import{QueryClient,QueryClientProvider}from'@tanstack/react-query';import{ModalReferidos,NotificacionReferidos}from'./src/components/referidos/CampanaReferidos';import{LandingContactForm}from'./src/components/landing/LandingContactForm';const landing=location.pathname==='/landing';createRoot(document.getElementById('root')).render(<React.StrictMode><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[landing?'/?ref=VX-DE0000000000#contacto':'/notificaciones']}>{landing?<><div style={{height:1600}}>Landing de prueba</div><section id='contacto'><h2>Contacto</h2><LandingContactForm/></section></>:<main className='mx-auto max-w-4xl space-y-6 p-4 sm:p-8'><h1 className='text-3xl font-bold'>Notificaciones</h1><NotificacionReferidos/><ModalReferidos/></main>}</MemoryRouter></QueryClientProvider></React.StrictMode>);`;
 const bundle=(await build({stdin:{contents:entry,resolveDir:root,loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},plugins:[{name:'isolated-referrals',setup(b){
  b.onResolve({filter:/^@\/hooks\/useComercio$/},()=>({path:'commerce',namespace:'fixture'}));b.onResolve({filter:/^@\/hooks\/use-toast$/},()=>({path:'toast',namespace:'fixture'}));b.onResolve({filter:/^@\/integrations\/supabase\/client$/},()=>({path:'db',namespace:'fixture'}));
  b.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'js',contents:args.path==='commerce'?`export const useComercio=()=>({comercio:{id:new URLSearchParams(location.search).get('tenant')||'a',nombre_comercio:'Comercio de prueba'}});`:args.path==='toast'?`const toast=value=>{window.toasts??=[];window.toasts.push(value)};export const useToast=()=>({toast});`:`export const supabase={rpc(name,args){const promise=fetch('/rpc',{method:'POST',body:JSON.stringify({name,args})}).then(r=>r.json());promise.abortSignal=()=>promise;return promise}};` }));
- b.onLoad({filter:/useReferidos\.ts$/},()=>({loader:'ts',resolveDir:path.join(root,'src/hooks'),contents:readFileSync('src/hooks/useReferidos.ts','utf8').replace('esVistaPreviaReferidos(window.location.hostname)','(esVistaPreviaReferidos(window.location.hostname) && !window.location.pathname.startsWith("/produccion"))')}));
+ b.onLoad({filter:/useReferidos\.ts$/},()=>({loader:'ts',resolveDir:path.join(root,'src/hooks'),contents:readFileSync('src/hooks/useReferidos.ts','utf8').replace('esVistaPreviaReferidos(window.location.hostname)','(esVistaPreviaReferidos(window.location.hostname) && !window.location.pathname.startsWith("/produccion"))').replaceAll('refetchInterval: 30_000','refetchInterval: 200')}));
 }}]})).outputFiles[0].text;
 const server=createServer(async(req,res)=>{
  if(req.url==='/rpc'){let raw='';for await(const part of req)raw+=part;const{name,args}=JSON.parse(raw),data=state(args.p_comercio_id);let value=null;
-  if(name==='mi_programa_referidos')value={...data};
+  if(name==='mi_programa_referidos')value=args.p_comercio_id==='late'&&!lateCampaignActive?null:{...data};
   else if(name==='reclamar_modal_referidos'){value=!data.modal_visto_at;if(value){data.modal_visto_at=new Date().toISOString();claims++;}}
   else if(name==='leer_notificacion_referidos')data.notificacion_leida_at=new Date().toISOString();
   else throw Error('RPC inesperada '+name);
@@ -44,6 +44,9 @@ try{
  await load('/produccion?tenant=a');assert.equal(await modal(),true);assert.equal(claims,1,'StrictMode no duplica reclamacion');await click('Ahora no');assert.equal(await modal(),false);
  await load('/produccion?tenant=a');assert.equal(await modal(),false,'Recarga no repite modal');assert.equal(claims,1);await click('Marcar como leída');assert.ok(await evaluate(`document.body.textContent.includes('Leída')`));assert.ok(await evaluate(`document.querySelector('a[href^="https://wa.me/"]')?.href.includes('VX-ABCDEF123456')`));await capture('notificacion-escritorio');
  await load('/produccion?tenant=b');assert.equal(await modal(),true);assert.equal(claims,2,'Otro comercio recibe su propia presentacion');
- await load('/landing');assert.ok(await evaluate('scrollY>1200'),'El enlace enfoca contacto en primera carga');assert.ok(await evaluate(`document.body.textContent.includes('VX-DE0000000000')`));assert.equal(claims,2);
- console.log('OK UI: modal local reabrible; produccion una vez, StrictMode, recarga y otro comercio; destacada permanece leida; enlace WhatsApp con codigo; contacto en primera apertura. Escritorio y movil. API simulada.');
+ await load('/produccion?tenant=late');assert.equal(await modal(),false,'Sin campaña al abrir sesión');
+ lateCampaignActive=true;await new Promise(r=>setTimeout(r,800));assert.equal(await modal(),true,'Campaña activada con sesión abierta muestra modal sin recargar');assert.equal(claims,3);
+ await click('Ahora no');await new Promise(r=>setTimeout(r,600));assert.equal(await modal(),false,'El sondeo no repite el modal');assert.equal(claims,3);
+ await load('/landing');assert.ok(await evaluate('scrollY>1200'),'El enlace enfoca contacto en primera carga');assert.ok(await evaluate(`document.body.textContent.includes('VX-DE0000000000')`));assert.equal(claims,3);
+ console.log('OK UI: campaña activada con sesión abierta sin recarga y sin repetir modal; modal local reabrible; produccion una vez, StrictMode, recarga y otro comercio; destacada permanece leida; enlace WhatsApp con codigo; contacto en primera apertura. Escritorio y movil. API simulada.');
 }finally{socket?.close();browser?.kill();await new Promise(r=>server.close(r));}

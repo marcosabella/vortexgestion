@@ -33,6 +33,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminCampanaReferidos } from "@/components/referidos/AdminCampanaReferidos";
+import { useGuardarComunicacion, usePresentacionesComunicaciones } from "@/hooks/useComunicaciones";
+import { metadataComunicacion, mensajeCampanaPredeterminado } from "@/utils/comunicaciones";
+import type { Json } from "@/integrations/supabase/types";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "short",
@@ -46,9 +51,11 @@ function formatDate(value: string) {
 function EstadoLectura({
   notificacion,
   comercios,
+  presentacion = false,
 }: {
   notificacion: Notificacion;
   comercios: { id: string; nombre_comercio: string }[];
+  presentacion?: boolean;
 }) {
   const destinatarioIds = notificacion.destinatarios?.length
     ? notificacion.destinatarios
@@ -69,7 +76,7 @@ function EstadoLectura({
         <Button type="button" variant="ghost" size="sm" className="h-auto gap-2 px-2 py-1">
           <Eye className="h-4 w-4" />
           <Badge variant={todasLeidas ? "default" : "secondary"}>
-            {total === 1 ? (leidas === 1 ? "Leida" : "No leida") : `${leidas}/${total} leidas`}
+            {presentacion ? `${leidas}/${total} modales cerrados` : total === 1 ? (leidas === 1 ? "Leida" : "No leida") : `${leidas}/${total} leidas`}
           </Badge>
         </Button>
       </PopoverTrigger>
@@ -89,7 +96,7 @@ function EstadoLectura({
                   <div>
                     <p className="font-medium">{nombres.get(id) || "Comercio"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {readAt ? `Leida el ${formatDate(readAt)}` : "No leida"}
+                      {presentacion ? readAt ? `Modal cerrado el ${formatDate(readAt)}` : "Presentación pendiente" : readAt ? `Leida el ${formatDate(readAt)}` : "No leida"}
                     </p>
                   </div>
                 </div>
@@ -126,17 +133,22 @@ export default function AdminNotificaciones() {
   const { comerciosQuery } = useAdminComercios();
   const {
     notificacionesQuery,
-    crearNotificacion,
     desactivarNotificacion,
     reactivarNotificacion,
-    modificarNotificacion,
     eliminarNotificacion,
   } = useAdminNotificaciones();
+  const crearNotificacion = useGuardarComunicacion();
+  const modificarNotificacion = useGuardarComunicacion();
+  const presentaciones = usePresentacionesComunicaciones(isAdmin === true);
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [metadata, setMetadata] = useState<Record<string, Json | undefined>>({});
+  const [vistaPrevia, setVistaPrevia] = useState(false);
+  const [esReenvio, setEsReenvio] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [categoria, setCategoria] = useState<NotificacionCategoria>("general");
-  const [prioridad, setPrioridad] = useState<NotificacionPrioridad>("normal");
+  const [prioridad, setPrioridad] = useState<NotificacionPrioridad | "destacada">("normal");
   const [destino, setDestino] = useState<"todos" | "seleccionados">("todos");
   const [selectedComercios, setSelectedComercios] = useState<string[]>([]);
   const [comprobanteNumero, setComprobanteNumero] = useState("");
@@ -160,6 +172,9 @@ export default function AdminNotificaciones() {
   }
 
   const resetForm = () => {
+    setMostrarModal(false);
+    setMetadata({});
+    setEsReenvio(false);
     setEditingId(null);
     setTitulo("");
     setMensaje("");
@@ -173,12 +188,15 @@ export default function AdminNotificaciones() {
     setComprobantePeriodo("");
   };
 
-  const startEditing = (notificacion: Notificacion) => {
-    setEditingId(notificacion.id);
+  const startEditing = (notificacion: Notificacion, reenviar = false) => {
+    setEditingId(reenviar ? null : notificacion.id);
+    setEsReenvio(reenviar);
+    setMetadata(metadataComunicacion(notificacion.metadata));
+    setMostrarModal(metadataComunicacion(notificacion.metadata).mostrar_modal === true);
     setTitulo(notificacion.titulo);
     setMensaje(notificacion.mensaje);
     setCategoria(notificacion.categoria);
-    setPrioridad(notificacion.prioridad);
+    setPrioridad(metadataComunicacion(notificacion.metadata).destacada === true ? "destacada" : notificacion.prioridad);
     setDestino(notificacion.destinatarios?.length ? "seleccionados" : "todos");
     setSelectedComercios(notificacion.destinatarios || []);
     setComprobanteNumero(notificacion.comprobante_numero || "");
@@ -202,7 +220,8 @@ export default function AdminNotificaciones() {
         titulo,
         mensaje,
         categoria,
-        prioridad,
+        prioridad: prioridad === "destacada" ? "alta" as const : prioridad,
+        metadata: { ...metadata, mostrar_modal: mostrarModal, destacada: prioridad === "destacada" } as Json,
         comercioIds: destino === "todos" ? [] : selectedComercios,
         comprobante_numero: comprobanteNumero,
         comprobante_fecha: comprobanteFecha,
@@ -219,7 +238,7 @@ export default function AdminNotificaciones() {
   };
 
   return (
-    <div className="container mx-auto space-y-6 p-8">
+    <div className="container mx-auto space-y-6 p-4 sm:p-8">
       <div>
         <h1 className="text-3xl font-bold">Centro de notificaciones</h1>
         <p className="text-sm text-muted-foreground">
@@ -228,9 +247,9 @@ export default function AdminNotificaciones() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:w-[520px]">
-          <TabsTrigger value="carga">Carga de notificaciones</TabsTrigger>
-          <TabsTrigger value="historial">Historial de notificaciones</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 md:w-[520px]">
+          <TabsTrigger value="carga" className="whitespace-normal text-xs sm:text-sm">Carga de notificaciones</TabsTrigger>
+          <TabsTrigger value="historial" className="whitespace-normal text-xs sm:text-sm">Historial de notificaciones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="carga" className="mt-0">
@@ -243,16 +262,16 @@ export default function AdminNotificaciones() {
         </CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="min-w-48 flex-1 space-y-2">
                 <Label htmlFor="titulo">Titulo</Label>
-                <Input id="titulo" value={titulo} onChange={(event) => setTitulo(event.target.value)} required />
+                <Input id="titulo" value={titulo} onChange={(event) => setTitulo(event.target.value)} required maxLength={200} />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-wrap items-end gap-3" data-opciones-notificacion>
                 <div className="space-y-2">
-                  <Label>Categoria</Label>
+                  <Label htmlFor="categoria-notificacion">Categoria</Label>
                   <Select value={categoria} onValueChange={(value) => setCategoria(value as NotificacionCategoria)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="categoria-notificacion" className="w-auto min-w-32 gap-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -265,19 +284,23 @@ export default function AdminNotificaciones() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Prioridad</Label>
-                  <Select value={prioridad} onValueChange={(value) => setPrioridad(value as NotificacionPrioridad)}>
-                    <SelectTrigger>
+                  <Label htmlFor="prioridad-notificacion">Prioridad</Label>
+                  <Select value={prioridad} onValueChange={(value) => setPrioridad(value as NotificacionPrioridad | "destacada")}>
+                    <SelectTrigger id="prioridad-notificacion" aria-label="Prioridad" className="w-auto min-w-28 gap-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(prioridadLabels).map(([value, label]) => (
+                      {Object.entries({ ...prioridadLabels, destacada: "Destacada" }).map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex h-10 items-center gap-2">
+                  <Checkbox id="mostrar-modal" checked={mostrarModal} onCheckedChange={checked => setMostrarModal(checked === true)} />
+                  <Label htmlFor="mostrar-modal" className="whitespace-nowrap">Mostrar también como modal</Label>
                 </div>
               </div>
             </div>
@@ -289,8 +312,15 @@ export default function AdminNotificaciones() {
                 value={mensaje}
                 onChange={(event) => setMensaje(event.target.value)}
                 required
+                maxLength={10000}
                 rows={5}
               />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Se presenta a los administradores de los comercios destinatarios en Inicio, Caja o Notificaciones, incluso con la sesión abierta. Al cerrarlo queda registrado para no repetirlo.</p>
+              {editingId && <p className="text-xs text-muted-foreground">Guardar cambios conserva las lecturas y presentaciones. Para mostrarlo otra vez, prepará un reenvío desde el historial.</p>}
+              {esReenvio && <p className="text-sm font-medium">Estás preparando un nuevo envío. Revisá los textos, el modal y los destinatarios antes de enviarlo. El historial anterior se conserva.</p>}
             </div>
 
             <div className="space-y-3 rounded-md border p-4">
@@ -354,7 +384,8 @@ export default function AdminNotificaciones() {
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setVistaPrevia(true)}>Vista previa</Button>
               <Button
                 type="submit"
                 variant="success"
@@ -373,7 +404,7 @@ export default function AdminNotificaciones() {
                       ? "Guardar cambios"
                       : "Enviar notificacion"}
               </Button>
-              {editingId && (
+              {(editingId || esReenvio) && (
                 <Button type="button" variant="outline" onClick={resetForm} disabled={modificarNotificacion.isPending}>
                   <X className="h-4 w-4" />
                   Cancelar
@@ -385,7 +416,7 @@ export default function AdminNotificaciones() {
       </Card>
         </TabsContent>
 
-        <TabsContent value="historial" className="mt-0">
+        <TabsContent value="historial" className="mt-0 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -408,6 +439,15 @@ export default function AdminNotificaciones() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              <AdminCampanaReferidos enabled={isAdmin === true} comercios={comercios} onReenviar={campana => {
+                resetForm();
+                setTitulo(campana.titulo);
+                setMensaje(campana.mensaje || mensajeCampanaPredeterminado);
+                setMostrarModal(true);
+                setMetadata({ tipo: "campana_referidos", campana_id: campana.id });
+                setEsReenvio(true);
+                setActiveTab("carga");
+              }} />
               {notificacionesQuery.isLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground">
@@ -417,7 +457,7 @@ export default function AdminNotificaciones() {
               ) : (notificacionesQuery.data || []).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No hay notificaciones enviadas.
+                    No hay otros avisos en el historial.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -428,6 +468,8 @@ export default function AdminNotificaciones() {
                       <div className="flex items-center gap-2">
                         {(notificacion.comprobante_numero || notificacion.comprobante_monto) && <ReceiptText className="h-4 w-4" />}
                         {notificacion.titulo}
+                        {metadataComunicacion(notificacion.metadata).destacada === true && <Badge>Destacada</Badge>}
+                        {metadataComunicacion(notificacion.metadata).mostrar_modal === true && <Badge variant="outline">Modal</Badge>}
                       </div>
                     </TableCell>
                     <TableCell>{categoriaLabels[notificacion.categoria]}</TableCell>
@@ -438,6 +480,11 @@ export default function AdminNotificaciones() {
                     </TableCell>
                     <TableCell>
                       <EstadoLectura notificacion={notificacion} comercios={comercios} />
+                      {metadataComunicacion(notificacion.metadata).mostrar_modal === true && (
+                        presentaciones.isError ? <p className="text-xs text-destructive">No se pudo cargar el estado del modal.</p>
+                          : presentaciones.isPending ? <p className="text-xs text-muted-foreground">Cargando presentaciones...</p>
+                          : <EstadoLectura presentacion notificacion={{ ...notificacion, lecturas: presentaciones.data.filter(item => item.notificacion_id === notificacion.id).map(item => ({ comercio_id: item.comercio_id, read_at: item.presentada_at })) }} comercios={comercios} />
+                      )}
                     </TableCell>
                     <TableCell><EstadoCobroMembresia notificacion={notificacion} /></TableCell>
                     <TableCell>
@@ -447,6 +494,9 @@ export default function AdminNotificaciones() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                      <Button type="button" variant="outline" size="sm" title="Preparar reenvío como un nuevo aviso" onClick={() => startEditing(notificacion, true)}>
+                        <Send className="h-4 w-4" /><span className="sr-only">Preparar reenvío</span>
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -526,6 +576,13 @@ export default function AdminNotificaciones() {
       </Card>
         </TabsContent>
       </Tabs>
+      <Dialog open={vistaPrevia} onOpenChange={setVistaPrevia}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader><DialogTitle>{titulo || "Título del aviso"}</DialogTitle><DialogDescription>Vista previa · {mostrarModal ? "aviso con modal" : "aviso en Notificaciones"}</DialogDescription></DialogHeader>
+          <p className="whitespace-pre-line break-words text-sm leading-6">{mensaje || "Mensaje del aviso"}</p>
+          <Button onClick={() => setVistaPrevia(false)}>Cerrar vista previa</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

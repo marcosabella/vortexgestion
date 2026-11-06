@@ -58,7 +58,7 @@ import AdminMigraciones from "./pages/AdminMigraciones";
 import AdminIncidentes from "./pages/AdminIncidentes";
 import AdminConsultasLanding from "./pages/AdminConsultasLanding";
 import AdminReferidos from "./pages/AdminReferidos";
-import { ModalReferidos } from "@/components/referidos/CampanaReferidos";
+import { ModalesComunicaciones } from "@/components/ModalesComunicaciones";
 import { IncidentesMonitor } from "@/components/IncidentesMonitor";
 import { crearCachesIncidentes } from "@/utils/incidentesQuery";
 import Notificaciones from "./pages/Notificaciones";
@@ -374,7 +374,7 @@ function AuthenticatedLayout() {
             </Routes></RestauranteAcceso>}
           </main>
           {!terminalRestaurante && <MembershipReminder comercio={comercio} onVisibilityChange={setMembershipOpen} />}
-          <ModalReferidos bloqueado={terminalRestaurante || seleccionRequerida || membershipOpen} />
+          <ModalesComunicaciones bloqueado={terminalRestaurante || seleccionRequerida || membershipOpen} />
           <Dialog open={seleccionRequerida} onOpenChange={() => undefined}>
             <DialogContent className="sm:max-w-xl [&>button]:hidden" onEscapeKeyDown={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
               <DialogHeader>

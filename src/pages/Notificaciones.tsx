@@ -257,7 +257,7 @@ function NotificacionItem({
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{categoriaLabels[notificacion.categoria]}</Badge>
               <Badge variant={notificacion.prioridad === "alta" ? "destructive" : "outline"}>
-                {prioridadLabels[notificacion.prioridad]}
+              {metadata.destacada === true ? "Destacada" : prioridadLabels[notificacion.prioridad]}
               </Badge>
               <span className="text-xs text-muted-foreground">{formatDate(notificacion.created_at)}</span>
             </div>

@@ -1,4 +1,6 @@
 export type ProgramaReferidos = {
+  aviso_estado?: "activo" | "archivado" | "eliminado";
+  mensaje?: string | null; condiciones?: string | null;
   campana_id: string; titulo: string; codigo: string; modal_visto_at: string | null;
   notificacion_leida_at: string | null; pendientes: number; meses_bonificados: number;
 };
