@@ -1,0 +1,20 @@
+-- Cambio de configuración autorizado para demo@demo.com. No crea datos de ejemplo.
+BEGIN;
+DO $$
+DECLARE destino uuid; cantidad integer;
+BEGIN
+  SELECT count(*),min(cu.comercio_id::text)::uuid INTO cantidad,destino
+  FROM auth.users u JOIN public.comercio_usuarios cu ON cu.user_id=u.id
+  JOIN public.comercio c ON c.id=cu.comercio_id
+  WHERE lower(u.email)='demo@demo.com' AND cu.activo AND cu.rol='admin' AND c.activo;
+  IF cantidad<>1 OR destino IS DISTINCT FROM '253d8d21-e5e9-4ceb-92fd-9baa41f731a5'::uuid THEN
+    RAISE EXCEPTION 'No se pudo identificar de forma unívoca el comercio demo autorizado';
+  END IF;
+  UPDATE public.comercio_parametrizacion
+    SET parametros=jsonb_set(parametros,'{modulos}',coalesce(parametros->'modulos','{}'::jsonb)||'{"apicola":true}'::jsonb,true)
+    WHERE comercio_id=destino;
+  IF NOT FOUND THEN RAISE EXCEPTION 'El comercio demo no tiene parametrización'; END IF;
+END; $$;
+SELECT comercio_id,parametros->'modulos'->'apicola' AS apicola_habilitado
+FROM public.comercio_parametrizacion WHERE comercio_id='253d8d21-e5e9-4ceb-92fd-9baa41f731a5';
+COMMIT;

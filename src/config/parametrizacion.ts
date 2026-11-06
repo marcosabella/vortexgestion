@@ -19,6 +19,7 @@ export type ModuloSistema =
   | "gastos_egresos"
   | "extintores"
   | "campo"
+  | "apicola"
   | "distribucion"
   | "restaurante"
   | "taller"
@@ -81,6 +82,7 @@ export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; descrip
   { key: "gastos_egresos", label: "Gastos y egresos", description: "Registro de gastos, pagos y obligaciones del comercio." },
   { key: "extintores", label: "Extintores", description: "Asignacion y seguimiento de extintores por cliente." },
   { key: "campo", label: "Vortex Campo", description: "Consulta de establecimientos y lotes del comercio." },
+  { key: "apicola", label: "Vortex Apícola", description: "Campañas, apiarios, colmenas, cuaderno de visitas, sanidad, existencias y agenda." },
   { key: "distribucion", label: "Vortex Distribución", description: "Pedidos, preparación, reparto, entregas parciales, devoluciones y rendición." },
   { key: "restaurante", label: "Vortex Restaurante / Delivery", description: "Mesas, pedidos, comandas, cocina, entregas, cobros y cierre." },
   { key: "taller", label: "Vortex Taller", description: "Vehículos, órdenes, repuestos, mano de obra, turnos e historial integrados con presupuestos y ventas." },
@@ -114,6 +116,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     whatsapp: false,
     extintores: false,
     campo: false,
+    apicola: false,
     distribucion: false,
     taller: false,
     restaurante: false,

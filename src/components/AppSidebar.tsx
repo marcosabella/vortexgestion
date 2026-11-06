@@ -32,13 +32,15 @@ import {
   CalendarDays,
   UtensilsCrossed,
   Calculator,
+  Hexagon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ModuloSistema } from "@/config/parametrizacion";
 import { restauranteSecciones, restaurantePermisoVista } from "@/config/restauranteNavigation";
 import { distribucionSecciones } from "@/config/distribucionNavigation";
 import { utilidadesSecciones } from "@/config/utilidadesNavigation";
+import { apicolaGruposDisponibles } from "@/config/apicolaNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { useCampoAccess } from "@/hooks/useCampoAccess";
 import { useComercio } from "@/hooks/useComercio";
@@ -70,6 +72,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -78,6 +83,7 @@ type MenuItem = {
   url: string;
   icon: typeof Banknote;
   modulo?: ModuloSistema;
+  grupo?: string;
 };
 
 type GroupKey =
@@ -87,6 +93,7 @@ type GroupKey =
   | "tesoreria"
   | "utilidades"
   | "campo"
+  | "apicola"
   | "taller"
   | "restaurante"
   | "distribucion"
@@ -170,6 +177,7 @@ const tallerItems: MenuItem[] = [
   { title: "Agenda y próximos servicios", url: "/taller/agenda", icon: CalendarDays },
   { title: "Técnicos", url: "/taller/tecnicos", icon: Users },
 ];
+const apicolaItems: MenuItem[] = apicolaGruposDisponibles.flatMap(grupo => grupo.opciones.map(item => ({ title: item.titulo, url: item.url, icon: item.icon, grupo: grupo.opciones.length > 1 ? grupo.titulo : undefined })));
 
 const restauranteItems: MenuItem[] = restauranteSecciones.map(({ title, vista, icon }) => ({ title, url: `/restaurante/${vista}`, icon }));
 const distribucionItems: MenuItem[] = distribucionSecciones.map(({ title, url, icon }) => ({ title, url, icon }));
@@ -186,6 +194,7 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   tesoreria: false,
   utilidades: false,
   campo: false,
+  apicola: false,
   taller: false,
   distribucion: false,
   restaurante: false,
@@ -207,6 +216,7 @@ const pathMatches = (currentPath: string, path: string) =>
 const getGroupForPath = (path: string): GroupKey | null => {
   if (pathMatches(path, "/utilidades")) return "utilidades";
   if (path.startsWith("/campo")) return "campo";
+  if (pathMatches(path, "/apicola")) return "apicola";
   if (path.startsWith("/taller")) return "taller";
   if (pathMatches(path, "/restaurante")) return "restaurante";
   if (pathMatches(path, "/distribucion")) return "distribucion";
@@ -225,6 +235,7 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const currentPath = useLocation().pathname;
   const collapsed = state === "collapsed";
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<GroupKey, boolean>>(() => {
     const initial = emptyOpenGroups();
     const activeGroup = getGroupForPath(currentPath);
@@ -263,6 +274,10 @@ export function AppSidebar() {
       ? current
       : { ...current, [activeGroup]: true });
   }, [currentPath]);
+  useEffect(() => {
+    const section = apicolaItems.find(item => pathMatches(currentPath, item.url))?.grupo;
+    if (section) setOpenSections(current => current[section] ? current : { ...current, [section]: true });
+  }, [currentPath]);
 
   const isActive = (path: string) => currentPath === path;
   const closeMobileMenu = () => {
@@ -278,7 +293,20 @@ export function AppSidebar() {
     ? pedidosSinVer > 99 ? "99+" : String(pedidosSinVer)
     : null;
 
-  const renderSubItems = (items: MenuItem[]) => items.map((item) => {
+  const renderSubItems = (items: MenuItem[]): ReactNode => items.map((item, index) => {
+    if (item.grupo) {
+      if (item.grupo === items[index - 1]?.grupo) return null;
+      const grupo = item.grupo;
+      const children = items.filter(child => child.grupo === grupo).map(child => ({ ...child, grupo: undefined }));
+      const SectionIcon = children[0].icon;
+      const open = openSections[grupo] ?? isGroupActive(children);
+      return <Collapsible asChild key={grupo} open={open} onOpenChange={value => setOpenSections(current => ({ ...current, [grupo]: value }))}>
+        <SidebarMenuSubItem>
+          <CollapsibleTrigger asChild><SidebarMenuSubButton asChild className={`w-full gap-1.5 ${isGroupActive(children) ? "bg-sidebar-accent/50" : ""}`}><button type="button" title={grupo}><SectionIcon className="h-4 w-4" /><span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">{grupo}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} /></button></SidebarMenuSubButton></CollapsibleTrigger>
+          <CollapsibleContent><SidebarMenuSub className="mx-0 ml-2 px-1">{renderSubItems(children)}</SidebarMenuSub></CollapsibleContent>
+        </SidebarMenuSubItem>
+      </Collapsible>;
+    }
     const badge = unreadBadge(item);
     return (
       <SidebarMenuSubItem key={item.url}>
@@ -291,6 +319,16 @@ export function AppSidebar() {
         </SidebarMenuSubButton>
       </SidebarMenuSubItem>
     );
+  });
+
+  const renderDropdownItems = (items: MenuItem[]): ReactNode => items.map((item, index) => {
+    if (item.grupo) {
+      if (item.grupo === items[index - 1]?.grupo) return null;
+      const children = items.filter(child => child.grupo === item.grupo).map(child => ({ ...child, grupo: undefined }));
+      return <DropdownMenuSub key={item.grupo}><DropdownMenuSubTrigger>{item.grupo}</DropdownMenuSubTrigger><DropdownMenuSubContent className="w-60">{renderDropdownItems(children)}</DropdownMenuSubContent></DropdownMenuSub>;
+    }
+    const badge = unreadBadge(item);
+    return <DropdownMenuItem key={item.url} asChild><NavLink to={item.url} end onClick={closeMobileMenu} className={isActive(item.url) ? "bg-accent" : ""}><item.icon className="mr-2 h-4 w-4" /><span>{item.title}</span>{badge && <span className="ml-auto rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">{badge}</span>}</NavLink></DropdownMenuItem>;
   });
 
   const renderCollapsedGroup = (
@@ -314,23 +352,7 @@ export function AppSidebar() {
         </SidebarMenuItem>
         <DropdownMenuContent side="right" align="start" className="w-64">
           <DropdownMenuLabel>{label}</DropdownMenuLabel>
-          {items.map((item) => {
-            const badge = unreadBadge(item);
-            return (
-              <DropdownMenuItem key={item.url} asChild>
-                <NavLink
-                  to={item.url}
-                  end
-                  onClick={closeMobileMenu}
-                  className={isActive(item.url) ? "bg-accent" : ""}
-                >
-                  <item.icon className="mr-2 h-4 w-4" />
-                  <span>{item.title}</span>
-                  {badge && <span className="ml-auto rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">{badge}</span>}
-                </NavLink>
-              </DropdownMenuItem>
-            );
-          })}
+          {renderDropdownItems(items)}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -413,6 +435,7 @@ export function AppSidebar() {
               {renderCollapsibleGroup("tesoreria", "Tesorería", Banknote, enabledTesoreriaItems)}
               {parametrizacion.modulos.utilidades && renderCollapsibleGroup("utilidades", "Utilidades", Calculator, utilidadesItems)}
               {parametrizacion.modulos.campo && renderCollapsibleGroup("campo", "Vortex Campo", Sprout, enabledCampoItems)}
+              {parametrizacion.modulos.apicola && renderCollapsibleGroup("apicola", "Vortex Apícola", Hexagon, apicolaItems)}
               {parametrizacion.modulos.taller && renderCollapsibleGroup("taller", "Vortex Taller", Wrench, tallerItems)}
               {parametrizacion.modulos.restaurante && renderCollapsibleGroup("restaurante", "Vortex Restaurante", UtensilsCrossed, restauranteItems)}
               {parametrizacion.modulos.distribucion && renderCollapsibleGroup("distribucion", "Vortex Distribución", Truck, distribucionItems)}

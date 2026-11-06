@@ -97,6 +97,7 @@ import CampoParteDetalle from "./pages/CampoParteDetalle";
 import CampoPartesPendientes from "./pages/CampoPartesPendientes";
 import CampoTelemetria from "./pages/CampoTelemetria";
 import CampoTelemetriaDetalle from "./pages/CampoTelemetriaDetalle";
+import Apicola from "./pages/Apicola";
 import InicioOperativo from "./pages/InicioOperativo";
 import Compras from "./pages/Compras";
 import NuevaCompra from "./pages/NuevaCompra";
@@ -330,6 +331,8 @@ function AuthenticatedLayout() {
               <Route path="/cheques" element={<ParametrizedRoute modulo="cheques"><Cheques /></ParametrizedRoute>} />
               <Route path="/cheques/nuevo" element={<ParametrizedRoute modulo="cheques"><NuevoCheque /></ParametrizedRoute>} />
               <Route path="/campo" element={<Navigate to="/campo/establecimientos" replace />} />
+              <Route path="/apicola" element={<ParametrizedRoute modulo="apicola"><Navigate to="/apicola/resumen" replace /></ParametrizedRoute>} />
+              <Route path="/apicola/:vista" element={<ParametrizedRoute modulo="apicola"><Apicola /></ParametrizedRoute>} />
               <Route path="/taller" element={<ParametrizedRoute modulo="taller"><Taller seccion="resumen" /></ParametrizedRoute>} />
               <Route path="/restaurante" element={<ParametrizedRoute modulo="restaurante"><Navigate to="/restaurante/pedidos" replace /></ParametrizedRoute>} />
               {restauranteSecciones.map(({ vista }) => <Route key={vista} path={`/restaurante/${vista}`} element={<ParametrizedRoute modulo="restaurante"><Restaurante vista={vista} /></ParametrizedRoute>} />)}
