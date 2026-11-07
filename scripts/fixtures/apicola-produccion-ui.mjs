@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+export async function probarProduccionUi({ load, click, evaluate, capture, pg }) {
+  const fill = async (key, value) => evaluate(`(()=>{const e=document.getElementById(${JSON.stringify(key)});if(!e)throw Error('Campo no encontrado: '+${JSON.stringify(key)});const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));})()`);
+  const guardar = async () => { await click('Guardar registro'); assert.equal(await evaluate(`!!document.querySelector('[role="dialog"]')`), false, await evaluate(`document.querySelector('[role="alert"]')?.textContent||'No se cerró el formulario'`)); };
+  const campana = pg.sql('SELECT id FROM apicola_campanas LIMIT 1;'), apiario = pg.sql('SELECT id FROM apicola_apiarios LIMIT 1;');
+  await load('salas'); await click('Registrar sala');
+  await fill('cal-codigo', 'S-UI'); await fill('cal-nombre', 'Sala externa local'); await fill('cal-tipo', 'externa'); await fill('cal-habilitacion', 'REG-LOCAL'); await guardar();
+  const sala = pg.sql("SELECT id FROM apicola_salas WHERE codigo='S-UI';");
+  await load('cosechas', 390); await click('Registrar cosecha');
+  await fill('prod-codigo', 'COS-UI'); await fill('prod-campana', campana); await fill('prod-apiario', apiario); await fill('prod-responsable', 'Operador local'); await fill('prod-alzas', '10');
+  await capture('produccion-cosecha-movil'); assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'), true); await guardar();
+  const cosecha = pg.sql("SELECT id FROM apicola_cosechas WHERE codigo='COS-UI';");
+  await load('extracciones'); await click('Registrar extraccion');
+  await fill('prod-codigo', 'EXT-UI'); await fill('prod-campana', campana); await fill('prod-responsable', 'Responsable local'); await fill('prod-sala', sala); await fill('prod-kg', '300.5'); await fill('prod-lote_codigo', 'MIEL-UI'); await fill('prod-floracion', 'Multifloral'); await fill('prod-humedad', '17.5'); await fill('origen-' + cosecha, '8'); await guardar();
+  const lote = pg.sql("SELECT id FROM apicola_lotes WHERE codigo='MIEL-UI';");
+  assert.equal(pg.sql('SELECT sum(alzas) FROM apicola_extraccion_origenes;'), '8');
+  await load('tambores', 390); await click('Registrar tambor');
+  await fill('prod-codigo', 'TAM-UI'); await fill('prod-lote', lote); await fill('prod-bruto', '210.5'); await fill('prod-tara', '10'); await fill('prod-ubicacion', 'Depósito local'); await guardar();
+  await click('Ver trazabilidad');
+  assert.ok(await evaluate(`document.querySelector('[role="dialog"]').textContent.includes('COS-UI')&&document.querySelector('[role="dialog"]').textContent.includes('100')`), 'Trazabilidad hasta cosecha y saldo a granel');
+  await capture('produccion-trazabilidad-movil'); assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'), true);
+  await load('analisis'); await click('Registrar análisis');
+  await fill('cal-lote', lote); await fill('cal-muestra', 'MUESTRA-UI'); await fill('cal-laboratorio', 'Laboratorio local'); await fill('cal-resultado', 'conforme'); await fill('cal-humedad', '17'); await fill('cal-informe', 'Informe local DOC-UI conforme'); await guardar();
+  await load('stock'); await click('Liberar lote'); await fill('cal-motivo', 'Informe conforme revisado'); await click('Confirmar decisión');
+  assert.equal(pg.sql("SELECT estado_calidad FROM apicola_lotes WHERE codigo='MIEL-UI';"), 'liberado');
+  await capture('produccion-stock-escritorio');
+  await load('stock', 390); assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'), true); await capture('produccion-stock-movil');
+  await load('extracciones?actor=operator'); assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Registrar extraccion'))`), false);
+  await load('cosechas?actor=operator'); assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Registrar cosecha'))`), true);
+  console.log('OK UI etapa 2: sala, cosecha, extracción, lote, tambor, trazabilidad, análisis, liberación, stock, permisos y móvil.');
+}

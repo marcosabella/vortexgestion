@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { idApicola as id,literalSql as lit } from './apicola-pg.mjs';
+import { sembrarDocumentosEconomicos } from './apicola-economia-pg.mjs';
+export async function probarComercialUi({load,click,evaluate,capture,pg}) {
+ if(pg.sql('SELECT count(*) FROM compras;')==='0') sembrarDocumentosEconomicos(pg);
+ const auth=`SET app.actor='${id(1)}';SET ROLE authenticated;`;
+ const op=(accion,d)=>JSON.parse(pg.sql(auth+`SELECT apicola_produccion_operar('${id(10)}',${lit(accion)},${lit(JSON.stringify(d))}::jsonb,'${randomUUID()}');`));
+ const campana=pg.sql('SELECT id FROM apicola_campanas LIMIT 1;'),apiario=pg.sql('SELECT id FROM apicola_apiarios LIMIT 1;'),hoy=pg.sql('SELECT current_date;');
+ const cosecha=op('cosecha',{campana_id:campana,apiario_id:apiario,fecha:hoy,codigo:'C-TRAZA',alzas:10,responsable:'Operador local'}),sala=op('sala',{codigo:'S-TRAZA',nombre:'Sala de trazabilidad',tipo:'propia'});
+ const extraccion=op('extraccion',{campana_id:campana,fecha:hoy,codigo:'E-TRAZA',sala_id:sala.id,responsable:'Operador local',kg:100,lote_codigo:'MIEL-TRAZA',origenes:[{cosecha_id:cosecha.id,alzas:10}]});
+ const lote=extraccion.lote_id;op('analisis',{lote_id:lote,fecha:hoy,muestra:'M-TRAZA',laboratorio:'Laboratorio local',resultado:'conforme',informe:'Informe conforme para prueba local'});op('liberar_lote',{lote_id:lote,version:2,motivo:'Informe conforme revisado'});
+ const tambor=op('tambor',{lote_id:lote,codigo:'T-TRAZA',fecha:hoy,bruto:70,tara:10,ubicacion:'Depósito local'});
+ pg.sql(`INSERT INTO productos(id,comercio_id,cod_producto,descripcion,stock,precio_costo) VALUES('${id(90)}','${id(10)}','ENV-UI','Envase de prueba',200,10);
+  INSERT INTO venta_items(id,comercio_id,venta_id,cantidad,descripcion_manual) VALUES('${id(91)}','${id(10)}','${id(42)}',100,'Frascos 500 g de prueba');
+  INSERT INTO pagos_venta(id,comercio_id,venta_id,tipo_pago,monto) VALUES('${id(92)}','${id(10)}','${id(42)}','transferencia',250);`);
+ const fill=async(key,value)=>evaluate(`(()=>{const e=document.getElementById(${JSON.stringify(key)});if(!e)throw Error('Campo no encontrado: '+${JSON.stringify(key)});const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));})()`);
+ const pause=ms=>new Promise(r=>setTimeout(r,ms));
+ const wait=async expression=>{for(let i=0;i<50&&!await evaluate(expression);i++)await pause(150);assert.ok(await evaluate(expression),expression);};
+ const guardar=async boton=>{await click(boton);await wait(`!document.querySelector('[role="dialog"]')||!!document.querySelector('[role="dialog"] [role="alert"]')`);assert.equal(await evaluate(`!!document.querySelector('[role="dialog"]')`),false,await evaluate(`document.querySelector('[role="alert"]')?.textContent||'Formulario sin cerrar'`));};
+ await load('fraccionado',390);await click('Registrar fraccionado');await fill('com-lote',lote);await fill('com-origen','tambor');await fill('com-tambor',tambor.id);await fill('com-codigo','F-TRAZA');await fill('com-presentacion','Frasco de 500 g');await fill('com-unidades','100');await fill('com-merma_kg','1');await fill('com-responsable','Operador local');
+ await wait(`!![...document.querySelectorAll('button')].find(b=>b.textContent==='Agregar insumo')`);await click('Agregar insumo');await fill('com-insumo-0',id(90));await fill('com-insumo-cantidad-0','100');await capture('comercial-fraccionado-movil');assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);await guardar('Guardar fraccionamiento');
+ assert.equal(pg.sql(`SELECT stock FROM productos WHERE id='${id(90)}';`),'100');const frac=pg.sql("SELECT id FROM apicola_fraccionamientos WHERE codigo='F-TRAZA';");
+ await load('salidas');await click('Registrar salida');await fill('com-lote',lote);await fill('com-origen','fraccionado');await fill('com-fraccionamiento',frac);await wait(`!!document.querySelector('#com-item option[value="${id(91)}"]')`);await fill('com-item',id(91));await fill('com-cantidad','20');await guardar('Guardar salida');
+ const saldo=()=>JSON.parse(pg.sql(auth+`SELECT apicola_stock_consultar('${id(10)}');`)).lotes.find(l=>l.id===lote);assert.equal(saldo().disponible_kg,89);
+ await capture('comercial-salidas-escritorio');await load('salidas',390);await click('Registrar devolución');await fill('com-retorno-cantidad','5');await fill('com-retorno-motivo','Retorno físico de cinco frascos');await guardar('Confirmar devolución');assert.equal(saldo().disponible_kg,91.5);assert.equal(saldo().estado_calidad,'bloqueado');
+ await load('devoluciones',390);assert.ok(await evaluate(`document.body.textContent.includes('Retorno físico de cinco frascos')`));await capture('comercial-devoluciones-movil');
+ await load('stock',390);await fill('apicola-filtro-apiario',apiario);await pause(300);assert.ok(await evaluate(`document.body.textContent.includes('91,5')`));await capture('comercial-stock-movil');
+ await load('lotes?lote='+lote);await wait(`!!document.querySelector('[role="dialog"]')`);await wait(`document.querySelector('[role="dialog"]').textContent.includes('VENTA-APICOLA')`);await capture('comercial-trazabilidad-escritorio');
+ await load('caja',390);await click('Asignar cobro o pago');await wait(`!!document.querySelector('#caj-fuente option[value="cobro_venta|${id(92)}"]')`);await fill('caj-fuente','cobro_venta|'+id(92));await fill('caj-campana',campana);await fill('caj-apiario',apiario);await fill('caj-importe','100');await fill('caj-criterio','Cobro asignado al apiario');await guardar('Guardar asignación de caja');
+ await click('Asignar cobro o pago');await wait(`!!document.querySelector('#caj-fuente option[value="gasto_pagado|${id(41)}"]')`);await fill('caj-fuente','gasto_pagado|'+id(41));await fill('caj-campana',campana);await fill('caj-apiario',apiario);await fill('caj-importe','40');await fill('caj-criterio','Pago asignado al apiario');await guardar('Guardar asignación de caja');
+ assert.equal(JSON.parse(pg.sql(auth+`SELECT apicola_caja_consultar('${id(10)}');`)).resumen[0].resultado,60);await capture('comercial-caja-movil');assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+ await load('resultados');await fill('val-precio','10');await click('Calcular estimación');await wait(`document.body.textContent.includes('Valor orientativo:')`);await capture('comercial-valoracion-escritorio');
+ await load('caja?actor=operator');assert.ok(await evaluate(`document.body.textContent.includes('disponible para administración')`));
+ await load('fraccionado?actor=operator');assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(b=>b.textContent==='Registrar fraccionado')`),false);assert.equal(await evaluate(`document.body.textContent.includes('costo de referencia')`),false);
+ console.log('OK UI comercial: fraccionado, envases, salida, devolución, calidad, stock actualizado, trazabilidad, caja, valorización, permisos y móvil.');
+}

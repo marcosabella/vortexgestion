@@ -17,6 +17,10 @@ export type ApicolaInforme = {
 };
 export const recursosApicolas: Record<string, string> = { colonias: "Colonias", piso: "Pisos", camara: "Cámaras", alza: "Alzas", cuadro: "Cuadros", techo: "Techos", otro_material: "Otro material" };
 export const vistasApicolas = [
+  { vista: "fraccionado", titulo: "Fraccionado" }, { vista: "salidas", titulo: "Salidas comerciales" }, { vista: "devoluciones", titulo: "Devoluciones físicas" }, { vista: "caja", titulo: "Caja de campaña" },
+  { vista: "costos", titulo: "Costos de campaña" }, { vista: "ingresos", titulo: "Ingresos asignados" }, { vista: "resultados", titulo: "Resultados económicos" },
+  { vista: "salas", titulo: "Salas de extracción" }, { vista: "analisis", titulo: "Análisis y muestras" }, { vista: "stock", titulo: "Stock a granel" },
+  { vista: "cosechas", titulo: "Cosechas" }, { vista: "extracciones", titulo: "Extracciones" }, { vista: "lotes", titulo: "Lotes de miel" }, { vista: "tambores", titulo: "Tambores" },
   { vista: "resumen", titulo: "Resumen" }, { vista: "campanas", titulo: "Campañas" }, { vista: "apiarios", titulo: "Apiarios" },
   { vista: "colmenas", titulo: "Colmenas y reinas" }, { vista: "visitas", titulo: "Visitas" }, { vista: "alimentacion", titulo: "Alimentación" },
   { vista: "sanidad", titulo: "Sanidad" }, { vista: "movimientos", titulo: "Existencias y movimientos" }, { vista: "agenda", titulo: "Agenda" }, { vista: "informes", titulo: "Informes" },

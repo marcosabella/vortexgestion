@@ -1,0 +1,10 @@
+import type { ApicolaFila } from './apicola';
+export type SaldoLoteApicola = { id: string; codigo: string; estado_calidad: string; campana_id: string; fecha: string; producidos_kg: number; sin_envasar_kg: number; tambores_kg: number; fraccionado_kg: number; merma_kg: number; despachados_kg: number; disponible_kg: number };
+export type SaldoTamborApicola = { id: string; lote_id: string; codigo: string; disponible_kg: number; neto: number };
+export type FraccionamientoApicola = ApicolaFila & { codigo: string; lote_id: string; tambor_id: string | null; fecha: string; presentacion: string; peso_kg: number; unidades: number; merma_kg: number; consumido_kg: number; disponibles: number; responsable: string; estado: string };
+export type StockApicola = { lotes: SaldoLoteApicola[]; tambores: SaldoTamborApicola[]; fraccionamientos: FraccionamientoApicola[] };
+export type CatalogoComercialApicola = { id: string; codigo: string; descripcion: string; cantidad: number; disponible: number; venta_id: string | null; comprobante: string; costo: number; moneda: string };
+export type FuenteCajaApicola = { origen: string; id: string; numero: string; fecha: string; moneda: string; tipo: string; importe: number; saldo: number; detalle: string };
+export type FlujoApicola = ApicolaFila & { origen: string; fecha: string; referencia: string; importe: number; moneda: string; tipo: string; campana: string; apiario: string | null; criterio: string; estado: string; motivo_anulacion: string | null };
+export type CajaApicola = { items: FlujoApicola[]; total: number; resumen: { moneda: string; cobros: number; pagos: number; resultado: number }[]; destinos: { campana: string; apiario: string | null; moneda: string; resultado: number }[] };
+export type ValoracionStockApicola = { liberado_kg: number; no_liberado_kg: number; moneda: string; precio_kg: number | null; valor_stock: number | null };

@@ -9,12 +9,12 @@ const grupos: GrupoApicola[] = [
   { key: "existencias", titulo: "Existencias y movimientos", etapa: 1, vistas: ["movimientos"] },
   { key: "agenda", titulo: "Agenda", etapa: 1, vistas: ["agenda"] },
   // Se incorporan rutas a estos grupos a medida que existan las funciones.
-  { key: "produccion", titulo: "Producción y trazabilidad", etapa: 2, vistas: [] },
-  { key: "economia", titulo: "Gestión económica", etapa: 3, vistas: [] },
+  { key: "produccion", titulo: "Producción y trazabilidad", etapa: 2, vistas: ["cosechas", "salas", "extracciones", "lotes", "tambores", "analisis", "fraccionado", "salidas", "devoluciones", "stock"] },
+  { key: "economia", titulo: "Gestión económica", etapa: 3, vistas: ["costos", "ingresos", "caja", "resultados"] },
   { key: "especializaciones", titulo: "Especializaciones", etapa: 4, vistas: [] },
   { key: "informes", titulo: "Informes", etapa: 1, vistas: ["informes"] },
 ];
-const iconos = { resumen: LayoutDashboard, campanas: CalendarDays, apiarios: MapPin, colmenas: Hexagon, visitas: ClipboardList, alimentacion: Sprout, sanidad: Activity, movimientos: ArrowLeftRight, agenda: CalendarDays, informes: FileText };
+const iconos = { resumen: LayoutDashboard, campanas: CalendarDays, apiarios: MapPin, colmenas: Hexagon, visitas: ClipboardList, alimentacion: Sprout, sanidad: Activity, movimientos: ArrowLeftRight, agenda: CalendarDays, informes: FileText, cosechas: Sprout, extracciones: Activity, lotes: ClipboardList, tambores: Hexagon, salas: MapPin, analisis: Activity, stock: Hexagon, costos: ClipboardList, ingresos: ArrowLeftRight, resultados: LayoutDashboard, fraccionado: Hexagon, salidas: ArrowLeftRight, devoluciones: ArrowLeftRight, caja: LayoutDashboard };
 
 export const apicolaGruposDisponibles = grupos.filter(grupo => grupo.vistas.length > 0).map(grupo => ({
   ...grupo,

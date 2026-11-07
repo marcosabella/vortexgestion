@@ -10,11 +10,19 @@ import postcss from 'postcss';
 import tailwindcss from 'tailwindcss';
 import WebSocket from 'ws';
 import { iniciarApicolaPg, idApicola as id, literalSql as literal } from './fixtures/apicola-pg.mjs';
+import { probarProduccionUi } from './fixtures/apicola-produccion-ui.mjs';
+import { prepararEconomiaPg } from './fixtures/apicola-economia-pg.mjs';
+import { probarEconomiaUi } from './fixtures/apicola-economia-ui.mjs';
+import { prepararComercialPg } from './fixtures/apicola-comercial-pg.mjs';
+import { probarComercialUi } from './fixtures/apicola-comercial-ui.mjs';
 
 const root = process.cwd(), pg = await iniciarApicolaPg();
 const comercioPdfFixture = JSON.stringify({ id: id(10), nombre_comercio: 'COMERCIO DEMO · PRUEBA LOCAL', calle: 'Av. de las Colmenas', numero: '123', localidad: 'Rafaela', provincia: 'Santa Fe', codigo_postal: '2300', telefono: '3492 123456', cuit: '30712345678', situacion_afip: 'Responsable Inscripto', ingresos_brutos: '123-456789-0', fecha_inicio_actividad: '2021-01-01', logo_url: '/logo.png', mostrar_razon_social_con_logo: true });
 let browser, socket, server;
 try {
+  for (const file of ['20261106140000_apicola_produccion_estructura.sql', '20261106140100_apicola_produccion_operaciones.sql']) pg.sql(readFileSync('supabase/migrations/' + file, 'utf8'));
+  prepararEconomiaPg(pg);
+  prepararComercialPg(pg);
   const clientFixture = `const request=body=>fetch('/api',{method:'POST',body:JSON.stringify({...body,actor:new URLSearchParams(location.search).get('actor')||'admin'})}).then(r=>r.json());export const supabase={rpc(name,args){return request({rpc:name,args})},from(table){const args={table,filters:[],orders:[]};const q={select(){return q},eq(k,v){args.filters.push([k,'=',v]);return q},gte(k,v){args.filters.push([k,'>=',v]);return q},lte(k,v){args.filters.push([k,'<=',v]);return q},contains(k,v){args.filters.push([k,'@>',v]);return q},or(value){args.or=value;return q},order(k,o){args.orders.push([k,o?.ascending!==false]);return q},range(start,end){args.start=start;args.end=end;return q},then(resolve,reject){return request(args).then(resolve,reject)}};return q}};`;
   const entry = `import React from'react';import{createRoot}from'react-dom/client';import{MemoryRouter,Routes,Route}from'react-router-dom';import{QueryClient,QueryClientProvider}from'@tanstack/react-query';import Apicola from'./src/pages/Apicola';import{AppSidebar}from'./src/components/AppSidebar';import{SidebarProvider,SidebarTrigger}from'./src/components/ui/sidebar';createRoot(document.getElementById('root')).render(<React.StrictMode><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[location.pathname]}><SidebarProvider><AppSidebar/><main className='min-w-0 flex-1'><SidebarTrigger/><Routes><Route path='/apicola/:vista' element={<Apicola/>}/></Routes></main></SidebarProvider></MemoryRouter></QueryClientProvider></React.StrictMode>);`;
   const bundle = (await build({ stdin: { contents: entry, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', '__APP_BUILD_DATE__': '"2026-11-06T12:00:00Z"' }, plugins: [{ name: 'local-api', setup(b) {
@@ -41,12 +49,20 @@ try {
       if (body.rpc) {
         const a = body.args; let expression;
         if (body.rpc === 'apicola_permiso') expression = `apicola_permiso(${literal(a.p_comercio)},${literal(a.p_nivel)})`;
-        else if (body.rpc === 'apicola_operar') expression = `apicola_operar(${literal(a.p_comercio)},${literal(a.p_accion)},${literal(JSON.stringify(a.p_datos))}::jsonb,${literal(a.p_clave)})`;
+        else if (['apicola_operar', 'apicola_produccion_operar', 'apicola_economia_operar', 'apicola_comercial_operar', 'apicola_caja_operar'].includes(body.rpc)) expression = `${body.rpc}(${literal(a.p_comercio)},${literal(a.p_accion)},${literal(JSON.stringify(a.p_datos))}::jsonb,${literal(a.p_clave)})`;
+        else if (body.rpc === 'apicola_stock_consultar') expression = `apicola_stock_consultar(${literal(a.p_comercio)})`;
+        else if (body.rpc === 'apicola_comercial_catalogo') expression = `apicola_comercial_catalogo(${[a.p_comercio,a.p_tipo,a.p_busqueda,a.p_pagina].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_comercial_consultar') expression = `apicola_comercial_consultar(${[a.p_comercio,a.p_tipo,a.p_campana,a.p_apiario,a.p_desde,a.p_hasta,a.p_pagina,a.p_lote].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_caja_consultar') expression = `apicola_caja_consultar(${[a.p_comercio,a.p_campana,a.p_apiario,a.p_desde,a.p_hasta,a.p_pagina].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_caja_fuentes') expression = `apicola_caja_fuentes(${[a.p_comercio,a.p_busqueda,a.p_pagina].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_valorar_stock') expression = `apicola_valorar_stock(${[a.p_comercio,a.p_campana,a.p_apiario,a.p_precio_kg,a.p_moneda].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_economia_consultar') expression = `apicola_economia_consultar(${[a.p_comercio,a.p_campana,a.p_apiario,a.p_desde,a.p_hasta,a.p_tipo,a.p_pagina].map(literal).join(',')})`;
+        else if (body.rpc === 'apicola_economia_documentos') expression = `apicola_economia_documentos(${[a.p_comercio,a.p_origen,a.p_busqueda,a.p_pagina].map(literal).join(',')})`;
         else if (body.rpc === 'apicola_informe') expression = `apicola_informe(${[a.p_comercio, a.p_campana, a.p_apiario, a.p_desde, a.p_hasta].map(literal).join(',')})`;
         else throw Error('RPC no permitida');
         data = JSON.parse(pg.sql(auth + `SELECT to_jsonb(${expression});`));
       } else {
-        const tables = ['apicola_campanas', 'apicola_apiarios', 'apicola_colmenas', 'apicola_existencias', 'apicola_registros', 'apicola_movimientos', 'apicola_tareas', 'apicola_parentescos'];
+        const tables = ['apicola_campanas', 'apicola_apiarios', 'apicola_colmenas', 'apicola_existencias', 'apicola_registros', 'apicola_movimientos', 'apicola_tareas', 'apicola_parentescos', 'apicola_salas', 'apicola_cosechas', 'apicola_extracciones', 'apicola_extraccion_origenes', 'apicola_lotes', 'apicola_tambores', 'apicola_analisis'];
         if (!tables.includes(body.table)) throw Error('Tabla no permitida');
         const column = key => { if (!/^[a-z_]+$/.test(key)) throw Error('Columna no permitida'); return `"${key}"`; };
         const conditions = body.filters.map(([key, operator, value]) => {
@@ -72,13 +88,14 @@ try {
   const { targetInfos } = await send('Target.getTargets'), targetId = targetInfos.find(t => t.type === 'page').targetId, { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true }); await send('Page.enable', {}, sessionId);
   const evaluate = async expression => { const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true, userGesture: true }, sessionId); if (r.exceptionDetails) throw Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value; };
   const pause = ms => new Promise(r => setTimeout(r, ms));
-  const load = async (page, width = 1280) => { await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 }, sessionId); await send('Page.navigate', { url: origin + '/apicola/' + page }, sessionId); await pause(1400); };
+  const load = async (page, width = 1280) => { await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 }, sessionId); await send('Page.navigate', { url: origin + '/apicola/' + page }, sessionId); await pause(1400); for (let i = 0; i < 50 && await evaluate(`!![...document.querySelectorAll('[role="status"]')].find(e=>e.textContent.includes('Cargando'))`); i++) await pause(200); };
   const click = async text => { assert.ok(await evaluate(`(()=>{const all=[...document.querySelectorAll('button')],text=${JSON.stringify(text)},b=all.find(b=>b.textContent.trim()===text)||all.find(b=>b.textContent.includes(text));b?.click();return !!b})()`), text); await pause(650); };
   const fill = async (key, value) => evaluate(`(()=>{const e=document.getElementById('apicola-'+${JSON.stringify(key)});if(!e)throw Error('Campo no encontrado: '+${JSON.stringify(key)});const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));})()`);
   const save = async () => { await click('Guardar registro'); assert.equal(await evaluate(`!!document.querySelector('[role="dialog"]')`), false, await evaluate(`document.querySelector('[role="alert"]')?.textContent||'El formulario no se cerró'`)); };
   const out = path.join(root, 'private-backups/apicola-preview'); mkdirSync(out, { recursive: true });
   const capture = async name => { const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, sessionId); writeFileSync(path.join(out, name + '.png'), Buffer.from(data, 'base64')); };
   const comprobarSubmenu = async () => assert.equal(await evaluate(`(()=>{const b=document.querySelector('button[title="Cuaderno de campo"]'),s=b.querySelector('span'),svg=b.querySelectorAll('svg'),t=s.getBoundingClientRect(),arrow=svg[svg.length-1].getBoundingClientRect();return s.scrollHeight<=parseFloat(getComputedStyle(s).lineHeight)+1&&t.right<=arrow.left+1&&t.top>=b.getBoundingClientRect().top})()`), true, 'Cuaderno de campo ocupa una línea y no se superpone con la flecha');
+  if (!process.argv.includes('--produccion') && !process.argv.includes('--economia') && !process.argv.includes('--comercial')) {
   await load('campanas');
   assert.ok(await evaluate(`document.querySelector('[data-sidebar="content"]').textContent.includes('Base productiva')`), 'Menú agrupado por base productiva');
   assert.ok(await evaluate(`document.querySelector('[data-sidebar="content"]').textContent.includes('Cuaderno de campo')`), 'Menú agrupado por cuaderno');
@@ -86,7 +103,9 @@ try {
   assert.equal(await evaluate(`[...document.querySelectorAll('[data-sidebar="content"] button')].find(b=>b.textContent.trim()==='Base productiva').getAttribute('aria-expanded')`), 'true', 'El grupo de la sección actual abre automáticamente');
   await click('Base productiva'); assert.equal(await evaluate(`!!document.querySelector('[data-sidebar="content"] a[href="/apicola/campanas"]')`), false, 'Base productiva es colapsable');
   await click('Base productiva'); assert.equal(await evaluate(`!!document.querySelector('[data-sidebar="content"] a[href="/apicola/campanas"]')`), true);
-  assert.equal(await evaluate(`document.body.textContent.includes('Producción y trazabilidad')||document.body.textContent.includes('Gestión económica')||document.body.textContent.includes('Especializaciones')`), false, 'Las etapas futuras no aparecen');
+  assert.equal(await evaluate(`document.body.textContent.includes('Especializaciones')`), false, 'Las etapas futuras no aparecen');
+  assert.equal(await evaluate(`document.body.textContent.includes('Gestión económica')`), true, 'El bloque económico aparece en la navegación');
+  assert.equal(await evaluate(`document.body.textContent.includes('Producción y trazabilidad')`), true, 'La etapa 2 aparece en la navegación');
   await click('Nueva campaña'); await fill('nombre', 'Campaña local 2026/2027'); await save();
   await load('apiarios'); await click('Nuevo apiario'); await fill('codigo', 'A01'); await fill('nombre', 'Los Aromos'); await fill('localidad', 'Rafaela'); await save();
   const apiario = pg.sql(`SELECT id FROM apicola_apiarios;`);
@@ -120,5 +139,14 @@ try {
   await click('Base productiva'); await evaluate(`document.querySelector('[role="dialog"] a[href="/apicola/colmenas"]').click()`); await pause(400); assert.equal(await evaluate(`!!document.querySelector('[role="dialog"]')`), false, 'Navegar cierra el menú móvil');
   await fill('seccion', 'informes'); await pause(500); assert.ok(await evaluate(`document.body.textContent.includes('Actividad del período')`), 'Selector compacto mantiene la navegación');
   await load('apiarios?actor=operator'); assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Nuevo apiario'))`), false, 'El operador no administra catálogos');
-  console.log('OK UI + PostgreSQL local: campañas, apiarios, alta 40, visita parcial 18/40, confirmación, alimentación, sanidad, agenda, historial de colmena, informes y permisos. Escritorio y móvil sin desbordes.');
+  } else {
+    const tenant = id(10), actor = id(1);
+    pg.sql(`SET app.actor='${actor}'; SET ROLE authenticated;
+      SELECT apicola_operar('${tenant}','campana',jsonb_build_object('nombre','Campaña de producción','fecha_inicio',date_trunc('year',current_date)::date,'fecha_fin',(date_trunc('year',current_date)+interval '1 year'-interval '1 day')::date),gen_random_uuid());
+      SELECT apicola_operar('${tenant}','apiario','{"codigo":"A01","nombre":"Los Aromos"}',gen_random_uuid());`);
+  }
+  if (!process.argv.includes('--economia') && !process.argv.includes('--comercial')) await probarProduccionUi({ load, click, evaluate, capture, pg });
+  if (!process.argv.includes('--produccion') && !process.argv.includes('--comercial')) await probarEconomiaUi({ load, click, evaluate, capture, pg });
+  if (!process.argv.includes('--produccion') && !process.argv.includes('--economia')) await probarComercialUi({ load, click, evaluate, capture, pg });
+  if (!process.argv.includes('--produccion') && !process.argv.includes('--economia') && !process.argv.includes('--comercial')) console.log('OK UI + PostgreSQL local: campañas, apiarios, alta 40, visita parcial 18/40, confirmación, alimentación, sanidad, agenda, historial de colmena, informes y permisos. Escritorio y móvil sin desbordes.');
 } finally { socket?.close(); browser?.kill(); if (server) { server.closeAllConnections(); await new Promise(r => server.close(r)); } pg.stop(); }
