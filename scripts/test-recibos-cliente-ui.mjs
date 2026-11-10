@@ -49,6 +49,8 @@ const entry = `import React from 'react';import {createRoot} from 'react-dom/cli
 import {buildReciboPagoHistorico,esPagoCliente} from './src/utils/reciboPagoHistorico';window.buildHistorical=buildReciboPagoHistorico;window.isPayment=esPagoCliente;
 window.fetch=()=>{throw Error('Conexiones externas prohibidas')};window.paymentCalls=[];
 window.receipt=${JSON.stringify(fixture)};window.buildReceiptHtml=buildReciboPagoHtml;window.buildReceiptPdf=buildReciboPagoPdf;
+// Fecha fija: las vistas filtran por período y los fixtures son de octubre.
+const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:['2026-10-15T15:30:00Z']));}static now(){return new NativeDate('2026-10-15T15:30:00Z').getTime();}};
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[location.search.includes('busqueda')?'/cuenta-corriente':'/cuenta-corriente/cliente-local']}><Routes><Route path="/cuenta-corriente" element={<CuentaCorrienteList/>}/><Route path="/cuenta-corriente/:clienteId" element={<Detail/>}/></Routes></MemoryRouter>);`;
 const bundle = await build({stdin:{contents:entry,loader:'tsx',resolveDir:repo},write:false,bundle:true,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},
   plugins:[{name:'fixtures',setup(builder){
@@ -96,17 +98,17 @@ try {
   await send('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,deviceScaleFactor:1,mobile:false},sessionId);
   await send('Page.navigate',{url:origin},sessionId);
   const sel = (css) => `document.querySelector(${JSON.stringify(css)})`;
-  await wait(exists('button[aria-label="Ver detalle de venta"]'));
+  await wait(exists('button[aria-label="Ver detalle del comprobante"]'));
   assert.equal(await evaluate('document.body.textContent.includes("Recibos de pago")'),false,'Sin seccion inferior de recibos');
   assert.equal(await evaluate(`document.querySelectorAll(${JSON.stringify('button[aria-label^="Ver detalle"]')}).length`),2,'Detalle en ambas filas');
-  await evaluate(`${sel('button[aria-label="Ver detalle de venta"]')}.click()`);
+  await evaluate(`${sel('button[aria-label="Ver detalle del comprobante"]')}.click()`);
   await wait('document.body.textContent.includes("Detalle de Venta venta1")');
   await click('Cerrar venta');
   await evaluate(`${sel('button[aria-label="Ver detalle del recibo de pago"]')}.click()`);
   await wait(exists('iframe[title="Vista previa del recibo"]'));
   await wait('!Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="PDF").disabled');
   const receiptText=await evaluate(`${sel('iframe[title="Vista previa del recibo"]')}.contentDocument.body.textContent`);
-  assert.ok(receiptText.includes('Recibido del cliente:') && receiptText.includes('José Pérez') && receiptText.includes('250,00'),'Recibo historico con saldo original');
+  assert.ok(receiptText.includes('Recibido del cliente:') && receiptText.includes('JOSÉ PÉREZ') && receiptText.includes('250,00'),'Recibo historico con saldo original');
   assert.ok(receiptText.includes('$') && !receiptText.includes('ARS'),'Importes con simbolo monetario');
   await evaluate('document.querySelector("[role=dialog] button.absolute").click()');
   await wait('!document.querySelector("[role=dialog]")');
@@ -137,7 +139,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false},sessionId);
   assert.ok(await evaluate('(()=>{const r=document.querySelector("[role=dialog]").getBoundingClientRect();return r.width<=390 && r.left>=0;})()'),'Modal dentro de pantalla movil');
   const html=await evaluate('window.buildReceiptHtml({...window.receipt,cliente_snapshot:{...window.receipt.cliente_snapshot,nombre:"<script>alert(1)</script>"}})');
-  assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'),'Texto escapado');
+  assert.ok(html.toLowerCase().includes('&lt;script&gt;alert(1)&lt;/script&gt;'),'Texto escapado');
   const artifacts=mkdtempSync(path.join(tmpdir(),'vortex-recibos-qa-'));
   await send('Emulation.setDeviceMetricsOverride',{width:794,height:1123,deviceScaleFactor:1,mobile:false},sessionId);
   await evaluate('document.open();document.write(window.buildReceiptHtml(window.receipt));document.close()');
@@ -190,10 +192,41 @@ try {
   await send('Page.navigate',{url:origin+'/?busqueda'},sessionId);
   await wait(exists('input[placeholder^="Buscar"]'));
   await set('input[placeholder^="Buscar"]','Sin operaciones');
-  await wait('document.querySelector("tbody").textContent.includes("Sin operaciones")');
-  await evaluate(`${sel('button[aria-label="Ver cuenta de Cliente"]')}.click()`);
-  await wait('document.querySelector("h1").textContent.includes("Sin operaciones")');
+  await wait('document.querySelector("tbody").textContent.includes("SIN OPERACIONES")');
+  await evaluate(`${sel('button[aria-label="Ver cuenta de CLIENTE"]')}.click()`);
+  await wait('document.querySelector("h1").textContent.includes("SIN OPERACIONES")');
   assert.ok((await evaluate('document.body.textContent')).includes('No hay movimientos'),'Cliente sin movimientos abre cuenta vacia');
+  // El formulario real permite un cheque completo superior a la deuda.
+  await send('Page.navigate',{url:origin},sessionId);
+  await wait(exists('button[aria-label="Ver detalle del comprobante"]'));
+  await click('Registrar pago'); await click('Seleccionar comprobantes');
+  await wait('document.querySelectorAll("[role=dialog]").length===2');
+  await evaluate('Array.from(document.querySelectorAll("[role=dialog]")).at(-1).querySelector("button[role=checkbox]").click()');
+  await click('Aplicar selección (1)');
+  await evaluate('document.querySelector("[role=combobox]").click()');
+  await wait(exists('[role=option]'));
+  await evaluate('Array.from(document.querySelectorAll("[role=option]")).find(o=>o.textContent.trim()==="Cheque").click()');
+  await click('Registrar cheque');
+  await wait('document.querySelectorAll("[role=dialog]").length===2');
+  await set('[role=dialog]:last-of-type input[type=number]',300);
+  const chequeInput = async (label,value) => {
+    await evaluate(`(()=>{const modal=Array.from(document.querySelectorAll('[role=dialog]')).at(-1);const el=Array.from(modal.querySelectorAll('label')).find(l=>l.textContent===${JSON.stringify(label)}).parentElement.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  };
+  await chequeInput('Número de cheque','12345');
+  await chequeInput('Banco emisor','Banco prueba');
+  await wait('!Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Agregar cheque").disabled');
+  await click('Agregar cheque');
+  await wait('document.body.textContent.includes("Saldo a favor después del pago:")');
+  assert.ok((await evaluate('document.querySelector("[role=status]").textContent')).includes('50,00'),'Excedente visible antes de confirmar');
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Confirmar pago").disabled'),false,'Confirmación habilitada para cheque excedido');
+  await click('Confirmar pago');
+  await wait('window.paymentCalls.length===1');
+  const chequeCall=await evaluate('window.paymentCalls[0]');
+  assert.equal(chequeCall.pagos[0].tipo,'cheque');
+  assert.equal(chequeCall.pagos[0].monto,300,'Envía el cheque completo sin recortar');
+  assert.equal(chequeCall.pagos[0].cheque.numero_cheque,'12345');
+  const creditHtml=await evaluate('window.buildReceiptHtml({...window.receipt,importe:300,saldo_anterior:250,saldo_posterior:-50,pagos:[{tipo:"cheque",monto:300}],documentos:[{numero:"0001 - 00000001",importe:250}]})');
+  assert.ok(creditHtml.includes('Saldo a favor') && creditHtml.includes('50,00'),'Recibo presenta saldo a favor');
   assert.deepEqual(errors,[]);
-  console.log('OK Busqueda de saldados y sin movimientos, historico, detalle en filas, venta y recibos con PDF real. Captura: '+path.join(artifacts,'recibo.png'));
+  console.log('OK Cheque excedido con importe completo y saldo a favor; busqueda, historico, venta y recibos con PDF real. Captura: '+path.join(artifacts,'recibo.png'));
 } finally { socket?.close(); browser?.kill(); await new Promise(resolve => server.close(resolve)); }

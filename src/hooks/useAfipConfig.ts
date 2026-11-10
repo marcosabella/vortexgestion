@@ -4,10 +4,12 @@ import { toast } from '@/hooks/use-toast';
 import { AfipConfig, AfipConfigInsert, AfipConfigUpdate } from '@/types/afip';
 import { useComercio } from '@/hooks/useComercio';
 import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
-import { useEmisoresFiscales } from '@/hooks/useEmisoresFiscales';
+import { useEmisoresFiscales, rpcEmisorFiscal } from '@/hooks/useEmisoresFiscales';
+import { useAccesoComercio } from '@/hooks/useUsuariosComercio';
 import { configEmisorFiscal } from '@/utils/emisorFiscal';
 
 export function useAfipConfig(emisorId?: string | null) {
+  const acceso = useAccesoComercio();
   const { comercio } = useComercio();
   const comercioId = comercio?.id;
   const { data: parametros } = useComercioParametrizacion();
@@ -16,11 +18,17 @@ export function useAfipConfig(emisorId?: string | null) {
   const emisores = useEmisoresFiscales(usarEmisor);
 
   const legacy = useQuery({
-    queryKey: ['afip-config', comercioId],
-    enabled: Boolean(comercioId) && !usarEmisor,
+    queryKey: ['afip-config', comercioId, acceso.data?.configurado && !acceso.data.admin ? 'publico' : 'completo'],
+    enabled: Boolean(comercioId && acceso.data?.activo) && !usarEmisor,
     queryFn: async () => {
       if (!comercioId) {
         return null;
+      }
+
+      if (acceso.data?.configurado && !acceso.data.admin) {
+        const {data,error}=await rpcEmisorFiscal<AfipConfig>('vortex_config_fiscal_publica',{p_comercio_id:comercioId});
+        if(error)throw error;
+        return data;
       }
 
       const query = supabase

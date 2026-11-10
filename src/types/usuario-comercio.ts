@@ -1,0 +1,3 @@
+import type { PermisosUsuario } from '@/config/usuariosPermisos';
+export type UsuarioComercio = { user_id: string; nombre: string; email: string; rol: 'admin' | 'operador'; activo: boolean; configurado: boolean; solo_restaurante: boolean; perfil: string; permisos: PermisosUsuario; version: number; restaurante_roles: string[]; restaurante_sector_id: string | null; restaurante_cobros: boolean };
+export type UsuarioComercioDatos = { user_id?: string; version?: number; nombre: string; email: string; password?: string; rol: 'admin' | 'operador'; activo: boolean; perfil: string; permisos: PermisosUsuario; restaurante_roles: string[]; restaurante_sector_id: string | null; restaurante_cobros: boolean };

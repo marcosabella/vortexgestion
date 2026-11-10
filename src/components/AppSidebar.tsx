@@ -39,6 +39,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import type { ModuloSistema } from "@/config/parametrizacion";
 import { restauranteSecciones, restaurantePermisoVista } from "@/config/restauranteNavigation";
 import { distribucionSecciones } from "@/config/distribucionNavigation";
+import { transporteSecciones } from "@/config/transporteNavigation";
 import { utilidadesSecciones } from "@/config/utilidadesNavigation";
 import { apicolaGruposDisponibles } from "@/config/apicolaNavigation";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
@@ -47,6 +48,8 @@ import { useComercio } from "@/hooks/useComercio";
 import { useRestauranteAcceso } from "@/hooks/useRestauranteUsuarios";
 import { useComercioParametrizacion } from "@/hooks/useComercioParametrizacion";
 import { useNotificaciones } from "@/hooks/useNotificaciones";
+import { useAccesoComercio } from "@/hooks/useUsuariosComercio";
+import { puedeAbrirRuta } from "@/config/usuariosPermisos";
 
 import {
   Sidebar,
@@ -95,6 +98,7 @@ type GroupKey =
   | "campo"
   | "apicola"
   | "taller"
+  | "transporte"
   | "restaurante"
   | "distribucion"
   | "extintores"
@@ -129,6 +133,7 @@ const tesoreriaItems: MenuItem[] = [
 const utilidadesItems: MenuItem[] = utilidadesSecciones.map(item => ({ title: item.title, url: `/utilidades/${item.vista}`, icon: item.icon, modulo: "utilidades" }));
 
 const configuracionItems: MenuItem[] = [
+  { title: "Usuarios y permisos", url: "/usuarios", icon: Users },
   { title: "Mi Comercio", url: "/comercio", icon: Store },
   { title: "Bancos", url: "/bancos", icon: Building2, modulo: "bancos" },
   { title: "Tarjetas", url: "/tarjetas", icon: CreditCard, modulo: "tarjetas" },
@@ -196,6 +201,7 @@ const emptyOpenGroups = (): Record<GroupKey, boolean> => ({
   campo: false,
   apicola: false,
   taller: false,
+  transporte: false,
   distribucion: false,
   restaurante: false,
   extintores: false,
@@ -218,6 +224,7 @@ const getGroupForPath = (path: string): GroupKey | null => {
   if (path.startsWith("/campo")) return "campo";
   if (pathMatches(path, "/apicola")) return "apicola";
   if (path.startsWith("/taller")) return "taller";
+  if (pathMatches(path, "/transporte")) return "transporte";
   if (pathMatches(path, "/restaurante")) return "restaurante";
   if (pathMatches(path, "/distribucion")) return "distribucion";
   if (path.startsWith("/extintores")) return "extintores";
@@ -227,7 +234,7 @@ const getGroupForPath = (path: string): GroupKey | null => {
   if (["/compras", "/proveedores"].some((item) => pathMatches(path, item))) return "compras";
   if (pathMatches(path, "/productos")) return "inventario";
   if (["/caja", "/gastos-egresos", "/cheques"].some((item) => pathMatches(path, item))) return "tesoreria";
-  if (["/comercio", "/bancos", "/tarjetas", "/mercado-pago", "/tienda-online", "/whatsapp", "/afip", "/seguridad"].some((item) => pathMatches(path, item))) return "configuracion";
+  if (["/usuarios", "/comercio", "/bancos", "/tarjetas", "/mercado-pago", "/tienda-online", "/whatsapp", "/afip", "/seguridad"].some((item) => pathMatches(path, item))) return "configuracion";
   return null;
 };
 
@@ -246,6 +253,7 @@ export function AppSidebar() {
   const { comercio, isLoading: isComercioLoading } = useComercio();
   const campoAccess = useCampoAccess(comercio?.id);
   const restauranteAccess = useRestauranteAcceso(comercio?.id);
+  const usuarioAccess = useAccesoComercio();
   const soloRestaurante = restauranteAccess.data?.solo_restaurante;
   const { data: parametrizacion } = useComercioParametrizacion();
   const { notificaciones } = useNotificaciones(true);
@@ -259,7 +267,7 @@ export function AppSidebar() {
   const enabledInventarioItems = inventarioItems.filter((item) => isModuloEnabled(item.modulo));
   const enabledTesoreriaItems = tesoreriaItems.filter((item) => isModuloEnabled(item.modulo));
   const enabledConfiguracionItems = configuracionItems.filter((item) => isModuloEnabled(item.modulo));
-  const enabledCampoItems = campoItems.filter((item) => !item.adminOnly || campoAccess.isAdmin);
+  const enabledCampoItems = campoItems.filter((item) => (!item.adminOnly || campoAccess.isAdmin) && (item.url !== '/campo/operadores' || usuarioAccess.data?.admin));
   const pedidosSinVer = notificaciones.filter((notificacion) => {
     const metadata = notificacion.metadata;
     return !notificacion.leida && typeof metadata === "object" &&
@@ -364,6 +372,7 @@ export function AppSidebar() {
     icon: typeof Banknote,
     items: MenuItem[],
   ) => {
+    items = items.filter(item => puedeAbrirRuta(usuarioAccess.data, item.url));
     if (soloRestaurante) {
       if (key === "restaurante") items = items.filter(item => restauranteAccess.data?.permisos.includes(restaurantePermisoVista(item.url.split("/")[2])));
       else if (key === "configuracion") items = items.filter(item => item.url === "/seguridad");
@@ -412,7 +421,7 @@ export function AppSidebar() {
         <SidebarGroup className="mt-2 pb-3">
           <SidebarGroupContent>
             <SidebarMenu>
-              {!soloRestaurante && parametrizacion.inicio.habilitado && (
+              {!soloRestaurante && parametrizacion.inicio.habilitado && puedeAbrirRuta(usuarioAccess.data, '/inicio') && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -437,6 +446,7 @@ export function AppSidebar() {
               {parametrizacion.modulos.campo && renderCollapsibleGroup("campo", "Vortex Campo", Sprout, enabledCampoItems)}
               {parametrizacion.modulos.apicola && renderCollapsibleGroup("apicola", "Vortex Apícola", Hexagon, apicolaItems)}
               {parametrizacion.modulos.taller && renderCollapsibleGroup("taller", "Vortex Taller", Wrench, tallerItems)}
+              {parametrizacion.modulos.transporte && renderCollapsibleGroup("transporte", "Vortex Transporte", Truck, transporteSecciones.map(s => ({ title: s.title, url: `/transporte/${s.vista}`, icon: s.icon })))}
               {parametrizacion.modulos.restaurante && renderCollapsibleGroup("restaurante", "Vortex Restaurante", UtensilsCrossed, restauranteItems)}
               {parametrizacion.modulos.distribucion && renderCollapsibleGroup("distribucion", "Vortex Distribución", Truck, distribucionItems)}
               {parametrizacion.modulos.extintores && renderCollapsibleGroup("extintores", "Extintores", Flame, extintoresItems)}

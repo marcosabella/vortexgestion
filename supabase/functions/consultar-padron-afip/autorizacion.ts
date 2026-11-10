@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { assertPermisoUsuario } from '../_shared/usuarios-permisos.ts';
 
 export async function getAuthorizedComercioId(req: Request, supabase: SupabaseClient, requestedComercioId?: string, altaComercio = false): Promise<string | null> {
   const token = (req.headers.get('Authorization') || '').replace('Bearer ', '');
@@ -21,5 +22,6 @@ export async function getAuthorizedComercioId(req: Request, supabase: SupabaseCl
   if (!error && altaComercio && !requestedComercioId && !data?.length) return null;
   if (error || !data?.length) throw new Error('No tiene acceso al comercio solicitado');
   if (!requestedComercioId && data.length > 1) throw new Error('Debe indicar el comercio para esta consulta');
+  await assertPermisoUsuario(supabase,userData.user.id,data[0].comercio_id,'clientes','consultar');
   return data[0].comercio_id;
 }

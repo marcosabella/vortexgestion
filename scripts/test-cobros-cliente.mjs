@@ -116,6 +116,7 @@ try {
   `);
   sql(migration('20260924150000_pagos_mixtos_clientes.sql'));
   sql(migration('20261002100000_cobros_cliente_multi_comprobante.sql'));
+  sql(migration('20261110110000_cobros_cheque_excedente_cliente.sql'));
   const test = (name, statements) => {
     sql(`BEGIN; ${asUser} ${statements} ROLLBACK;`);
     passed += 1;
@@ -165,6 +166,43 @@ try {
   test('Respeta créditos generales del cliente',
     `INSERT INTO cuenta_corriente(comercio_id,cliente_id,tipo_movimiento,monto,concepto) VALUES ('${ids.tenant}','${ids.client}','credito',200,'ajuste');` +
     fails(call([{ tipo: 'contado', monto: 151 }]), 'pagos_cliente_superan_saldo'));
+  test('Cheque mayor cancela comprobantes y conserva excedente sin venta',
+    call([{ tipo: 'cheque', monto: 400, cheque }]) +
+    check(`SELECT count(*)=1 AND min(monto)=400 FROM cheques`, 'cheque íntegro en cartera') +
+    check(`SELECT sum(monto)=350 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id IS NOT NULL`, 'solo cancela deuda') +
+    check(`SELECT monto=50 AND cheque_id IS NOT NULL FROM cuenta_corriente WHERE venta_id IS NULL`, 'excedente vinculado') +
+    check(`SELECT sum(CASE WHEN tipo_movimiento='debito' THEN monto ELSE -monto END)=-50 FROM cuenta_corriente WHERE cliente_id='${ids.client}'`, 'saldo a favor'));
+  test('Caso VRANBI: tres comprobantes por 626500.04 y cheque de 650000',
+    `UPDATE cuenta_corriente SET monto=200000.01 WHERE cliente_id='${ids.client}';
+     INSERT INTO ventas(id,comercio_id,cliente_id) VALUES ('30000000-0000-0000-0000-000000000005','${ids.tenant}','${ids.client}');
+     INSERT INTO cuenta_corriente(comercio_id,cliente_id,venta_id,tipo_movimiento,monto,concepto) VALUES ('${ids.tenant}','${ids.client}','30000000-0000-0000-0000-000000000005','debito',226500.02,'pago_cuenta_corriente');` +
+    call([{ tipo: 'cheque', monto: 650000, cheque }], [ids.sale1, ids.sale2, '30000000-0000-0000-0000-000000000005']) +
+    check(`SELECT count(*)=4 AND sum(monto)=650000 AND count(DISTINCT cheque_id)=1 FROM cuenta_corriente WHERE tipo_movimiento='credito'`, 'tres imputaciones y crédito') +
+    check(`SELECT monto=23499.96 FROM cuenta_corriente WHERE venta_id IS NULL`, 'centavos exactos'));
+  test('Reversión desde el excedente elimina el cheque y todas sus imputaciones',
+    call([{ tipo: 'cheque', monto: 400, cheque }]) +
+    `SELECT eliminar_pago_cliente((SELECT id FROM cuenta_corriente WHERE venta_id IS NULL));` +
+    check(`SELECT count(*)=0 FROM cheques`, 'sin cheque') +
+    check(`SELECT count(*)=0 FROM cuenta_corriente WHERE tipo_movimiento='credito'`, 'sin crédito residual'));
+  test('Excedente respeta el saldo global con créditos generales previos',
+    `INSERT INTO cuenta_corriente(comercio_id,cliente_id,tipo_movimiento,monto,concepto) VALUES ('${ids.tenant}','${ids.client}','credito',200,'ajuste');` +
+    call([{ tipo: 'cheque', monto: 175, cheque }]) +
+    check(`SELECT sum(monto)=150 FROM cuenta_corriente WHERE cheque_id IS NOT NULL AND venta_id IS NOT NULL`, 'imputación limitada al saldo global') +
+    check(`SELECT monto=25 FROM cuenta_corriente WHERE cheque_id IS NOT NULL AND venta_id IS NULL`, 'nuevo excedente separado'));
+  test('Selección parcial conserva crédito sin afectar comprobantes no elegidos',
+    call([{ tipo: 'cheque', monto: 150, cheque }], [ids.sale1]) +
+    check(`SELECT sum(monto)=100 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id='${ids.sale1}'`, 'primera venta saldada') +
+    check(`SELECT count(*)=0 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id='${ids.sale2}'`, 'otra venta intacta') +
+    check(`SELECT monto=50 FROM cuenta_corriente WHERE venta_id IS NULL`, 'crédito a cuenta'));
+  test('Medios mixtos reservan deuda para efectivo aunque el cheque venga primero',
+    call([{ tipo: 'cheque', monto: 400, cheque }, { tipo: 'contado', monto: 50 }]) +
+    check(`SELECT sum(monto)=50 AND count(venta_id)=count(*) FROM cuenta_corriente WHERE concepto='pago_efectivo'`, 'efectivo imputado') +
+    check(`SELECT monto=100 AND cheque_id IS NOT NULL FROM cuenta_corriente WHERE venta_id IS NULL`, 'solo excedente de cheque') +
+    check(`SELECT sum(monto)=400 FROM cuenta_corriente WHERE cheque_id IS NOT NULL`, 'cheque completo'));
+  test('Dos cheques conservan sus excedentes y referencias independientes',
+    call([{ tipo: 'cheque', monto: 400, cheque }, { tipo: 'cheque', monto: 100, cheque: { ...cheque, numero_cheque: 'segundo' } }]) +
+    check(`SELECT count(*)=2 AND sum(monto)=500 FROM cheques`, 'dos cheques íntegros') +
+    check(`SELECT sum(monto)=150 AND count(DISTINCT cheque_id)=2 FROM cuenta_corriente WHERE venta_id IS NULL`, 'dos créditos trazables'));
   test('Revalida comprobantes ya cobrados', call([{ tipo: 'contado', monto: 100 }], [ids.sale1]) +
     fails(call([{ tipo: 'contado', monto: 10 }]), 'comprobante_cliente_sin_saldo'));
   test('Rechaza monedas distintas', `UPDATE ventas SET moneda = 'USD' WHERE id = '${ids.sale2}';` +

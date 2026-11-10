@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { assertPermisoUsuario } from '../_shared/usuarios-permisos.ts';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
@@ -319,6 +320,7 @@ async function getAuthorizedComercioId(req: Request, supabase: any, requestedCom
     throw new Error('Debe indicar el comercio para esta consulta');
   }
 
+  await assertPermisoUsuario(supabase,userData.user.id,data[0].comercio_id,'ventas','consultar');
   return data[0].comercio_id;
 }
 

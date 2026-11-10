@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { assertPermisoUsuario } from '../_shared/usuarios-permisos.ts';
 import forge from 'https://esm.sh/node-forge@1.3.1';
 import { obtenerTicketWsaaCacheado } from '../_shared/wsaa-cache.ts';
 import { resolverConfiguracionFiscal } from '../_shared/emisor-fiscal.ts';
@@ -584,16 +585,16 @@ async function getAuthenticatedUserId(req: Request, supabase: SupabaseClient): P
 async function assertUserCanAccessComercio(supabase: SupabaseClient, userId: string, comercioId: string): Promise<void> {
   const { data, error } = await supabase
     .from('comercio_usuarios')
-    .select('id')
+    .select('id,rol')
     .eq('user_id', userId)
     .eq('comercio_id', comercioId)
-    .eq('rol', 'admin')
     .eq('activo', true)
     .maybeSingle();
 
   if (error || !data) {
     throw new Error('No tiene acceso al comercio solicitado');
   }
+  if (data.rol !== 'admin') await assertPermisoUsuario(supabase,userId,comercioId,'ventas','facturar',true);
 }
 
 Deno.serve(async (req) => {
@@ -834,7 +835,7 @@ Deno.serve(async (req) => {
       const detallePrevio = intentoPrevio.solicitud?.FeDetReq?.FECAEDetRequest;
       if (intentoPrevio.ambiente !== afipConfig.ambiente || intentoPrevio.cuit_emisor !== cuitEmisor
           || intentoPrevio.punto_venta !== afipConfig.punto_venta || intentoPrevio.tipo_comprobante !== codigoComprobante || !detallePrevio
-          || JSON.stringify(detallePrevio.PeriodoAsoc) !== JSON.stringify(detalleActual.PeriodoAsoc)
+          || JSON.stringify(detallePrevio.PeriodoAsoc) !== JSON.stringify((detalleActual as { PeriodoAsoc?: unknown }).PeriodoAsoc)
           || JSON.stringify(detallePrevio.CbtesAsoc) !== JSON.stringify('CbtesAsoc' in detalleActual ? detalleActual.CbtesAsoc : undefined)
           || ['DocTipo', 'DocNro', 'CbteFch', 'ImpTotal', 'ImpNeto', 'ImpIVA', 'Concepto', 'FchServDesde', 'FchServHasta', 'FchVtoPago'].some(campo =>
             String(detallePrevio[campo]) !== String(detalleActual[campo as keyof typeof detalleActual]))) {

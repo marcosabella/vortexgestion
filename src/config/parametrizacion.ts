@@ -23,6 +23,7 @@ export type ModuloSistema =
   | "distribucion"
   | "restaurante"
   | "taller"
+  | "transporte"
   | "utilidades";
 
 export type FuncionSistema =
@@ -61,6 +62,7 @@ export type ComercioParametrizacion = {
 };
 
 export const MODULOS_SISTEMA: Array<{ key: ModuloSistema; label: string; description: string }> = [
+  { key: "transporte", label: "Vortex Transporte", description: "Auxilio mecánico, transporte de maquinaria, kilómetros, gastos y mantenimiento integrados con Gestión." },
   { key: "utilidades", label: "Utilidades", description: "Billetes del Banco Nación y consultas BCRA: divisas, Central de Deudores y cheques." },
   { key: "caja", label: "Caja diaria", description: "Apertura, movimientos y cierre de caja." },
   { key: "clientes", label: "Clientes", description: "Alta, edicion y consulta de clientes." },
@@ -119,6 +121,7 @@ export const DEFAULT_PARAMETRIZACION: ComercioParametrizacion = {
     apicola: false,
     distribucion: false,
     taller: false,
+    transporte: false,
     restaurante: false,
     utilidades: false,
   },

@@ -6,6 +6,7 @@ import type { TallerDatabase } from '@/types/taller';
 import { useComercio } from '@/hooks/useComercio';
 import { useComercioParametrizacion } from '@/hooks/useComercioParametrizacion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccesoComercio } from '@/hooks/useUsuariosComercio';
 import { toast } from 'sonner';
 import type { Venta } from '@/types/venta';
 
@@ -36,6 +37,7 @@ export function tallerError(error: unknown): string {
 }
 
 export function useTaller() {
+  const accesoGeneral=useAccesoComercio();
   const { comercio } = useComercio();
   const { user } = useAuth();
   const { data: parametros } = useComercioParametrizacion();
@@ -64,11 +66,12 @@ export function useTaller() {
     },
   });
   type Functions = TallerDatabase['public']['Functions'];
+  const isAdmin=access.data===true || Boolean(accesoGeneral.data?.configurado && accesoGeneral.data.permisos.taller?.includes('administrar'));
   type FunctionName = 'taller_guardar_catalogo' | 'taller_guardar_marca_modelo' | 'taller_guardar_orden' | 'taller_guardar_item' | 'taller_cambiar_estado' | 'taller_finalizar_orden' | 'taller_generar_presupuesto' | 'taller_facturar_orden';
   type Operation = { [Name in FunctionName]: { name: Name; args: Functions[Name]['Args'] } }[FunctionName];
   const mutation = useMutation({
     mutationFn: async (operation: Operation) => {
-      if (!comercioId || !access.data) throw new Error('taller_sin_permisos_o_deshabilitado');
+      if (!comercioId || !isAdmin) throw new Error('taller_sin_permisos_o_deshabilitado');
       const { data, error } = await db.rpc(operation.name, operation.args);
       if (error) throw error;
       return data;
@@ -80,7 +83,7 @@ export function useTaller() {
     onError: (error) => toast.error(tallerError(error)),
   });
   return {
-    comercio, comercioId, isAdmin: access.data === true, isLoading: query.isLoading || access.isLoading,
+    comercio, comercioId, isAdmin, isLoading: query.isLoading || access.isLoading || accesoGeneral.isLoading,
     error: query.error || access.error, refetch: query.refetch,
     vehiculos: query.data?.vehiculos ?? [], tecnicos: query.data?.tecnicos ?? [], ordenes: query.data?.ordenes ?? [], items: query.data?.items ?? [],
     run: mutation.mutateAsync, isPending: mutation.isPending,

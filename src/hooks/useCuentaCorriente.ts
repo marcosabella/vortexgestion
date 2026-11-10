@@ -327,7 +327,7 @@ export const useCuentaCorriente = ({ cargarMovimientos = true } = {}) => {
         : error.message.includes("solicitud_recibo_datos_distintos")
           ? "Este intento ya fue registrado con otros datos. Cerrá y volvé a abrir el formulario para iniciar un nuevo pago."
           : error.message.includes("pagos_cliente_superan_saldo")
-        ? "Los pagos ingresados superan el saldo pendiente."
+        ? "El efectivo, las transferencias y las tarjetas no pueden superar la deuda seleccionada. Solo el excedente de cheques puede quedar como crédito a cuenta."
         : error.message.includes("comprobante_cliente_sin_saldo")
           ? "Uno de los comprobantes seleccionados ya no tiene saldo pendiente."
           : error.message.includes("comprobantes_cliente_moneda_distinta")

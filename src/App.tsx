@@ -2,6 +2,9 @@ import Restaurante from "@/pages/Restaurante";
 import RestauranteTerminal from "@/pages/RestauranteTerminal";
 import RestauranteCarta from "@/pages/RestauranteCarta";
 import Utilidades from "@/pages/Utilidades";
+import Transporte from "@/pages/Transporte";
+import UsuariosComercio from "@/pages/UsuariosComercio";
+import { AccesoUsuario } from "@/components/usuarios/AccesoUsuario";
 import { utilidadesSecciones } from "@/config/utilidadesNavigation";
 import { useRestauranteTerminalAcceso } from "@/hooks/useRestaurantePin";
 import { RestauranteAcceso } from "@/components/restaurante/RestauranteAcceso";
@@ -279,7 +282,10 @@ function AuthenticatedLayout() {
             {puedeCambiarEmpleado && <Button variant="outline" size="sm" onClick={() => navigate("/restaurante-terminal")}>Cambiar empleado</Button>}
           </header>
           <main className="flex-1 bg-background">
-            {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <RestauranteAcceso><Routes>
+            {seleccionRequerida ? <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6 text-center text-muted-foreground">Seleccioná el comercio con el que querés trabajar.</div> : <AccesoUsuario><RestauranteAcceso><Routes>
+              <Route path="/usuarios" element={<UsuariosComercio />} />
+              <Route path="/usuarios/nuevo" element={<UsuariosComercio formulario />} />
+              <Route path="/usuarios/:usuarioId/editar" element={<UsuariosComercio formulario />} />
               <Route path="/" element={<Navigate to={parametrizacion.inicio.habilitado ? "/inicio" : "/caja"} replace />} />
               <Route path="/inicio" element={parametrizacion.inicio.habilitado ? <InicioOperativo /> : <Navigate to="/caja" replace />} />
               <Route path="/clientes" element={<ParametrizedRoute modulo="clientes"><Clientes /></ParametrizedRoute>} />
@@ -334,6 +340,7 @@ function AuthenticatedLayout() {
               <Route path="/apicola" element={<ParametrizedRoute modulo="apicola"><Navigate to="/apicola/resumen" replace /></ParametrizedRoute>} />
               <Route path="/apicola/:vista" element={<ParametrizedRoute modulo="apicola"><Apicola /></ParametrizedRoute>} />
               <Route path="/taller" element={<ParametrizedRoute modulo="taller"><Taller seccion="resumen" /></ParametrizedRoute>} />
+              <Route path="/transporte/*" element={<ParametrizedRoute modulo="transporte"><Transporte /></ParametrizedRoute>} />
               <Route path="/restaurante" element={<ParametrizedRoute modulo="restaurante"><Navigate to="/restaurante/pedidos" replace /></ParametrizedRoute>} />
               {restauranteSecciones.map(({ vista }) => <Route key={vista} path={`/restaurante/${vista}`} element={<ParametrizedRoute modulo="restaurante"><Restaurante vista={vista} /></ParametrizedRoute>} />)}
               <Route path="/distribucion" element={<ParametrizedRoute modulo="distribucion"><Navigate to="/distribucion/pedidos" replace /></ParametrizedRoute>} />
@@ -361,6 +368,7 @@ function AuthenticatedLayout() {
               <Route path="/campo/partes-pendientes" element={<ParametrizedRoute modulo="campo"><CampoPartesPendientes /></ParametrizedRoute>} />
               <Route path="/campo/operarios" element={<ParametrizedRoute modulo="campo"><CampoOperarios /></ParametrizedRoute>} />
               <Route path="/campo/operadores" element={<ParametrizedRoute modulo="campo"><CampoOperadores /></ParametrizedRoute>} />
+              <Route path="/campo/operadores/:usuarioId/vincular" element={<ParametrizedRoute modulo="campo"><CampoOperadores /></ParametrizedRoute>} />
               <Route path="/campo/maquinarias" element={<ParametrizedRoute modulo="campo"><CampoMaquinarias /></ParametrizedRoute>} />
               <Route path="/campo/tarifas" element={<ParametrizedRoute modulo="campo"><CampoTarifas /></ParametrizedRoute>} />
               <Route path="/campo/insumos" element={<ParametrizedRoute modulo="campo"><CampoInsumos /></ParametrizedRoute>} />
@@ -374,7 +382,7 @@ function AuthenticatedLayout() {
               <Route path="/listados/gastos-egresos" element={<ParametrizedRoute modulo="listados"><ListadoGastosEgresos /></ParametrizedRoute>} />
               <Route path="/listados/cuenta-corriente" element={<ParametrizedRoute modulo="listados"><ListadoCuentaCorriente /></ParametrizedRoute>} />
               <Route path="*" element={<NotFound />} />
-            </Routes></RestauranteAcceso>}
+            </Routes></RestauranteAcceso></AccesoUsuario>}
           </main>
           {!terminalRestaurante && <MembershipReminder comercio={comercio} onVisibilityChange={setMembershipOpen} />}
           <ModalesComunicaciones bloqueado={terminalRestaurante || seleccionRequerida || membershipOpen} />

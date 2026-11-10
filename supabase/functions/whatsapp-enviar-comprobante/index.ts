@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { assertPermisoUsuario } from '../_shared/usuarios-permisos.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +65,7 @@ Deno.serve(async (req) => {
       true,
     ).eq("solo_restaurante", false).maybeSingle();
     if (!membership) throw new Error("No tiene acceso a este comercio");
+    await assertPermisoUsuario(db,userData.user.id,comercioId,'whatsapp','operar');
     const { data: credentials, error: credentialsError } = await db
       .from("whatsapp_credenciales")
       .select("access_token, waba_id, phone_number_id")

@@ -1,5 +1,11 @@
 # Venta local y disponibilidad de la tienda: stock por talle/color
 
+## Conciliación 385 — MONO SIMONE, 10/11/2026
+
+El usuario confirmó una sola unidad física de Negro L y autorizó ajustar el stock a 1. La revisión remota encontró total general 2 y una única variante Negro L con stock 1; una compra recibida por 1 y ningún ítem de venta registrado del producto. Esa diferencia impedía registrar una nueva venta.
+
+Se guardó un respaldo privado del producto y su variante en `private-backups` (excluido de Git) y se ejecutó `docs/sql/reparar-stock-euforia-385.sql`, separado de las migraciones estructurales. La transacción validó comercio, producto, stock, fecha de actualización y distribución completa, y ajustó únicamente el stock general de 2 a 1. Se conservó la variante en 1 y se verificó que los demás datos del producto permanecieran iguales, salvo la fecha de actualización. No se registró ninguna venta ni se publicó el frontend.
+
 ## Causa identificada
 
 El formulario seleccionaba `producto_variante_id`, pero `useVentas` lo descartaba al preparar el JSON para registrar una venta normal, manual o multi-CUIT. Además, las funciones `registrar_venta_transaccional` y `registrar_venta_emisor_transaccional` no aceptaban ni insertaban ese campo. El trigger descontaba el stock de `productos`, dejando intacta `producto_variantes`.

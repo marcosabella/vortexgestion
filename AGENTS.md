@@ -53,6 +53,13 @@ No ejecutar comandos que escriban artefactos, inicien despliegues o alteren serv
 - No utilizar `mercadopago_sucursales` como bases operativas o sucursales generales: esa tabla pertenece exclusivamente a la integracion con Mercado Pago.
 - La interfaz nueva debe ser responsive y utilizable desde celular, considerando operacion en contexto rural y pantallas tactiles.
 
+## Preferencias de interfaz
+
+- Los formularios de alta (Nuevo/Agregar) y edición deben abrir como páginas con URL propia, dentro del diseño principal, con acciones claras para volver o cancelar. No usar modales para estos formularios salvo pedido expreso del usuario.
+- Aplicar esta preferencia en futuras modificaciones, altas y nuevos módulos. Al intervenir un formulario existente, conservar los permisos, las validaciones y el retorno al listado correspondiente.
+- Los accesos a las funciones de Vortex Transporte se realizan desde las opciones del menú lateral, sin repetir una fila de botones de navegación dentro de las páginas.
+- Las cuentas y permisos de personas se administran centralmente en Configuración → Usuarios y permisos, también para comercios sin módulos adicionales. Los módulos deben reutilizar esas identidades y conservar únicamente sus vínculos operativos y funciones específicas. Los usuarios nuevos o configurados requieren autorización en el backend; no alcanza con ocultar opciones del menú.
+
 ## Migraciones y proteccion de datos
 
 - Publicar en Netlify solamente por pedido expreso del usuario. Un pedido de commit y push no autoriza una publicacion.

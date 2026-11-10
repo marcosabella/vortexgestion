@@ -104,7 +104,11 @@ export function PagoClienteMultipleDialog({
     .filter((document): document is PendingDocument => Boolean(document));
   const debt = roundMoney(Math.max(Math.min(selectedDocuments.reduce((sum, document) => sum + document.saldo, 0), saldoCliente), 0));
   const assigned = roundMoney(rows.reduce((sum, row) => sum + Number(row.monto), 0));
+  const regularAssigned = roundMoney(rows.filter((row) => row.tipo !== "cheque").reduce((sum, row) => sum + Number(row.monto), 0));
   const remaining = roundMoney(Math.max(debt - assigned, 0));
+  const excess = roundMoney(Math.max(assigned - debt, 0));
+  const projectedBalance = roundMoney(saldoCliente - assigned);
+  const paymentsValid = Number.isFinite(assigned) && assigned > 0 && regularAssigned <= debt;
   const selectionValid = selectedDocuments.length > 0 && selectedDocuments.length === documentIds.length;
   const chequeComplete = Boolean(
     Number.isFinite(chequeAmount) && roundMoney(chequeAmount) > 0 && cheque.numero_cheque.trim() && cheque.banco_emisor.trim()
@@ -137,8 +141,8 @@ export function PagoClienteMultipleDialog({
   const applyDocuments = () => {
     const selectedDebt = roundMoney(Math.max(Math.min(draftDocumentIds.reduce((sum, id) =>
       sum + (pendingDocuments.find((document) => document.id === id)?.saldo || 0), 0), saldoCliente), 0));
-    if (selectedDebt < assigned) {
-      toast({ title: "Selección insuficiente", description: "Los comprobantes elegidos no cubren los medios de pago ya agregados.", variant: "destructive" });
+    if (selectedDebt < regularAssigned) {
+      toast({ title: "Selección insuficiente", description: "Los comprobantes elegidos no cubren los pagos en efectivo, transferencia o tarjeta ya agregados. Solo los cheques pueden generar un excedente a cuenta.", variant: "destructive" });
       return;
     }
     setDocumentIds(draftDocumentIds);
@@ -153,7 +157,7 @@ export function PagoClienteMultipleDialog({
     setAmount(0);
   };
   const openChequeForm = () => {
-    if (!selectionValid || remaining <= 0) {
+    if (!selectionValid || debt <= 0) {
       toast({ title: "Seleccioná primero uno o más comprobantes pendientes", variant: "destructive" });
       return;
     }
@@ -162,8 +166,8 @@ export function PagoClienteMultipleDialog({
     setChequeOpen(true);
   };
   const addCheque = () => {
-    if (!chequeComplete || roundMoney(chequeAmount) > remaining) {
-      toast({ title: "Cheque inválido", description: "Completá sus datos y verificá que el importe no supere el saldo restante.", variant: "destructive" });
+    if (!chequeComplete) {
+      toast({ title: "Cheque inválido", description: "Completá sus datos e ingresá el importe total del cheque, mayor que cero.", variant: "destructive" });
       return;
     }
     setRows((current) => [...current, {
@@ -177,7 +181,7 @@ export function PagoClienteMultipleDialog({
     setChequeAmount(0);
   };
   const submit = () => {
-    if (!selectionValid || rows.length === 0 || assigned > debt || !date || registrarPagosMixtos.isPending) return;
+    if (!selectionValid || debt <= 0 || !paymentsValid || !date || registrarPagosMixtos.isPending) return;
     registrarPagosMixtos.mutate({
       solicitudId,
       clienteId,
@@ -213,18 +217,22 @@ export function PagoClienteMultipleDialog({
           <Summary label="Total agregado" value={assigned} className="text-green-600" />
           <Summary label="Saldo restante" value={remaining} className="text-orange-600" />
         </div>
+        {excess > 0 && <div role="status" className="space-y-1 rounded-lg border p-4 text-sm">
+          <p>Se imputarán {money(Math.min(assigned, debt))} a los comprobantes seleccionados. El excedente del cheque de <strong>{money(excess)}</strong> quedará como crédito en la cuenta corriente del cliente.</p>
+          <p>{projectedBalance < 0 ? <>Saldo a favor después del pago: <strong>{money(Math.abs(projectedBalance))}</strong>.</> : projectedBalance > 0 ? <>Saldo total pendiente después del pago: <strong>{money(projectedBalance)}</strong>.</> : "La cuenta quedará saldada."}</p>
+        </div>}
         <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_1fr_auto]">
           <div className="space-y-2"><Label>Medio de pago</Label><Select value={method} onValueChange={(value) => setMethod(value as PaymentRow["tipo"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contado">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="cheque">Cheque</SelectItem></SelectContent></Select></div>
           {method !== "cheque"
             ? <div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={amount || ""} onChange={(event) => setAmount(Number(event.target.value))} /></div>
             : <div className="flex items-end"><p className="pb-2 text-sm text-muted-foreground">El cheque recibido ingresará en cartera.</p></div>}
-          <div className="flex items-end"><Button type="button" disabled={!selectionValid || remaining <= 0 || registrarPagosMixtos.isPending} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
+          <div className="flex items-end"><Button type="button" disabled={!selectionValid || debt <= 0 || (method !== "cheque" && remaining <= 0) || registrarPagosMixtos.isPending} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
         </div>
         <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Medio</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Importe</TableHead><TableHead className="w-16" /></TableRow></TableHeader><TableBody>{rows.length === 0
           ? <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Todavía no agregaste medios de pago.</TableCell></TableRow>
           : rows.map((row) => <TableRow key={row.localId}><TableCell>{methodLabels[row.tipo]}</TableCell><TableCell>{row.detail}</TableCell><TableCell className="text-right font-medium">{money(row.monto)}</TableCell><TableCell><Button type="button" size="icon" variant="ghost" className="text-destructive" disabled={registrarPagosMixtos.isPending} onClick={() => setRows((current) => current.filter((item) => item.localId !== row.localId))}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div>
         <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Fecha</Label><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div><div className="space-y-2"><Label>Observaciones generales</Label><Input value={notes} onChange={(event) => setNotes(event.target.value)} /></div></div>
-        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={registrarPagosMixtos.isPending}>Cancelar</Button><Button onClick={submit} disabled={!selectionValid || rows.length === 0 || assigned > debt || !date || registrarPagosMixtos.isPending}>Confirmar pago</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} disabled={registrarPagosMixtos.isPending}>Cancelar</Button><Button onClick={submit} disabled={!selectionValid || debt <= 0 || !paymentsValid || !date || registrarPagosMixtos.isPending}>Confirmar pago</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -235,8 +243,10 @@ export function PagoClienteMultipleDialog({
     </DialogContent></Dialog>
 
     <Dialog open={chequeOpen} onOpenChange={setChequeOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Registrar cheque recibido</DialogTitle></DialogHeader>
+      <p className="text-sm text-muted-foreground">Ingresá el importe total del cheque. Si supera la deuda seleccionada, la diferencia quedará como crédito en la cuenta corriente del cliente.</p>
       <div className="grid gap-4 sm:grid-cols-2"><Field label="Número de cheque" value={cheque.numero_cheque} onChange={(value) => setCheque((current) => ({ ...current, numero_cheque: value }))} /><Field label="Banco emisor" value={cheque.banco_emisor} onChange={(value) => setCheque((current) => ({ ...current, banco_emisor: value }))} /><div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={chequeAmount || ""} onChange={(event) => setChequeAmount(Number(event.target.value))} /></div><Field label="Nombre del emisor" value={cheque.emisor_nombre} onChange={(value) => setCheque((current) => ({ ...current, emisor_nombre: value }))} /><Field label="CUIT del emisor" value={cheque.emisor_cuit || ""} onChange={(value) => setCheque((current) => ({ ...current, emisor_cuit: value }))} /><div className="space-y-2"><Label>Fecha de emisión</Label><Input type="date" value={cheque.fecha_emision} onChange={(event) => setCheque((current) => ({ ...current, fecha_emision: event.target.value }))} /></div><div className="space-y-2"><Label>Fecha de vencimiento</Label><Input type="date" value={cheque.fecha_vencimiento} onChange={(event) => setCheque((current) => ({ ...current, fecha_vencimiento: event.target.value }))} /></div><div className="space-y-2 sm:col-span-2"><Label>Observaciones</Label><Textarea rows={2} value={cheque.observaciones || ""} onChange={(event) => setCheque((current) => ({ ...current, observaciones: event.target.value }))} /></div></div>
-      <DialogFooter><Button variant="outline" onClick={() => setChequeOpen(false)}>Cancelar</Button><Button disabled={!chequeComplete || roundMoney(chequeAmount) > remaining} onClick={addCheque}>Agregar cheque</Button></DialogFooter>
+      {roundMoney(chequeAmount) > remaining && <p role="status" className="text-sm">Este cheque dejará {money(roundMoney(chequeAmount - remaining))} adicionales como crédito a cuenta.</p>}
+      <DialogFooter><Button variant="outline" onClick={() => setChequeOpen(false)}>Cancelar</Button><Button disabled={!chequeComplete} onClick={addCheque}>Agregar cheque</Button></DialogFooter>
     </DialogContent></Dialog>
   </>;
 }

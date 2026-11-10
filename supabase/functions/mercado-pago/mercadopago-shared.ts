@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { assertPermisoUsuario } from '../_shared/usuarios-permisos.ts';
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -39,6 +40,7 @@ export async function assertComercio(
   ).eq("user_id", userId).eq("comercio_id", comercioId).eq("activo", true).eq("solo_restaurante", false)
     .maybeSingle();
   if (error || !data) throw new Error("No tiene acceso al comercio");
+  await assertPermisoUsuario(db,userId,comercioId,'mercado_pago','operar');
 }
 export async function credential(db: any, comercioId: string) {
   const { data, error } = await db.from("mercadopago_credenciales").select("*")

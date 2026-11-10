@@ -116,6 +116,7 @@ try {
   `);
   sql(migration('20260924150000_pagos_mixtos_clientes.sql'));
   sql(migration('20261002100000_cobros_cliente_multi_comprobante.sql'));
+  sql(migration('20261110110000_cobros_cheque_excedente_cliente.sql'));
 
   sql(`ALTER TABLE public.comercio ADD COLUMN nombre_comercio text DEFAULT 'Comercio prueba', ADD COLUMN calle text, ADD COLUMN numero text, ADD COLUMN localidad text, ADD COLUMN provincia text, ADD COLUMN codigo_postal text, ADD COLUMN telefono text, ADD COLUMN cuit text, ADD COLUMN situacion_afip text, ADD COLUMN ingresos_brutos text, ADD COLUMN fecha_inicio_actividad date, ADD COLUMN logo_url text, ADD COLUMN mostrar_razon_social_con_logo boolean;
     ALTER TABLE public.clientes ADD COLUMN nombre text DEFAULT 'Cliente', ADD COLUMN apellido text DEFAULT 'Prueba', ADD COLUMN cuit text, ADD COLUMN telefono text;
@@ -141,6 +142,17 @@ try {
     check("SELECT count(*)=1 FROM recibos_pago_cliente",'un recibo')+
     check("SELECT sum(monto)=100 FROM cuenta_corriente WHERE tipo_movimiento='credito'",'un cobro')+
     fails(receiptCall(90),'solicitud_recibo_datos_distintos'));
+  const excessCall=receiptCall(400,request,ids.client,[ids.sale1,ids.sale2],[{tipo:'cheque',monto:400,cheque}]);
+  test('Recibo de cheque excedido incluye importe completo, saldo a favor e idempotencia',excessCall+excessCall+
+    check("SELECT count(*)=1 AND min(importe)=400 AND min(saldo_anterior)=350 AND min(saldo_posterior)=-50 FROM recibos_pago_cliente",'saldo a favor persistido')+
+    check("SELECT cardinality(movimiento_ids)=3 AND jsonb_array_length(documentos)=2 AND pagos->0->>'monto'='400' FROM recibos_pago_cliente",'imputaciones y crédito en un recibo')+
+    check("SELECT sum((d->>'importe')::numeric)=350 FROM recibos_pago_cliente,jsonb_array_elements(documentos) d",'documentos sin sobrepago')+
+    check("SELECT count(*)=1 AND min(monto)=400 FROM cheques",'un cheque sin duplicar'));
+  test('Revertir excedente anula recibo y restituye deuda completa',excessCall+
+    "SELECT eliminar_pago_cliente((SELECT id FROM cuenta_corriente WHERE venta_id IS NULL));"+
+    check("SELECT importe=400 AND anulado_en IS NOT NULL FROM recibos_pago_cliente",'recibo completo anulado')+
+    check("SELECT count(*)=0 FROM cheques",'sin cheque')+
+    check("SELECT count(*)=0 FROM cuenta_corriente WHERE tipo_movimiento='credito'",'sin crédito residual'));
   test('Reimpresion mantiene saldo e identidad aunque haya nuevos movimientos',receiptCall()+
     "RESET ROLE; UPDATE clientes SET nombre='Nombre nuevo' WHERE id='"+ids.client+"'; UPDATE comercio SET nombre_comercio='Otro nombre' WHERE id='"+ids.tenant+"';"+asUser+
     receiptCall(100,'40000000-0000-0000-0000-000000000002',ids.client,[ids.sale2])+
