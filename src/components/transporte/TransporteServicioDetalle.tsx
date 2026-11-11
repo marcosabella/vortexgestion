@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TransporteForm } from './TransporteForm';
+import { TransporteLineaTiempo } from './TransporteLineaTiempo';
 import type { TransporteCampo } from './transporteCampos';
 import { supabase } from '@/integrations/supabase/client';
 import type { useTransporte } from '@/hooks/useTransporte';
 import { ESTADOS_TRANSPORTE, type EstadoTransporte, type TransporteDatos, type TransporteServicio } from '@/types/transporte';
-import { transporteError, transporteImporte } from '@/utils/transporte';
+import { PRESENTACIONES_TRANSPORTE, transporteError, transporteImporte } from '@/utils/transporte';
 
 const siguientes: Partial<Record<EstadoTransporte, EstadoTransporte>> = { solicitado: 'asignado', asignado: 'en_camino', en_camino: 'en_lugar', en_lugar: 'trasladando', trasladando: 'finalizado' };
-const presentaciones = { pendiente_documentacion: 'Pendiente de documentación', pendiente_autorizacion: 'Pendiente de autorización', listo: 'Listo para facturar', observado: 'Observado', rechazado: 'Rechazado' };
+const presentaciones = PRESENTACIONES_TRANSPORTE;
 export function TransporteServicioDetalle({ servicio: s, datos: d, run, pending }: { servicio: TransporteServicio; datos: TransporteDatos; run: ReturnType<typeof useTransporte>['run']; pending: boolean }) {
   const [transicion, setTransicion] = useState<EstadoTransporte | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -49,8 +50,8 @@ export function TransporteServicioDetalle({ servicio: s, datos: d, run, pending 
       {d.admin && s.venta_id && <Button asChild variant="outline"><Link to="/ventas">Ver ventas y cobros</Link></Button>}
     </div>
     {transicion && <section className="rounded-lg border p-4"><h3 className="mb-3 font-semibold">Registrar: {ESTADOS_TRANSPORTE[transicion]}</h3><TransporteForm key={transicion} campos={campos} pending={pending} guardar={async datos => { await run({ accion: 'estado', id: s.id, version: s.version, datos: { ...datos, estado: transicion } }); setTransicion(null); }} /><Button variant="ghost" disabled={pending} onClick={() => setTransicion(null)}>Volver</Button></section>}
-    {d.admin && puedeEditar && !s.venta_id && <section className="rounded-lg border p-4"><h3 className="mb-3 font-semibold">Documentación y presentación</h3><TransporteForm key={`${s.id}-${s.version}`} campos={[{ key: 'presentacion', label: 'Estado de presentación', required: true, options: Object.entries(presentaciones).map(([value, label]) => ({ value, label })) }, { key: 'detalle', label: 'Observación de la presentación' }]} valores={s} pending={pending} guardar={async datos => { await run({ accion: 'presentacion', id: s.id, version: s.version, datos }); }} /></section>}
-    <section className="space-y-3"><h3 className="font-semibold">Fotos, documentación y constancias</h3><label className="block text-sm">Adjuntar imagen o PDF (hasta 10 MB)<input className="mt-2 block w-full text-sm" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={!puedeOperar || subiendo || pending} onChange={async e => {
+    {d.admin && puedeEditar && !s.venta_id && <section className="rounded-lg border p-4"><h3 className="mb-3 font-semibold">Documentación y revisión (opcionales)</h3><p className="mb-3 text-sm text-muted-foreground">Podés facturar el servicio finalizado sin adjuntar documentos ni crear un presupuesto. Usá esta revisión solo si el cliente lo requiere.</p><TransporteForm key={`${s.id}-${s.version}`} campos={[{ key: 'presentacion', label: 'Estado de presentación', required: true, options: Object.entries(presentaciones).map(([value, label]) => ({ value, label })) }, { key: 'detalle', label: 'Observación de la presentación' }]} valores={s} pending={pending} guardar={async datos => { await run({ accion: 'presentacion', id: s.id, version: s.version, datos }); }} /></section>}
+    <section className="space-y-3"><h3 className="font-semibold">Fotos, documentación y constancias</h3><label className="block text-sm">Adjuntar imagen o PDF (opcional, hasta 10 MB)<input className="mt-2 block w-full text-sm" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={!puedeOperar || subiendo || pending} onChange={async e => {
       const file = e.target.files?.[0]; e.target.value = ''; if (!file) return;
       setError('');
       if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type) || file.size > 10 * 1024 * 1024) { setError('Elegí una imagen JPG, PNG, WebP o un PDF de hasta 10 MB.'); return; }
@@ -65,6 +66,6 @@ export function TransporteServicioDetalle({ servicio: s, datos: d, run, pending 
       {d.adjuntos.filter(a => a.servicio_id === s.id).map(a => <div key={a.id} className="flex flex-wrap items-center gap-3 text-sm"><span>{a.nombre}</span><Button variant="outline" size="sm" onClick={() => void abrir(a.ruta)}>Preparar enlace</Button>{archivo?.ruta === a.ruta && <a className="underline" href={archivo.url} target="_blank" rel="noreferrer">Abrir archivo (enlace por 60 segundos)</a>}</div>)}
     </section>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <section className="space-y-2"><h3 className="font-semibold">Historial</h3>{d.eventos.filter(e => e.servicio_id === s.id).map(e => <div className="border-l-2 pl-3 text-sm" key={e.id}><p>{new Date(e.created_at).toLocaleString('es-AR')} · {ESTADOS_TRANSPORTE[e.estado as EstadoTransporte] || e.estado}</p><p className="whitespace-pre-wrap">{e.detalle}</p></div>)}</section>
+    <TransporteLineaTiempo eventos={d.eventos.filter(e => e.servicio_id === s.id)} />
   </div>;
 }

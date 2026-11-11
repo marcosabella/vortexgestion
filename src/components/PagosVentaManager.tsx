@@ -20,6 +20,7 @@ type PagosVentaManagerProps = {
   pagos: Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">[]
   onChange: (pagos: Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at">[]) => void
   mercadoPagoHabilitado?: boolean
+  permitirCuentaCorriente?: boolean
   mercadoPagoCajas?: Array<{ id: string; nombre: string; sucursal?: { nombre?: string } }>
   mercadoPagoCajaId?: string
   onMercadoPagoCajaChange?: (cajaId: string) => void
@@ -31,6 +32,7 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
   pagos,
   onChange,
   mercadoPagoHabilitado = false,
+  permitirCuentaCorriente = true,
   mercadoPagoCajas = [],
   mercadoPagoCajaId = "",
   onMercadoPagoCajaChange,
@@ -46,7 +48,7 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
   const [cuotas, setCuotas] = useState<number>(1)
   const [recargoMonetario, setRecargoMonetario] = useState<number>(0)
   const [chequeDialogOpen, setChequeDialogOpen] = useState(false)
-  const [pendingPago, setPendingPago] = useState<any>(null)
+  const [pendingPago, setPendingPago] = useState<Omit<PagoVenta, "id" | "venta_id" | "created_at" | "updated_at"> | null>(null)
 
   const { tarjetaCuotas } = useTarjetaCuotas(tarjetaId)
 
@@ -154,12 +156,18 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
     resetForm()
   }
 
-  const handleChequeSubmit = async (chequeData: any) => {
+  const handleChequeSubmit = async (chequeData: Parameters<React.ComponentProps<typeof ChequeDialogForm>["onSubmit"]>[0]) => {
     if (!pendingPago) return
 
     try {
       const chequeCompleto = {
         ...chequeData,
+        numero_cheque: chequeData.numero_cheque,
+        banco_emisor: chequeData.banco_emisor,
+        monto: chequeData.monto,
+        fecha_emision: chequeData.fecha_emision,
+        fecha_vencimiento: chequeData.fecha_vencimiento,
+        emisor_nombre: chequeData.emisor_nombre,
         cliente_id: clienteId,
         estado: 'en_cartera' as const,
       }
@@ -244,7 +252,7 @@ export const PagosVentaManager: React.FC<PagosVentaManagerProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TIPOS_PAGO.filter(tipo => tipo.value !== "mercado_pago" || mercadoPagoHabilitado).map(tipo => (
+                    {TIPOS_PAGO.filter(tipo => (tipo.value !== "mercado_pago" || mercadoPagoHabilitado) && (tipo.value !== "cta_cte" || permitirCuentaCorriente)).map(tipo => (
                       <SelectItem key={tipo.value} value={tipo.value}>
                         {tipo.label}
                       </SelectItem>

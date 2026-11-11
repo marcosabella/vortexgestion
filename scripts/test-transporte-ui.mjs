@@ -5,6 +5,9 @@ const mock = `
 export const useTransporte=()=>({data:globalThis.__transporteDatos,comercio:{id:'comercio',nombre_comercio:'Demo'},run:async()=>'',isPending:false,isFetching:false,refetch:async()=>{}});
 export const useComercioParametrizacion=()=>({data:{funciones:{multiples_cuit:false}}});
 export const useEmisoresFiscales=()=>({data:[],isFetching:false});
+export const useBancos=()=>({bancos:[]});
+export const useTarjetas=()=>({tarjetas:[]});
+export const useTarjetaCuotas=()=>({tarjetaCuotas:[]});
 export const supabase={storage:{from:()=>{throw Error('No se permiten conexiones en esta prueba')}}};`;
 const entry = `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {MemoryRouter} from 'react-router-dom';
 import Transporte from './src/pages/Transporte';
@@ -16,7 +19,7 @@ export function detalle(servicio,datos){return renderToStaticMarkup(<MemoryRoute
 export function formulario(accion,datos){return renderToStaticMarkup(<TransporteForm campos={camposTransporte(accion,datos)} guardar={async()=>{}} pending={false}/>)}
 `;
 const bundle = await build({ stdin: { contents: entry, loader: 'tsx', resolveDir: process.cwd() }, write: false, bundle: true, platform: 'node', format: 'esm', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'transporte-fixtures', setup(builder) {
-  builder.onResolve({ filter: /^@\/(hooks\/(useTransporte|useEmisoresFiscales|useComercioParametrizacion)|integrations\/supabase\/client)$/ }, () => ({ path: 'fixtures', namespace: 'fixtures' }));
+  builder.onResolve({ filter: /^@\/(hooks\/(useTransporte|useEmisoresFiscales|useComercioParametrizacion|useBancos|useTarjetas|useTarjetaCuotas)|integrations\/supabase\/client)$/ }, () => ({ path: 'fixtures', namespace: 'fixtures' }));
   builder.onLoad({ filter: /.*/, namespace: 'fixtures' }, () => ({ contents: mock, loader: 'js' }));
 } }] });
 // Mantiene los require del runtime de React resolubles desde este script.

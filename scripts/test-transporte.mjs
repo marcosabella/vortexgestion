@@ -63,6 +63,13 @@ try {
   sql('GRANT SELECT ON presupuestos,presupuesto_items,presupuesto_pagos TO authenticated;');
   sql(migration('20260908130000_venta_items_precio_iva_decimal.sql'));
   sql(migration('20261110100000_vortex_transporte.sql'));
+  // Fixture del permiso central; permite probar la nueva operación sin importar
+  // las dependencias de todos los módulos de Gestión en esta base temporal.
+  sql(`CREATE FUNCTION public.vortex_permiso(c uuid,m text,a text) RETURNS boolean LANGUAGE sql AS $$ SELECT public.user_is_comercio_admin(c) AND coalesce(current_setting('app.test_editar',true),'true')<>'false' $$;`);
+  sql(migration('20261111100000_transporte_eliminar_registros.sql'));
+  sql(migration('20261111101000_transporte_validar_equipo_servicio.sql'));
+  sql(migration('20261111102000_transporte_documentacion_opcional.sql'));
+  sql(migration('20261111103000_transporte_liquidacion_recargos_pago.sql'));
   sql(`INSERT INTO comercio VALUES('${tenant}'),('${other}'); INSERT INTO comercio_usuarios VALUES('${tenant}','${admin}','admin',true),('${tenant}','${driver}','operador',true);
     INSERT INTO comercio_parametrizacion(comercio_id,parametros) VALUES('${tenant}','{"modulos":{"transporte":true}}'),('${other}','{"modulos":{"transporte":true}}');
     INSERT INTO clientes VALUES('${client}','${tenant}','Cliente','Local',NULL),('${foreign}','${other}','Ajeno','',NULL);`);
@@ -70,6 +77,7 @@ try {
   const chauffeur = sql(actor + op('chofer', { nombre: 'Chofer', user_id: driver }));
   const serviceData = { tipo: 'auxilio', cliente_id: client, origen: 'Retiro', destino: 'Taller', carga: 'Auto', precio_manual: 121, iva: 21, unidad_id: unit, chofer_id: chauffeur };
   const service = sql(actor + op('servicio', serviceData));
+  test('Unidad y equipo iguales muestran validación clara antes del CHECK', actor + fail(op('servicio', { ...serviceData, equipo_id: unit }), 'La unidad principal y el equipo adicional deben ser distintos') + check('SELECT count(*)=1 FROM transporte_servicios', 'alta inválida sin registros parciales'));
   const currentVersion = id => Number(sql(`SELECT version FROM transporte_servicios WHERE id='${id}'`));
   const state = (id, value, data = {}) => op('estado', { estado: value, ...data }, id, currentVersion(id));
   test('Aislamiento: rechaza cliente ajeno y oculta datos de otra empresa', actor + fail(op('servicio', { ...serviceData, cliente_id: foreign }), 'transporte_relacion_de_otro_comercio') + check(`SELECT count(*)=0 FROM transporte_unidades WHERE comercio_id='${other}'`, 'RLS por comercio'));
@@ -98,12 +106,45 @@ try {
   test('Mantenimiento realizado actualiza próximos vencimientos', actor + op('mantenimiento', { unidad_id: unit, plan_id: maintenancePlan, fecha: '2026-11-10', estado: 'realizado', tareas: 'Cambio de aceite', kilometraje: 120, horas: 0 }) + check(`SELECT proximo_km=1120 AND proxima_fecha='2026-12-10' FROM transporte_planes WHERE id='${maintenancePlan}'`, 'vencimientos renovados'));
   const budget = sql(actor + op('presupuesto', { servicios: [second] }));
   test('Presupuesto vinculado e idempotente', actor + check(`${op('presupuesto', { servicios: [second] }).replace(/;$/, '')}='${budget}'::uuid`, 'mismo presupuesto') + check(`SELECT total=121 FROM presupuestos WHERE id='${budget}'`, 'total presupuesto'));
-  sql(actor + op('presentacion', { presentacion: 'listo' }, service, currentVersion(service)));
   const invoice = op('facturar', { servicios: [service], tipo_comprobante: 'recibo_x', modalidad: 'cta_cte', pagos: [], idempotency_key: uuid(20) });
+  for (const presentacion of ['pendiente_autorizacion','observado','rechazado']) {
+    sql(actor + op('presentacion', { presentacion }, service, currentVersion(service)));
+    test(`Facturar respeta revisión explícita: ${presentacion}`, actor + fail(invoice, 'Finalizá el servicio y revisá'));
+  }
+  sql(actor + op('presentacion', { presentacion: 'pendiente_documentacion' }, service, currentVersion(service)));
+  test('Liquidación directa sin presupuesto ni documentos', actor + check(`SELECT presupuesto_id IS NULL AND presentacion='pendiente_documentacion' FROM transporte_servicios WHERE id='${service}'`, 'servicio directo') + check(`SELECT count(*)=0 FROM transporte_adjuntos WHERE servicio_id='${service}'`, 'sin documentos'));
+  test('No factura un servicio que todavía no finalizó', actor + fail(op('facturar', { servicios: [second], tipo_comprobante: 'recibo_x', modalidad: 'cta_cte', pagos: [], idempotency_key: uuid(22) }), 'Finalizá el servicio y revisá'));
   const sale = sql(actor + invoice);
   test('Venta real reutiliza función de Gestión y vincula servicio', actor + check(`SELECT total=121 AND tipo_pago='cta_cte' FROM ventas WHERE id='${sale}'`, 'total y modalidad') + check(`SELECT venta_id='${sale}' FROM transporte_servicios WHERE id='${service}'`, 'venta vinculada'));
   test('Reintento no duplica venta ni pago', actor + check(`${invoice.replace(/;$/, '')}='${sale}'::uuid`, 'misma venta') + check('SELECT count(*)=1 FROM ventas', 'venta única') + check('SELECT count(*)=1 FROM pagos_venta', 'pago único'));
   test('Storage privado y helpers no ejecutables', check("SELECT NOT public FROM storage.buckets WHERE id='transporte'", 'bucket privado') + check("NOT has_function_privilege('authenticated','transporte_registrar_lectura(uuid,uuid,uuid,numeric,numeric,text)','EXECUTE')", 'helper privado'));
+  const remove = (section, id, version = null) => op('eliminar', { seccion: section }, id, version);
+  const unused = sql(actor + op('unidad', { nombre: 'Sin uso', patente: 'AB123CD', tipo: 'grua', kilometraje: 0, horas: 0 }));
+  test('Eliminar requiere administración', driverActor + fail(remove('unidades', unused), 'transporte_solo_administracion'));
+  test('Eliminar requiere permiso de edición del backend', actor + `SET app.test_editar='false';` + fail(remove('unidades', unused), 'No tenés permiso para eliminar registros de Transporte') + `SET app.test_editar='true';`);
+  test('Eliminar no acepta secciones arbitrarias ni lecturas históricas', actor + fail(remove('lecturas', unused), 'transporte_eliminacion_no_permitida') + fail(remove('unidades; DROP TABLE comercio', unused), 'transporte_eliminacion_no_permitida'));
+  sql(`INSERT INTO transporte_unidades(id,comercio_id,nombre,patente,tipo) VALUES('${uuid(90)}','${other}','Ajena','AJENA','grua')`);
+  test('Eliminar valida tenant en el servidor', actor + fail(remove('unidades', uuid(90)), 'transporte_registro_no_disponible') + check(`SELECT count(*)=1 FROM transporte_unidades WHERE id='${unused}'`, 'registro local conservado'));
+  test('Eliminar unidad sin uso elimina solo su lectura inicial', actor + remove('unidades', unused) + check(`SELECT count(*)=0 FROM transporte_unidades WHERE id='${unused}'`, 'unidad eliminada') + check(`SELECT count(*)=0 FROM transporte_lecturas WHERE unidad_id='${unused}'`, 'lectura inicial eliminada'));
+  test('Unidad y tarifa utilizadas no se eliminan', actor + fail(remove('unidades', unit), 'La unidad tiene registros vinculados') + fail(remove('tarifas', tariff), 'El registro tiene vínculos'));
+  const draft = sql(actor + op('servicio', { ...serviceData, unidad_id: null, chofer_id: null }));
+  test('Eliminar servicio exige versión vigente', actor + fail(remove('servicios', draft, 0), 'transporte_version_desactualizada'));
+  test('Eliminar solicitud sin actividad', actor + remove('servicios', draft, currentVersion(draft)) + check(`SELECT count(*)=0 FROM transporte_servicios WHERE id='${draft}'`, 'solicitud eliminada') + check(`SELECT count(*)=0 FROM transporte_eventos WHERE servicio_id='${draft}'`, 'sin eventos huérfanos'));
+  test('Servicio facturado conserva historial y venta', actor + fail(remove('servicios', service, currentVersion(service)), 'Solo se eliminan solicitudes') + check(`SELECT count(*)=1 FROM ventas WHERE id='${sale}'`, 'venta conservada'));
+  const planned = sql(actor + op('mantenimiento', { unidad_id: unit, fecha: '2026-11-10', estado: 'programado', tareas: 'Pendiente', kilometraje: 120, horas: 0 }));
+  test('Eliminar mantenimiento programado sin gastos', actor + remove('mantenimientos', planned) + check(`SELECT count(*)=0 FROM transporte_mantenimientos WHERE id='${planned}'`, 'mantenimiento eliminado'));
+  test('Helper de eliminación no ejecutable directamente', check("NOT has_function_privilege('authenticated','transporte_eliminar_registro(uuid,text,uuid,integer)','EXECUTE')", 'helper privado'));
+  const crearFinalizado = () => sql(`INSERT INTO transporte_servicios(comercio_id,tipo,cliente_id,origen,destino,carga,estado,total) VALUES('${tenant}','auxilio','${client}','Retiro','Taller','Servicio directo','finalizado',121) RETURNING id;`);
+  const efectivo = crearFinalizado();
+  const cobroEfectivo = op('facturar', { servicios: [efectivo], tipo_comprobante: 'factura_b', modalidad: 'contado', pagos: [{ tipo_pago: 'contado', monto: 121 }], idempotency_key: uuid(40) });
+  const ventaEfectivo = sql(actor + cobroEfectivo);
+  test('Liquidación registra Factura B al contado y su pago', actor + check(`SELECT tipo_comprobante='factura_b' AND tipo_pago='contado' AND total=121 FROM ventas WHERE id='${ventaEfectivo}'`, 'tipo y condición elegidos') + check(`SELECT count(*)=1 FROM pagos_venta WHERE venta_id='${ventaEfectivo}' AND tipo_pago='contado' AND monto=121`, 'cobro registrado') + check(`SELECT count(*)=0 FROM cuenta_corriente WHERE venta_id='${ventaEfectivo}'`, 'sin deuda'));
+  const tarjeta = uuid(41); sql(`INSERT INTO tarjetas_credito VALUES('${tarjeta}','${tenant}')`);
+  const financiado = crearFinalizado();
+  const ventaFinanciada = sql(actor + op('facturar', { servicios: [financiado], tipo_comprobante: 'factura_a', modalidad: 'contado', pagos: [{ tipo_pago: 'contado', monto: 21 }, { tipo_pago: 'tarjeta', tarjeta_id: tarjeta, monto: 110, cuotas: 3, recargo_cuotas: 10 }], idempotency_key: uuid(42) }));
+  test('Liquidación admite pagos combinados y recargo de tarjeta', actor + check(`SELECT tipo_comprobante='factura_a' AND total=131 FROM ventas WHERE id='${ventaFinanciada}'`, 'total con financiación') + check(`SELECT count(*)=2 AND sum(monto)=131 FROM pagos_venta WHERE venta_id='${ventaFinanciada}'`, 'pagos conservados'));
+  const incompleto = crearFinalizado();
+  test('Contado sin pagos y pagos que no cubren el total se rechazan', actor + fail(op('facturar', { servicios: [incompleto], tipo_comprobante: 'recibo_x', modalidad: 'contado', pagos: [], idempotency_key: uuid(43) }), 'ventas_pago_requerido') + fail(op('facturar', { servicios: [incompleto], tipo_comprobante: 'recibo_x', modalidad: 'contado', pagos: [{ tipo_pago: 'contado', monto: 100 }], idempotency_key: uuid(43) }), 'ventas_pagos_no_coinciden') + check(`SELECT venta_id IS NULL FROM transporte_servicios WHERE id='${incompleto}'`, 'sin venta parcial'));
   console.log(`${passed} pruebas PostgreSQL y 7 casos de dominio correctos. Dependencias externas simuladas en fixture; sin validación remota ni UI.`);
 } catch (error) {
   console.error(error);

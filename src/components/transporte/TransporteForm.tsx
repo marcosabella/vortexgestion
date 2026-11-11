@@ -15,7 +15,11 @@ export function TransporteForm({ campos, valores = {}, guardar, pending, cancela
     if (f.type === 'datetime-local' && value) { const d = new Date(String(value)); value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
     return [f.key, String(value)];
   }));
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<Record<string, string>>({ resolver: zodResolver(z.object(shape)), defaultValues: defaults });
+  const schema = z.object(shape).superRefine((datos, ctx) => {
+    if (datos.unidad_id && datos.equipo_id && datos.unidad_id === datos.equipo_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['equipo_id'], message: 'El equipo adicional debe ser distinto de la unidad principal. Si no usás un acoplado, dejalo sin seleccionar.' });
+  });
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<Record<string, string>>({ resolver: zodResolver(schema), defaultValues: defaults });
+  const unidadSeleccionada = watch('unidad_id');
   return <form className="space-y-4" onSubmit={handleSubmit(async raw => {
     const datos: Record<string, unknown> = {};
     const detalles: Record<string, string> = {};
@@ -29,7 +33,7 @@ export function TransporteForm({ campos, valores = {}, guardar, pending, cancela
   })}>
     <div className="grid gap-4 sm:grid-cols-2">{campos.map(f => <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
       <Label htmlFor={`transporte-${f.key}`}>{f.label}{f.required ? ' *' : ''}</Label>
-      {f.options ? <select id={`transporte-${f.key}`} className="mt-1 h-11 w-full rounded-md border bg-background px-3 text-sm" {...register(f.key)}><option value="">Seleccionar…</option>{f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+      {f.options ? <select id={`transporte-${f.key}`} className="mt-1 h-11 w-full rounded-md border bg-background px-3 text-sm" {...register(f.key)}><option value="">Seleccionar…</option>{f.options.map(o => <option key={o.value} value={o.value} disabled={f.key === 'equipo_id' && o.value === unidadSeleccionada}>{o.label}</option>)}</select>
         : f.type === 'textarea' ? <Textarea id={`transporte-${f.key}`} {...register(f.key)} /> : <Input className="mt-1 h-11" id={`transporte-${f.key}`} type={f.type || 'text'} step={f.type === 'number' ? 'any' : undefined} min={f.type === 'number' ? f.min ?? 0 : undefined} {...register(f.key)} />}
       {f.help && <p className="mt-1 text-xs text-muted-foreground">{f.help}</p>}{errors[f.key] && <p className="text-sm text-destructive">{String(errors[f.key]?.message)}</p>}
     </div>)}</div>

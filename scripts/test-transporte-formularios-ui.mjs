@@ -13,13 +13,16 @@ const fixtures = `
 export const useTransporte=()=>({data:window.datos,comercio:{id:'comercio',nombre_comercio:'Demo'},isPending:false,isFetching:false,refetch:async()=>{},run:async args=>{window.calls.push(args);if(window.failSave)throw Error('Error simulado');return 'nuevo';}});
 export const useComercioParametrizacion=()=>({data:{funciones:{multiples_cuit:false}}});
 export const useEmisoresFiscales=()=>({data:[],isFetching:false});
+export const useBancos=()=>({bancos:[]});
+export const useTarjetas=()=>({tarjetas:[]});
+export const useTarjetaCuotas=()=>({tarjetaCuotas:[]});
 export const supabase={storage:{from:()=>{throw Error('Sin conexiones externas')}}};`;
 const entry = `import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter,useLocation} from 'react-router-dom';import Transporte from './src/pages/Transporte';
 window.calls=[];window.fetch=()=>{throw Error('Sin conexiones externas')};
-window.datos={admin:!location.search.includes('operador'),unidades:[{id:'unidad',nombre:'Grúa de prueba',patente:'AA123AA',tipo:'grua',estado:'disponible',activo:true,kilometraje:100,horas:0}],servicios:[],choferes:[],clientes:[],tarifas:[],planes:[],mantenimientos:[],lecturas:[],gastos:[],eventos:[],adjuntos:[],proveedores:[],usuarios:[]};
+window.datos={admin:!location.search.includes('operador'),unidades:[{id:'unidad',nombre:'Grúa de prueba',patente:'AA123AA',tipo:'grua',estado:'disponible',activo:true,kilometraje:100,horas:0}],servicios:[{id:'directo',numero:77,tipo:'auxilio',estado:'finalizado',presentacion:'pendiente_documentacion',cliente_id:'cliente',unidad_id:null,chofer_id:null,presupuesto_id:null,venta_id:null,total:121,carga:'Servicio directo',origen:'Retiro',destino:'Taller',created_at:'2026-11-11T12:00:00Z',detalles:{}}],choferes:[],clientes:[{id:'cliente',nombre:'Cliente',apellido:'Directo'}],tarifas:[],planes:[],mantenimientos:[],lecturas:[{id:'lectura',unidad_id:'unidad',user_id:'abb3137b-3145-49d9-9f97-6023888eecaa',kilometraje:100,horas:0,motivo:'Alta de unidad',created_at:'2026-11-11T12:00:00Z'}],gastos:[],eventos:[],adjuntos:[],proveedores:[],usuarios:[{user_id:'abb3137b-3145-49d9-9f97-6023888eecaa',nombre:'Responsable de prueba',email:'responsable@example.test'}]};
 function App(){const {pathname}=useLocation();return <><output id="ruta">{pathname}</output><Transporte/></>;}createRoot(document.getElementById('root')).render(<BrowserRouter><App/></BrowserRouter>);`;
 const bundle = await build({ stdin: { contents: entry, loader: 'tsx', resolveDir: repo }, write: false, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'fixtures', setup(builder) {
-  builder.onResolve({ filter: /^@\/(hooks\/(useTransporte|useComercioParametrizacion|useEmisoresFiscales)|integrations\/supabase\/client)$/ }, () => ({ path: 'fixtures', namespace: 'fixtures' }));
+  builder.onResolve({ filter: /^@\/(hooks\/(useTransporte|useComercioParametrizacion|useEmisoresFiscales|useBancos|useTarjetas|useTarjetaCuotas)|integrations\/supabase\/client)$/ }, () => ({ path: 'fixtures', namespace: 'fixtures' }));
   builder.onLoad({ filter: /.*/, namespace: 'fixtures' }, () => ({ contents: fixtures, loader: 'js' }));
 } }] });
 const server = createServer((req,res) => {
@@ -46,7 +49,7 @@ try {
   await send('Runtime.enable',{},sessionId);
   const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true},sessionId);if(result.exceptionDetails)throw Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
   const wait=async expression=>{const end=Date.now()+8000;while(Date.now()<end){if(await evaluate(expression))return;if(errors.length)throw Error(errors.join('\n'));await new Promise(resolve=>setTimeout(resolve,50));}throw Error('No se cumplió: '+expression);};
-  const click=async text=>evaluate(`[...document.querySelectorAll('button,a')].find(b=>b.textContent.trim()===${JSON.stringify(text)}).click()`);
+  const click=async text=>evaluate(`(()=>{const items=[...document.querySelectorAll('button,a')];(items.find(b=>b.textContent.trim()===${JSON.stringify(text)})||items.find(b=>b.title===${JSON.stringify(text)})).click();})()`);
   const set=async(name,value)=>evaluate(`(()=>{const el=document.querySelector('[name=${name}]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const navigate=async route=>{await send('Page.navigate',{url:origin+route},sessionId);await wait(`document.getElementById('ruta')?.textContent===${JSON.stringify(route.split('?')[0])}`);};
 
@@ -57,6 +60,13 @@ try {
     assert.equal(await evaluate('Boolean(document.querySelector("[role=dialog]"))'),false,'Alta sin modal: '+vista);
     await click('Cancelar');await wait(`location.pathname==='/transporte/${vista}' && !document.querySelector('form')`);
   }
+  await navigate('/transporte/servicios/nuevo');await wait('Boolean(document.querySelector("form"))');
+  const elegir=async(name,value)=>evaluate(`(()=>{const el=document.querySelector('[name='+${JSON.stringify(name)}+']');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await elegir('equipo_id','unidad');await elegir('unidad_id','unidad');
+  await wait('document.querySelector("[name=equipo_id] option[value=unidad]").disabled');
+  await click('Guardar');await wait('document.body.textContent.includes("El equipo adicional debe ser distinto")');
+  assert.equal(await evaluate('window.calls.length'),0,'Unidad y equipo iguales no se envian');
+  await click('Cancelar');
   await navigate('/transporte/unidades/nuevo');
   await wait('Boolean(document.querySelector("form"))');
   await click('Guardar');
@@ -71,6 +81,26 @@ try {
   await set('nombre','Grúa modificada');await click('Guardar');await wait('location.pathname==="/transporte/unidades"');
   assert.equal(await evaluate('window.calls[1].id'),'unidad');
   assert.equal(await evaluate('window.calls[1].datos.nombre'),'Grúa modificada');
+  await click('Ver detalle');await wait('document.body.textContent.includes("Detalle de unidad o equipo")');
+  assert.equal(await evaluate('document.querySelector("[role=dialog]").textContent.includes("AA123AA")'),true,'Detalle muestra datos de la unidad');
+  await click('Cerrar');
+  await evaluate('document.querySelector("button[title=Eliminar]").click()');
+  await wait('Boolean(document.querySelector("[role=alertdialog]"))');
+  await click('Cancelar');
+  assert.equal(await evaluate('window.calls.length'),2,'Cancelar no elimina');
+  await evaluate('document.querySelector("button[title=Eliminar]").click()');
+  await wait('Boolean(document.querySelector("[role=alertdialog]"))');
+  await click('Eliminar');await wait('!document.querySelector("[role=alertdialog]")');
+  assert.equal(await evaluate('window.calls[2].accion'),'eliminar');
+  assert.equal(await evaluate('window.calls[2].datos.seccion'),'unidades');
+  assert.equal(await evaluate('window.calls[2].id'),'unidad');
+  await navigate('/transporte/lecturas');await wait('Boolean(document.querySelector("table"))');
+  assert.equal(await evaluate('document.querySelector("table").textContent.includes("Responsable de prueba")'),true,'Responsable muestra nombre');
+  assert.equal(await evaluate('document.querySelector("table").textContent.includes("abb3137b-3145-49d9-9f97-6023888eecaa")'),false,'No muestra UUID');
+  await click('Ver detalle');await wait('Boolean(document.querySelector("[role=dialog]"))');
+  assert.equal(await evaluate('document.querySelector("[role=dialog]").textContent.includes("Responsable de prueba")'),true,'Detalle muestra nombre');
+  await click('Cerrar');
+  assert.equal(await evaluate('[...document.querySelectorAll("button")].find(b=>b.getAttribute("aria-label")==="Eliminar lectura").disabled'),true,'Lecturas históricas protegidas');
   await navigate('/transporte/unidades/nuevo');await wait('Boolean(document.querySelector("form"))');
   await set('nombre','Con error');await set('patente','AC123DE');await evaluate('window.failSave=true');
   await click('Guardar');await wait('document.body.textContent.includes("No se guardaron los cambios")');
@@ -79,8 +109,31 @@ try {
   await click('Volver');await wait('location.pathname==="/transporte/unidades"');
   await navigate('/transporte/unidades/ajena/editar');await wait('Boolean(document.querySelector("[role=alert]"))');
   assert.equal(await evaluate('Boolean(document.querySelector("form"))'),false,'No edita registros ajenos');
+  await navigate('/transporte/liquidacion');await wait('Boolean(document.querySelector("table"))');
+  assert.equal(await evaluate('document.querySelector("input[type=checkbox]").disabled'),false,'Documentacion opcional no bloquea la seleccion');
+  await click('Facturar servicio');await wait('Boolean(document.querySelector("[role=dialog]"))');
+  assert.equal(await evaluate('window.calls.length'),0,'Facturar pide confirmacion antes de registrar');
+  await evaluate('(()=>{const el=document.getElementById("tr-comprobante");el.value="factura_b";el.dispatchEvent(new Event("change",{bubbles:true}));})()');
+  await click('Confirmar venta');
+  await wait('window.calls.length===1 && !document.querySelector("[role=dialog]")');
+  assert.equal(await evaluate('window.calls[0].accion'),'facturar','Servicio directo sin presupuesto');
+  assert.equal(await evaluate('window.calls[0].datos.servicios[0]'),'directo');
+  assert.equal(await evaluate('window.calls[0].datos.tipo_comprobante'),'factura_b','Comprobante elegido');
+  assert.equal(await evaluate('window.calls[0].datos.modalidad'),'cta_cte','Cuenta corriente elegida');
+  assert.deepEqual(await evaluate('window.calls[0].datos.pagos'),[],'Cuenta corriente no simula cobros');
+  await click('Facturar servicio');await wait('Boolean(document.querySelector("[role=dialog]"))');
+  await evaluate('(()=>{const el=document.getElementById("tr-condicion");el.value="contado";el.dispatchEvent(new Event("change",{bubbles:true}));})()');
+  await wait('Boolean(document.querySelector("[role=dialog] input[type=number]"))');
+  await click('Confirmar venta');await wait('document.body.textContent.includes("Agregá la forma de pago")');
+  assert.equal(await evaluate('window.calls.length'),1,'Contado sin pago no se envía');
+  await wait('document.querySelector("[role=dialog] input[type=number]").value==="121"');
+  await click('Agregar Pago');
+  await wait('!document.querySelector("[role=dialog] input[type=number]")');
+  await click('Confirmar venta');await wait('window.calls.length===2 && !document.querySelector("[role=dialog]")');
+  assert.equal(await evaluate('window.calls[1].datos.modalidad'),'contado','Condición de contado');
+  assert.deepEqual(await evaluate('window.calls[1].datos.pagos'),[{tipo_pago:'contado',monto:121,cuotas:1}],'Pago del gestor de Ventas conservado');
   await navigate('/transporte/unidades/nuevo?operador');await wait('Boolean(document.querySelector("[role=alert]"))');
   assert.equal(await evaluate('Boolean(document.querySelector("form"))'),false,'Alta requiere administración');
   assert.deepEqual(errors,[]);
-  console.log('OK navegador: ocho altas como páginas, cancelación, acceso directo, validación, guardado, edición precargada, retorno al listado, error conserva datos y permisos. Sin Supabase.');
+  console.log('OK navegador: ocho altas como páginas, edición mediante icono, detalle, confirmación y cancelación de eliminación, responsable por nombre, lecturas protegidas, validaciones y permisos. Sin Supabase.');
 } finally {socket?.close();browser?.kill();await new Promise(resolve=>server.close(resolve));}

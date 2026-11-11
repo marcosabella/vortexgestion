@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ReportPrintHeader } from '@/components/ReportPrintHeader';
 import { Printer, TrendingUp, FileText, Users, DollarSign } from 'lucide-react';
 import { TIPOS_COMPROBANTE, discriminaIvaEnComprobante, formatNumeroComprobante, getVentaTipoPagoLabel, getVentaImporteContable } from '@/types/venta';
@@ -33,14 +35,20 @@ const ListadoVentas = () => {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [clienteFilter, setClienteFilter] = useState('todos');
+  const [tiposComprobante, setTiposComprobante] = useState<string[] | null>(null);
+  const tiposDisponibles = useMemo(() => TIPOS_COMPROBANTE.filter(t => ventas?.some(v => v.tipo_comprobante === t.value)), [ventas]);
+  const tiposSeleccionados = tiposDisponibles.filter(t => tiposComprobante === null || tiposComprobante.includes(t.value)).map(t => t.value);
+  const [incluirResumenComprobantes, setIncluirResumenComprobantes] = useState(true);
+  const [incluirRankingClientes, setIncluirRankingClientes] = useState(true);
 
   const ventasFiltradas = useMemo(() => {
     if (!ventas) return [];
     
     return ventas.filter(venta => {
+      if (tiposComprobante && !tiposComprobante.includes(venta.tipo_comprobante)) return false;
       // Filtro por fecha
       if (fechaDesde || fechaHasta) {
-        const fechaVenta = new Date(venta.fecha_venta);
+        const fechaVenta = /^\d{4}-\d{2}-\d{2}$/.test(venta.fecha_venta) ? parseLocalDateInput(venta.fecha_venta) : new Date(venta.fecha_venta);
         // El input date no incluye zona horaria. new Date("AAAA-MM-DD") se
         // interpreta como UTC y en Argentina desplaza el rango al dia anterior.
         const desde = fechaDesde ? startOfDay(parseLocalDateInput(fechaDesde)) : new Date(0);
@@ -62,7 +70,7 @@ const ListadoVentas = () => {
       if (dateDifference !== 0) return dateDifference;
       return Number(b.numero_comprobante) - Number(a.numero_comprobante);
     });
-  }, [ventas, fechaDesde, fechaHasta, clienteFilter]);
+  }, [ventas, fechaDesde, fechaHasta, clienteFilter, tiposComprobante]);
 
   // Resumen general
   const resumenGeneral = useMemo(() => {
@@ -70,7 +78,9 @@ const ListadoVentas = () => {
     const cantidadVentas = ventasFiltradas.length;
     const ticketPromedio = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
     
-    return { totalVentas, cantidadVentas, ticketPromedio };
+    const totalNeto = ventasFiltradas.reduce((sum, v) => sum + (discriminaIvaEnComprobante(v.tipo_comprobante) ? Number(v.subtotal) : 0), 0);
+    const totalIva = ventasFiltradas.reduce((sum, v) => sum + (discriminaIvaEnComprobante(v.tipo_comprobante) ? Number(v.total_iva) : 0), 0);
+    return { totalVentas, cantidadVentas, ticketPromedio, totalNeto, totalIva };
   }, [ventasFiltradas]);
 
   // Ranking por clientes
@@ -139,6 +149,8 @@ const ListadoVentas = () => {
     const file = await buildListadoVentasPdfFile(ventasFiltradas, {
       comercio,
       rango: getRangoLabel(),
+      incluirResumenComprobantes,
+      incluirRankingClientes,
     });
     const url = URL.createObjectURL(file);
     const pdfWindow = window.open(url, '_blank');
@@ -236,6 +248,14 @@ const ListadoVentas = () => {
                 </Select>
               </div>
             </div>
+            <div className="mt-4 grid items-end gap-4 md:grid-cols-2">
+              <div className="space-y-2"><Label htmlFor="tipos-comprobante">Tipos de comprobante</Label>
+                <Popover><PopoverTrigger asChild><Button id="tipos-comprobante" disabled={!tiposDisponibles.length} variant="outline" className="w-full justify-start">{!tiposDisponibles.length ? 'Sin comprobantes emitidos' : tiposSeleccionados.length === tiposDisponibles.length ? 'Todos los comprobantes' : tiposSeleccionados.length === 0 ? 'Ningún comprobante seleccionado' : tiposSeleccionados.length + ' tipos seleccionados'}</Button></PopoverTrigger>
+                  <PopoverContent className="w-80 space-y-3" align="start" side="bottom" avoidCollisions={false}><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setTiposComprobante(null)}>Todos</Button><Button size="sm" variant="outline" onClick={() => setTiposComprobante([])}>Ninguno</Button></div><div className="max-h-72 space-y-3 overflow-y-auto" role="group" aria-label="Tipos de comprobante">{tiposDisponibles.map(t => <label key={t.value} className="flex cursor-pointer items-center gap-2 text-sm"><Checkbox checked={tiposSeleccionados.includes(t.value)} onCheckedChange={checked => setTiposComprobante(actual => checked === true ? [...(actual ?? tiposDisponibles.map(tipo => tipo.value)), t.value] : (actual ?? tiposDisponibles.map(tipo => tipo.value)).filter(tipo => tipo !== t.value))} />{t.label}</label>)}</div></PopoverContent>
+                </Popover>
+              </div>
+              <fieldset className="min-w-0"><legend className="mb-2 text-sm font-medium">Secciones del reporte</legend><div className="flex h-10 items-center gap-6 overflow-x-auto"><label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm"><Checkbox checked={incluirResumenComprobantes} onCheckedChange={value => setIncluirResumenComprobantes(value === true)} />Resumen por comprobante</label><label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm"><Checkbox checked={incluirRankingClientes} onCheckedChange={value => setIncluirRankingClientes(value === true)} />Ranking de clientes</label></div></fieldset>
+            </div>
           </CardContent>
         </Card>
 
@@ -277,7 +297,7 @@ const ListadoVentas = () => {
         </div>
 
         {/* Ranking de Clientes */}
-        <Card className="mb-6">
+        {incluirRankingClientes && <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -290,9 +310,9 @@ const ListadoVentas = () => {
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Promedio</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Cantidad</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Total</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Promedio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -307,11 +327,11 @@ const ListadoVentas = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell>{mostrarEnMayusculas(cliente.nombre)}</TableCell>
-                      <TableCell className="text-right">{cliente.cantidad}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">{cliente.cantidad}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         ${cliente.total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         ${(cliente.total / cliente.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
@@ -320,10 +340,10 @@ const ListadoVentas = () => {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Ventas por Tipo de Comprobante */}
-        <Card className="mb-6">
+        {incluirResumenComprobantes && <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -335,9 +355,9 @@ const ListadoVentas = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tipo de Comprobante</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Promedio</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Cantidad</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Total</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Promedio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -351,11 +371,11 @@ const ListadoVentas = () => {
                   ventasPorComprobante.map((comp) => (
                     <TableRow key={comp.tipo}>
                       <TableCell className="font-medium">{comp.label}</TableCell>
-                      <TableCell className="text-right">{comp.cantidad}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">{comp.cantidad}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         ${comp.total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         ${(comp.total / comp.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
@@ -364,7 +384,7 @@ const ListadoVentas = () => {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Detalle de Ventas */}
         <Card className="print-break">
@@ -375,17 +395,17 @@ const ListadoVentas = () => {
             </p>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table aria-label="Detalle de ventas">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>N° Comprobante</TableHead>
-                  <TableHead>Tipo</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">Fecha</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">N° Comprobante</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">Tipo</TableHead>
                   <TableHead className="w-[180px] max-w-[180px]">Cliente</TableHead>
                   <TableHead className="whitespace-nowrap">Forma de Pago</TableHead>
-                  <TableHead className="text-right">Subtotal neto</TableHead>
-                  <TableHead className="text-right">IVA</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Subtotal neto</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">IVA</TableHead>
+                  <TableHead className="text-right whitespace-nowrap tabular-nums">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -398,13 +418,13 @@ const ListadoVentas = () => {
                 ) : (
                   ventasFiltradas.map((venta) => (
                     <TableRow key={venta.id}>
-                      <TableCell>
-                        {format(new Date(venta.fecha_venta), 'dd/MM/yyyy', { locale: es })}
+                      <TableCell className="whitespace-nowrap">
+                        {format(/^\d{4}-\d{2}-\d{2}$/.test(venta.fecha_venta) ? parseLocalDateInput(venta.fecha_venta) : new Date(venta.fecha_venta), 'dd/MM/yyyy', { locale: es })}
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-medium">
                         {formatNumeroComprobante(venta.numero_comprobante, afipConfig?.punto_venta, venta.tipo_comprobante)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {TIPOS_COMPROBANTE.find(t => t.value === venta.tipo_comprobante)?.label || venta.tipo_comprobante}
                       </TableCell>
                       <TableCell className="w-[180px] max-w-[180px]">
@@ -420,22 +440,23 @@ const ListadoVentas = () => {
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{getVentaTipoPagoLabel(venta)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         {discriminaIvaEnComprobante(venta.tipo_comprobante)
                           ? `$${Number(venta.subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : '-'}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
                         {discriminaIvaEnComprobante(venta.tipo_comprobante)
                           ? `$${Number(venta.total_iva).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : '-'}
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right whitespace-nowrap tabular-nums font-medium">
                         ${getVentaImporteContable(venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
+                <TableRow className="bg-muted/50 font-semibold"><TableCell colSpan={5}>Totales</TableCell><TableCell className="whitespace-nowrap text-right tabular-nums">{resumenGeneral.totalNeto.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}</TableCell><TableCell className="whitespace-nowrap text-right tabular-nums">{resumenGeneral.totalIva.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}</TableCell><TableCell className="whitespace-nowrap text-right tabular-nums">{resumenGeneral.totalVentas.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}</TableCell></TableRow>
               </TableBody>
             </Table>
           </CardContent>

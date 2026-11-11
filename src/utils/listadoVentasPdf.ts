@@ -24,29 +24,29 @@ const CONTENT_BOTTOM = 790;
 const SECTION_GAP = 28;
 
 const DETALLE_COLUMNS = [
-  { key: "fecha", label: "Fecha", x: 24, width: 84, align: "center" },
-  { key: "comprobante", label: "Comprobante", x: 108, width: 78, align: "left" },
-  { key: "tipo", label: "Tipo", x: 186, width: 66, align: "left" },
-  { key: "cliente", label: "Cliente", x: 252, width: 90, align: "left" },
-  { key: "formaPago", label: "Pago", x: 342, width: 66, align: "left" },
-  { key: "subtotal", label: "Neto", x: 408, width: 54, align: "right" },
-  { key: "iva", label: "IVA", x: 462, width: 42, align: "right" },
-  { key: "total", label: "Total", x: 504, width: 84, align: "right" },
+  { key: "fecha", label: "Fecha", x: 24, width: 54, align: "center", fit: "shrink" },
+  { key: "comprobante", label: "Comprobante", x: 78, width: 78, align: "left", fit: "shrink" },
+  { key: "tipo", label: "Tipo", x: 156, width: 60, align: "left", fit: "shrink" },
+  { key: "cliente", label: "Cliente", x: 216, width: 96, align: "left" },
+  { key: "formaPago", label: "Pago", x: 312, width: 58, align: "left" },
+  { key: "subtotal", label: "Neto", x: 370, width: 76, align: "right", fit: "shrink" },
+  { key: "iva", label: "IVA", x: 446, width: 66, align: "right", fit: "shrink" },
+  { key: "total", label: "Total", x: 512, width: 76, align: "right", fit: "shrink" },
 ] as const;
 
 const COMPROBANTE_COLUMNS = [
   { key: "tipo", label: "Tipo de comprobante", x: 24, width: 258, align: "left" },
   { key: "cantidad", label: "Cantidad", x: 282, width: 84, align: "right" },
-  { key: "total", label: "Total", x: 366, width: 120, align: "right" },
-  { key: "promedio", label: "Promedio", x: 486, width: 102, align: "right" },
+  { key: "total", label: "Total", x: 366, width: 120, align: "right", fit: "shrink" },
+  { key: "promedio", label: "Promedio", x: 486, width: 102, align: "right", fit: "shrink" },
 ] as const;
 
 const CLIENTE_COLUMNS = [
   { key: "puesto", label: "#", x: 24, width: 42, align: "center" },
   { key: "cliente", label: "Cliente", x: 66, width: 270, align: "left" },
   { key: "cantidad", label: "Cantidad", x: 336, width: 78, align: "right" },
-  { key: "total", label: "Total", x: 414, width: 96, align: "right" },
-  { key: "promedio", label: "Promedio", x: 510, width: 78, align: "right" },
+  { key: "total", label: "Total", x: 414, width: 96, align: "right", fit: "shrink" },
+  { key: "promedio", label: "Promedio", x: 510, width: 78, align: "right", fit: "shrink" },
 ] as const;
 
 type PdfFont = "F1" | "F2" | "F3";
@@ -54,7 +54,7 @@ export type PrintableRow = Record<string, string>;
 export type PrintableSection<TRow extends PrintableRow = PrintableRow> = {
   title: string;
   rows: TRow[];
-  columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[];
+  columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right"; fit?: "shrink" }[];
   getRowFont?: (row: TRow) => PdfFont;
 };
 type DetailPage = { sections: PrintableSection[] };
@@ -63,6 +63,8 @@ type ListadoVentasPdfOptions = {
   comercio?: Comercio | null;
   rango: string;
   titulo?: string;
+  incluirResumenComprobantes?: boolean;
+  incluirRankingClientes?: boolean;
 };
 
 const moneyFormatter = new Intl.NumberFormat("es-AR", {
@@ -89,7 +91,7 @@ const formatMoney = (value?: number | null) => `$${moneyFormatter.format(Number(
 
 const formatDate = (value?: string | null, pattern = "dd/MM/yyyy") => {
   if (!value) return "";
-  const date = new Date(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, pattern);
 };
@@ -132,13 +134,21 @@ const opText = (
   font: PdfFont = "F1",
   align: "left" | "center" | "right" = "left",
   maxWidth?: number,
+  fit?: "shrink",
 ) => {
-  const fittedText = maxWidth ? fitText(text, maxWidth, size) : toPlainText(text);
-  const width = textWidth(fittedText, size);
+  const plain = toPlainText(text);
+  // Helvetica: los dígitos y $ miden 556 unidades, los separadores 278.
+  // Medirlos evita que los importes alineados a la derecha invadan otra columna.
+  const measure = fit === "shrink" && /^\$-?[\d.,]+$/.test(plain)
+    ? (value: string, fontSize: number) => [...value].reduce((sum, c) => sum + (c === '.' || c === ',' ? 278 : c === '-' ? 333 : 556), 0) * fontSize / 1000
+    : textWidth;
+  const fontSize = fit === "shrink" && maxWidth && measure(plain, size) > maxWidth ? size * maxWidth / measure(plain, size) : size;
+  const fittedText = fit === "shrink" ? plain : maxWidth ? fitText(text, maxWidth, size) : plain;
+  const width = measure(fittedText, fontSize);
   const finalX = align === "center" ? x - width / 2 : align === "right" ? x - width : x;
   const y = PAGE_HEIGHT - yFromTop;
 
-  return `BT /${font} ${size} Tf 0 g 1 0 0 1 ${finalX.toFixed(2)} ${y.toFixed(2)} Tm (${toPdfText(fittedText)}) Tj ET`;
+  return `BT /${font} ${fontSize.toFixed(3)} Tf 0 g 1 0 0 1 ${finalX.toFixed(2)} ${y.toFixed(2)} Tm (${toPdfText(fittedText)}) Tj ET`;
 };
 
 const opLine = (x1: number, y1Top: number, x2: number, y2Top: number) =>
@@ -220,37 +230,23 @@ const getTipoComprobanteLabel = (tipo: string) =>
   TIPOS_COMPROBANTE.find((item) => item.value === tipo)?.label || tipo;
 
 const buildDetalleRows = (ventas: Venta[]) => {
-  if (!ventas.length) {
-    return [
-      {
-        fecha: "",
-        comprobante: "Sin ventas para el rango seleccionado",
-        tipo: "",
-        cliente: "",
-        formaPago: "",
-        subtotal: "",
-        iva: "",
-        total: "",
-      },
-    ];
-  }
-
-  return ventas.map((venta) => {
+  const rows = ventas.map((venta) => {
     const muestraIva = discriminaIvaEnComprobante(venta.tipo_comprobante);
-
     return {
-      fecha: formatDate(venta.fecha_venta, "dd/MM/yyyy HH:mm") || "-",
-      comprobante: venta.tipo_comprobante === "recibo_x"
-        ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante)
-        : venta.numero_comprobante || "-",
-      tipo: getTipoComprobanteLabel(venta.tipo_comprobante),
-      cliente: getClienteVenta(venta),
-      formaPago: getVentaTipoPagoLabel(venta),
-      subtotal: muestraIva ? formatMoney(venta.subtotal) : "-",
-      iva: muestraIva ? formatMoney(venta.total_iva) : "-",
-      total: formatMoney(getVentaImporteContable(venta)),
+      fecha: formatDate(venta.fecha_venta) || "-",
+      comprobante: venta.tipo_comprobante === "recibo_x" ? formatNumeroComprobante(venta.numero_comprobante, null, venta.tipo_comprobante) : venta.numero_comprobante || "-",
+      tipo: getTipoComprobanteLabel(venta.tipo_comprobante), cliente: getClienteVenta(venta), formaPago: getVentaTipoPagoLabel(venta),
+      subtotal: muestraIva ? formatMoney(venta.subtotal) : "-", iva: muestraIva ? formatMoney(venta.total_iva) : "-", total: formatMoney(getVentaImporteContable(venta)),
     };
   });
+  if (!rows.length) rows.push({ fecha: "", comprobante: "Sin ventas para el rango seleccionado", tipo: "", cliente: "", formaPago: "", subtotal: "", iva: "", total: "" });
+  rows.push({
+    fecha: "", comprobante: "TOTAL", tipo: "", cliente: "", formaPago: "",
+    subtotal: formatMoney(ventas.reduce((sum, v) => sum + (discriminaIvaEnComprobante(v.tipo_comprobante) ? Number(v.subtotal) : 0), 0)),
+    iva: formatMoney(ventas.reduce((sum, v) => sum + (discriminaIvaEnComprobante(v.tipo_comprobante) ? Number(v.total_iva) : 0), 0)),
+    total: formatMoney(ventas.reduce((sum, v) => sum + getVentaImporteContable(v), 0)),
+  });
+  return rows;
 };
 
 const buildComprobanteRows = (ventas: Venta[]) => {
@@ -351,7 +347,7 @@ const paginateSections = (sections: PrintableSection[]): DetailPage[] => {
 const drawTable = <TRow extends PrintableRow>(
   title: string,
   rows: TRow[],
-  columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right" }[],
+  columns: readonly { key: keyof TRow; label: string; x: number; width: number; align: "left" | "center" | "right"; fit?: "shrink" }[],
   top: number,
   getRowFont: (row: TRow) => PdfFont = () => "F1",
 ) => {
@@ -390,7 +386,7 @@ const drawTable = <TRow extends PrintableRow>(
     columns.forEach((column) => {
       const x =
         column.align === "center" ? column.x + column.width / 2 : column.align === "right" ? column.x + column.width - 7 : column.x + 6;
-      ops.push(opText(row[column.key] || "", x, y + 9.95, 8.35, rowFont, column.align, column.width - 12));
+      ops.push(opText(row[column.key] || "", x, y + 9.95, 8.35, rowFont, column.align, column.width - 12, column.fit));
     });
   });
 
@@ -552,9 +548,9 @@ export const buildListadoVentasPdfFile = (ventas: Venta[], options: ListadoVenta
     (a, b) => new Date(a.fecha_venta).getTime() - new Date(b.fecha_venta).getTime(),
   );
   const sections: PrintableSection[] = [
-    { title: "Detalle de ventas", rows: buildDetalleRows(orderedVentas), columns: DETALLE_COLUMNS },
-    { title: "Ventas por tipo de comprobantes", rows: buildComprobanteRows(orderedVentas), columns: COMPROBANTE_COLUMNS },
-    { title: "Ranking de venta por cliente", rows: buildClienteRows(orderedVentas), columns: CLIENTE_COLUMNS },
+    { title: "Detalle de ventas", rows: buildDetalleRows(orderedVentas), columns: DETALLE_COLUMNS, getRowFont: row => row.comprobante === "TOTAL" ? "F2" : "F1" },
+    ...(options.incluirResumenComprobantes !== false ? [{ title: "Ventas por tipo de comprobantes", rows: buildComprobanteRows(orderedVentas), columns: COMPROBANTE_COLUMNS }] : []),
+    ...(options.incluirRankingClientes !== false ? [{ title: "Ranking de venta por cliente", rows: buildClienteRows(orderedVentas), columns: CLIENTE_COLUMNS }] : []),
   ];
   const pages = paginateSections(sections);
 
