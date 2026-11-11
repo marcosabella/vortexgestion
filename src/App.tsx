@@ -54,7 +54,8 @@ import NuevoMovimientoCuentaCorriente from "./pages/NuevoMovimientoCuentaCorrien
 import NuevoBanco from "./pages/NuevoBanco";
 import NuevaTarjeta from "./pages/NuevaTarjeta";
 import NuevoCheque from "./pages/NuevoCheque";
-import AdminComercios from "./pages/AdminComercios";
+import AdminComercios, { AdminComercioEditar } from "./pages/AdminComercios";
+import AdminComercioExterno from "./pages/AdminComercioExterno";
 import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
@@ -328,6 +329,10 @@ function AuthenticatedLayout() {
               <Route path="/seguridad" element={<ParametrizedRoute modulo="seguridad"><Seguridad /></ParametrizedRoute>} />
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="/admin" element={<AdminComercios />} />
+              <Route path="/admin/comercios/:comercioId/editar" element={<AdminComercioEditar />} />
+              <Route path="/admin/comercios/externos/nuevo" element={<AdminComercioExterno />} />
+              <Route path="/admin/comercios/externos/:externoId" element={<AdminComercioExterno />} />
+              <Route path="/admin/comercios/externos/:externoId/editar" element={<AdminComercioExterno />} />
               <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
               <Route path="/admin/migraciones" element={<AdminMigraciones />} />
               <Route path="/admin/incidentes" element={<AdminIncidentes />} />

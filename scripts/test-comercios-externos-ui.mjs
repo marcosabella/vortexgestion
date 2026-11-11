@@ -1,0 +1,65 @@
+// Componente y hook reales; RPC ficticias y detalle de venta sustituido. Sin servicios externos.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { createServer } from 'node:http';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { build } from 'esbuild';
+import WebSocket from 'ws';
+const require=createRequire(import.meta.url),repo=process.cwd();
+const fixtures="\nimport React from 'react';\nwindow.calls=[];window.notices=[];window.failure=false;\nwindow.external={id:'30000000-0000-0000-0000-000000000001',comercio_id:'emisor',cliente_id:'20000000-0000-0000-0000-000000000001',nombre_comercio:'PURA VIDA',sistema:'Complejos deportivos',url_sistema:'https://multiespaciopuravida.netlify.app/',importe_mensual:80000,concepto:'MEMBRESIA MENSUAL PURA VIDA',fecha_ingreso_sistema:null,membresia_vigente_hasta:null,cliente_nombre:'ALEXANDER MIGUEL CABALLIERI',cliente_cuit:'20123456786',cliente_situacion_afip:'Consumidor Final',emisor_nombre:'Emisor prueba'};\nexport const useComercio=()=>({comercio:{id:'emisor',nombre_comercio:'Emisor prueba'}});\nexport const useIsAppAdmin=()=>({data:true,isLoading:false});\nconst mutation={isPending:false,mutate:()=>{}};\nexport const useAdminComercios=()=>({comerciosQuery:{data:[],isLoading:false},createComercio:mutation,updateComercio:mutation,deleteComercio:mutation,setAccess:mutation,renovarMembresia:mutation,createOrUpdateAccess:mutation,resetPassword:mutation});\nexport const useClientes=()=>({data:[{id:'20000000-0000-0000-0000-000000000001',nombre:'ALEXANDER MIGUEL',apellido:'CABALLIERI',cuit:'20123456786'}],isLoading:false});\nexport const useConsultarArca=()=>({consultarCuit:async()=>null,isLoading:false});\nexport const useComercioParametrizacion=()=>({data:{funciones:{multiples_cuit:false}}});\nexport const useEmisoresFiscales=()=>({data:[]});\nexport const useToast=()=>({toast:value=>window.notices.push(value)});\nexport const VentasList=({detalleId,notificacionComercioIdInicial})=><p>Comprobante {detalleId} {notificacionComercioIdInicial||'Sin destino interno'}</p>;\nexport const supabase={rpc:async(name,args)=>{\n window.calls.push({name,args});if(window.failure)return {data:null,error:{message:'Error simulado'}};\n if(name==='listar_comercios_externos')return {data:{externos:[window.external],licencias:[]},error:null};\n if(name==='guardar_comercio_externo'){window.external={...window.external,nombre_comercio:args.p_nombre,importe_mensual:args.p_importe};return {data:window.external.id,error:null};}\n if(name==='consultar_licencia_externa')return {data:{configuracion:{...window.external,destinatario_comercio_id:window.external.id},comprobantes:[]},error:null};\n if(name==='generar_comprobante_licencia_externa')return {data:{venta_id:'venta-externa',reutilizado:false},error:null};\n throw Error('RPC inesperada: '+name);\n}};\n";
+const entry="import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter,Routes,Route} from 'react-router-dom';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';import AdminComercios from './src/pages/AdminComercios';import AdminComercioExterno from './src/pages/AdminComercioExterno';createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})}><BrowserRouter><Routes><Route path='/admin' element={<AdminComercios/>}/><Route path='/admin/comercios/externos/nuevo' element={<AdminComercioExterno/>}/><Route path='/admin/comercios/externos/:externoId' element={<AdminComercioExterno/>}/><Route path='/admin/comercios/externos/:externoId/editar' element={<AdminComercioExterno/>}/></Routes></BrowserRouter></QueryClientProvider>);";
+const bundle=await build({stdin:{contents:entry,loader:'tsx',resolveDir:repo},write:false,bundle:true,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(b){
+ b.onResolve({filter:/^@\/(hooks\/(useComercio|useComercioParametrizacion|useEmisoresFiscales|use-toast|useAdminComercios|useConsultarArca|useClientes)|integrations\/supabase\/client|components\/VentasList)$/},()=>({path:'fixtures',namespace:'fixtures'}));
+ b.onLoad({filter:/.*/,namespace:'fixtures'},()=>({contents:fixtures,loader:'jsx',resolveDir:repo}));
+ b.onResolve({filter:/^@\//},args=>{for(const ext of ['.tsx','.ts','.js']){try{return {path:require.resolve(path.join(repo,'src',args.path.slice(2))+ext)}}catch{}}throw Error(args.path)});
+}}]});
+const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/app.js'?'application/javascript':'text/html;charset=utf-8');res.end(req.url==='/app.js'?bundle.outputFiles[0].text:'<!doctype html><html lang="es"><meta charset="utf-8"><body><div id="root"></div><script src="/app.js"></script></body></html>')});
+let browser,socket;
+try{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ browser=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-first-run','--disable-background-networking','--disable-extensions','--disable-gpu','--user-data-dir='+mkdtempSync(path.join(tmpdir(),'vortex-externos-ui-')),'--remote-debugging-port=0','about:blank'],{windowsHide:true,stdio:['ignore','ignore','pipe']});
+ const url=await new Promise((resolve,reject)=>{let s='';const timer=setTimeout(()=>reject(Error('Chrome timeout')),15000);browser.once('error',reject);browser.stderr.on('data',chunk=>{s+=chunk;const m=s.match(/DevTools listening on (ws:\/\/\S+)/);if(m){clearTimeout(timer);resolve(m[1])}})});
+ socket=new WebSocket(url);await new Promise((r,j)=>{socket.once('open',r);socket.once('error',j)});
+ let seq=0;const pending=new Map(),errors=[];
+ socket.on('message',raw=>{const m=JSON.parse(String(raw));if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.exception?.description||m.params.exceptionDetails.text);const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result)}});
+ const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>reject(Error(method)),12000);pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}))});
+ const {targetInfos}=await send('Target.getTargets');const targetId=targetInfos.find(t=>t.type==='page').targetId;const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});await send('Runtime.enable',{},sessionId);await send('Page.enable',{},sessionId);
+ const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true},sessionId);if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value};
+ const until=async expression=>{const end=Date.now()+10000;while(Date.now()<end){if(await evaluate('Boolean('+expression+')'))return;if(errors.length)throw Error(errors.join('\n'));await new Promise(r=>setTimeout(r,40));}throw Error('Timeout: '+expression)};
+ const click=label=>evaluate(`[...document.querySelectorAll('button,a')].find(b=>b.textContent.trim()===${JSON.stringify(label)}).click()`);
+ const input=async(selector,value)=>evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+
+ await send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/admin'},sessionId);
+ await until('document.body.textContent.includes("PURA VIDA")');
+ assert.ok(await evaluate('document.querySelector("table").textContent.includes("80.000")'),'Membresia en grilla');
+ assert.equal(await evaluate('document.querySelector("table").textContent.includes("ALEXANDER MIGUEL CABALLIERI")'),false,'Cliente fuera de la grilla');
+ assert.equal(await evaluate('document.querySelectorAll("thead th").length'),7,'Grilla sin columna de usuario / cliente');
+ assert.equal(await evaluate('document.querySelectorAll("[role=switch]").length'),0,'Externo no tiene control de acceso');
+ await evaluate('[...document.querySelectorAll("a")].find(a=>a.title==="Ver detalle").click()');await until('document.querySelector("dl")');
+ assert.equal(await evaluate('Boolean(document.querySelector("form"))'),false,'Detalle sin formulario');
+ assert.equal(await evaluate('document.querySelector("a[target=_blank]").getAttribute("href")'),'https://multiespaciopuravida.netlify.app/');
+ await click('Editar');await until('Boolean(document.querySelector("form"))');
+ assert.equal(await evaluate('document.getElementById("importe_mensual").value'),'80000');
+ assert.ok(await evaluate('document.getElementById("cliente_externo").selectedOptions[0].textContent.includes("ALEXANDER MIGUEL CABALLIERI")'),'Cliente vinculado visible al editar');
+ await input('#importe_mensual','85000');await click('Guardar comercio externo');await until('location.pathname==="/admin"');
+ const guardado=await evaluate('window.calls.find(c=>c.name==="guardar_comercio_externo").args');
+ assert.equal(guardado.p_importe,85000);assert.equal(guardado.p_cliente_id,'20000000-0000-0000-0000-000000000001');
+ await until('document.querySelector("table").textContent.includes("85.000")');
+ await evaluate('[...document.querySelectorAll("button")].find(b=>b.title==="Licencia mensual y comprobantes").click()');
+ await until('document.querySelector("input[id^=licencia-importe]")');
+ assert.equal(await evaluate('document.querySelector("input[id^=licencia-importe]").value'),'85000');
+ await click('Generar comprobante mensual');await until('document.body.textContent.includes("venta-externa")');
+ assert.ok(await evaluate('document.body.textContent.includes("Sin destino interno")'),'No envia notificacion al sistema externo');
+ assert.ok(await evaluate('window.calls.some(c=>c.name==="generar_comprobante_licencia_externa")'),'RPC de membresia externa');
+ await click('Comercio externo');await until('location.pathname.endsWith("/nuevo") && Boolean(document.querySelector("form"))');
+ await input('#nombre_comercio','Otro complejo');await input('#sistema','Deportes');await input('#url_sistema','http://inseguro.test/');await input('#importe_mensual','80000');
+ await evaluate('(()=>{const e=document.getElementById("cliente_externo");e.value="20000000-0000-0000-0000-000000000001";e.dispatchEvent(new Event("change",{bubbles:true}));})()');
+ await click('Guardar comercio externo');await until('document.body.textContent.includes("HTTPS")');
+ assert.equal(await evaluate('window.calls.filter(c=>c.name==="guardar_comercio_externo").length'),1,'Rechaza URL insegura');
+ await click('Cancelar');await until('location.pathname==="/admin"');
+ assert.deepEqual(errors,[]);
+ console.log('OK UI: comercio externo en grilla, costo, cliente, sin controles de acceso, detalle y edicion como paginas, validacion y facturacion con RPC externa.');
+}finally{socket?.close();browser?.kill();await new Promise(r=>server.close(r));}

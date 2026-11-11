@@ -4,7 +4,7 @@ import { useComercio } from "@/hooks/useComercio";
 import { useToast } from "@/hooks/use-toast";
 import type { EstadoLicencia, LicenciaComercio } from "@/types/licencia";
 
-type LicenciaRpc = "consultar_licencia_comercio" | "guardar_licencia_comercio" | "generar_comprobante_licencia";
+type LicenciaRpc = "consultar_licencia_comercio" | "guardar_licencia_comercio" | "generar_comprobante_licencia" | "consultar_licencia_externa" | "guardar_licencia_externa" | "generar_comprobante_licencia_externa";
 async function rpc<T>(name: LicenciaRpc, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await (supabase as unknown as {
     rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: T; error: { message: string; code?: string } | null }>;
@@ -15,11 +15,11 @@ async function rpc<T>(name: LicenciaRpc, args: Record<string, unknown>): Promise
   return data;
 }
 
-export function useLicenciaComercio(destinatarioId: string, enabled: boolean) {
+export function useLicenciaComercio(destinatarioId: string, enabled: boolean, externo = false) {
   const { comercio } = useComercio();
   const client = useQueryClient();
   const { toast } = useToast();
-  const key = ["licencia-comercio", comercio?.id, destinatarioId];
+  const key = ["licencia-comercio", comercio?.id, destinatarioId, externo];
   const args = () => {
     if (!comercio?.id || comercio.id === destinatarioId) throw new Error("Seleccioná tu comercio emisor, diferente al comercio destinatario.");
     return { p_comercio_id: comercio.id, p_destinatario_id: destinatarioId };
@@ -27,18 +27,19 @@ export function useLicenciaComercio(destinatarioId: string, enabled: boolean) {
   const query = useQuery({
     queryKey: key,
     enabled: enabled && Boolean(comercio?.id) && comercio.id !== destinatarioId,
-    queryFn: () => rpc<EstadoLicencia>("consultar_licencia_comercio", args()),
+    queryFn: () => rpc<EstadoLicencia>(externo ? "consultar_licencia_externa" : "consultar_licencia_comercio", args()),
   });
   const onError = (error: Error) => toast({ title: "No se pudo completar la operación", description: error.message, variant: "destructive" });
   const guardar = useMutation({
-    mutationFn: ({ importe, concepto }: { importe: number; concepto: string }) => rpc<LicenciaComercio>("guardar_licencia_comercio", { ...args(), p_importe: importe, p_concepto: concepto }),
+    mutationFn: ({ importe, concepto }: { importe: number; concepto: string }) => rpc<LicenciaComercio>(externo ? "guardar_licencia_externa" : "guardar_licencia_comercio", { ...args(), p_importe: importe, p_concepto: concepto }),
     onSuccess: (configuracion) => {
       client.setQueryData<EstadoLicencia>(key, (previous) => ({ configuracion, comprobantes: previous?.comprobantes || [] }));
+      void client.invalidateQueries({ queryKey: ["admin-comercios-externos"] });
       toast({ title: "Licencia guardada", description: "El importe mensual quedó registrado para este comercio." });
     }, onError,
   });
   const generar = useMutation({
-    mutationFn: (values: { periodo: string; tipo: string; iva: number; vencimiento: string; emisorId?: string }) => rpc<{ venta_id: string; reutilizado: boolean }>("generar_comprobante_licencia", {
+    mutationFn: (values: { periodo: string; tipo: string; iva: number; vencimiento: string; emisorId?: string }) => rpc<{ venta_id: string; reutilizado: boolean }>(externo ? "generar_comprobante_licencia_externa" : "generar_comprobante_licencia", {
       ...args(), p_periodo: `${values.periodo}-01`, p_tipo_comprobante: values.tipo,
       p_iva: values.iva, p_vencimiento: values.vencimiento, p_emisor_fiscal_id: values.emisorId || null,
     }),

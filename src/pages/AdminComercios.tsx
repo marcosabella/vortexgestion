@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Building2, CalendarCheck2, KeyRound, Loader2, Pencil, Plus, Search, ShieldCheck, ShieldOff, SlidersHorizontal, Trash2, UserPlus } from "lucide-react";
 import { useAdminComercios, useIsAppAdmin, AdminComercio } from "@/hooks/useAdminComercios";
 import { ComercioFormData } from "@/types/comercio";
@@ -27,6 +27,8 @@ import { SITUACIONES_AFIP } from "@/types/cliente";
 import { useConsultarArca } from "@/hooks/useConsultarArca";
 import { useToast } from "@/hooks/use-toast";
 import { formatCUIT, validateCUIT } from "@/utils/validations";
+import { useComerciosExternos } from '@/hooks/useComerciosExternos';
+import { ComercioExternoRow } from '@/components/admin/ComercioExternoRow';
 import { LicenciaComercioButton } from "@/components/admin/LicenciaComercioButton";
 
 const emptyComercio: ComercioFormData = {
@@ -250,46 +252,6 @@ function comercioToForm(comercio: AdminComercio): ComercioFormData {
   };
 }
 
-function EditComercioButton({
-  comercio,
-  updateComercio,
-}: {
-  comercio: AdminComercio;
-  updateComercio: ReturnType<typeof useAdminComercios>["updateComercio"];
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar comercio</DialogTitle>
-        </DialogHeader>
-        <AdminComercioForm
-          initialData={comercioToForm(comercio)}
-          includeAccess={false}
-          isLoading={updateComercio.isPending}
-          submitLabel="Guardar cambios"
-          loadingLabel="Guardando..."
-          onSubmit={({ comercio: formData }) =>
-            updateComercio.mutate(
-              { comercioId: comercio.id, comercio: formData },
-              {
-                onSuccess: () => setOpen(false),
-              },
-            )
-          }
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function ResetPasswordButton({
   comercio,
   resetPassword,
@@ -500,9 +462,10 @@ function DeleteComercioButton({
 
 export default function AdminComercios() {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAppAdmin();
-  const { comerciosQuery, createComercio, updateComercio, deleteComercio, setAccess, renovarMembresia, createOrUpdateAccess, resetPassword } = useAdminComercios();
+  const { comerciosQuery, createComercio, deleteComercio, setAccess, renovarMembresia, createOrUpdateAccess, resetPassword } = useAdminComercios();
+  const externos = useComerciosExternos(isAdmin === true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | "habilitados" | "deshabilitados">("habilitados");
+  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | "habilitados" | "deshabilitados" | "externos">("todos");
 
   if (isAdminLoading) {
     return <div className="p-8">Cargando...</div>;
@@ -513,23 +476,25 @@ export default function AdminComercios() {
   }
 
   const comercios = comerciosQuery.data || [];
+  const registrosExternos = ["todos", "externos"].includes(estadoFiltro) ? externos.query.data?.externos || [] : [];
+  const importes = new Map(externos.query.data?.licencias.map(l => [l.destinatario_comercio_id, Number(l.importe_mensual)]));
   const today = new Date().toISOString().slice(0, 10);
   const comerciosFiltrados = comercios.filter((comercio) => {
     const habilitado = Boolean(comercio.activo && comercio.usuario?.activo && !comercio.membresia_vencida && (!comercio.membresia_vigente_hasta || comercio.membresia_vigente_hasta >= today));
-    return estadoFiltro === "todos" || (estadoFiltro === "habilitados" ? habilitado : !habilitado);
+    return estadoFiltro === "externos" ? false : estadoFiltro === "todos" || (estadoFiltro === "habilitados" ? habilitado : !habilitado);
   });
 
   return (
-    <div className="container mx-auto space-y-6 p-8">
+    <div className="mx-auto w-full min-w-0 max-w-full space-y-6 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Administrador</h1>
-          <p className="text-sm text-muted-foreground">Alta de comercios, usuarios de ingreso y control de acceso.</p>
+          <p className="text-sm text-muted-foreground">Comercios, sistemas externos, membresías y facturación centralizada.</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} variant="new">
+        <div className="flex flex-wrap gap-2"><Button asChild variant="new"><Link to="/admin/comercios/externos/nuevo"><Plus className="h-4 w-4" />Comercio externo</Link></Button><Button onClick={() => setShowCreateForm(true)} variant="new">
           <Plus className="h-4 w-4" />
           Nuevo comercio
-        </Button>
+        </Button></div>
       </div>
 
       {showCreateForm && (
@@ -552,29 +517,29 @@ export default function AdminComercios() {
         </Card>
       )}
 
+      {externos.query.error && <p role="alert" className="text-sm text-destructive">{externos.query.error.message}</p>}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <CardTitle className="flex items-center gap-2 text-lg"><Building2 className="h-5 w-5" />Comercios</CardTitle>
           <Select value={estadoFiltro} onValueChange={(value) => setEstadoFiltro(value as typeof estadoFiltro)}>
             <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos los estados</SelectItem>
+              <SelectItem value="todos">Todos los comercios</SelectItem><SelectItem value="externos">Sistemas externos</SelectItem>
               <SelectItem value="habilitados">Habilitados</SelectItem>
               <SelectItem value="deshabilitados">Deshabilitados</SelectItem>
             </SelectContent>
           </Select>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="[&_th]:whitespace-nowrap [&_th]:px-2 [&_td]:whitespace-nowrap [&_td]:px-2 [&_th:first-child]:w-full [&_td:first-child]:min-w-56 [&_td:first-child]:whitespace-normal [&_td:first-child]:[overflow-wrap:anywhere] [&_td:last-child_button:not([role=switch])]:h-8 [&_td:last-child_button:not([role=switch])]:w-8 [&_td:last-child_button:not([role=switch])]:p-0 [&_td:last-child_a]:h-8 [&_td:last-child_a]:w-8 [&_td:last-child_a]:p-0">
             <TableHeader>
               <TableRow>
                 <TableHead>Comercio</TableHead>
-                <TableHead>Usuario</TableHead>
                 <TableHead>Ultimo acceso</TableHead>
                 <TableHead>Pago / alta</TableHead>
-                <TableHead>Membresía hasta</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acceso</TableHead>
+                <TableHead className="w-px">Membresía hasta</TableHead>
+                <TableHead className="text-right">Membresía mensual</TableHead><TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -584,7 +549,7 @@ export default function AdminComercios() {
                     Cargando comercios...
                   </TableCell>
                 </TableRow>
-              ) : comerciosFiltrados.length === 0 ? (
+              ) : comerciosFiltrados.length === 0 && registrosExternos.length === 0 && !externos.query.isLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
                     {comercios.length ? "No hay comercios para el filtro seleccionado." : "No hay comercios cargados."}
@@ -598,10 +563,10 @@ export default function AdminComercios() {
                   return (
                     <TableRow key={comercio.id}>
                       <TableCell className="font-medium">{comercio.nombre_comercio}</TableCell>
-                      <TableCell>{comercio.usuario?.email || "-"}</TableCell>
                       <TableCell>{formatLastAccess(comercio.usuario?.last_sign_in_at)}</TableCell>
                       <TableCell>{comercio.fecha_ingreso_sistema ? new Date(`${comercio.fecha_ingreso_sistema}T00:00:00`).toLocaleDateString("es-AR") : "-"}</TableCell>
-                      <TableCell>{comercio.membresia_vigente_hasta ? new Date(`${comercio.membresia_vigente_hasta}T00:00:00`).toLocaleDateString("es-AR") : "Sin vencimiento"}</TableCell>
+                      <TableCell>{comercio.membresia_vigente_hasta ? new Date(`${comercio.membresia_vigente_hasta}T00:00:00`).toLocaleDateString("es-AR") : null}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">{importes.has(comercio.id) ? importes.get(comercio.id)!.toLocaleString("es-AR", { style: "currency", currency: "ARS" }) : null}</TableCell>
                       <TableCell>
                         <Badge variant={enabled ? "default" : "secondary"} className="gap-1">
                           {enabled ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
@@ -609,13 +574,13 @@ export default function AdminComercios() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-nowrap items-center justify-end gap-1 [&>*]:shrink-0">
                           {comercio.usuario ? (
                             <ResetPasswordButton comercio={comercio} resetPassword={resetPassword} />
                           ) : (
                             <AccessUserButton comercio={comercio} createOrUpdateAccess={createOrUpdateAccess} />
                           )}
-                          <EditComercioButton comercio={comercio} updateComercio={updateComercio} />
+                          <Button asChild variant="outline" size="sm"><Link to={`/admin/comercios/${comercio.id}/editar`} title="Editar comercio" aria-label={`Editar ${comercio.nombre_comercio}`}><Pencil className="h-4 w-4" /></Link></Button>
                           <RenewMembershipButton comercio={comercio} renovarMembresia={renovarMembresia} />
                           <LicenciaComercioButton comercio={comercio} />
                           <Button asChild variant="outline" size="sm">
@@ -636,10 +601,29 @@ export default function AdminComercios() {
                   );
                 })
               )}
+              {registrosExternos.map(externo => <ComercioExternoRow key={externo.id} externo={externo} emisorId={externos.comercio?.id} eliminar={externos.eliminar} />)}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
     </div>
   );
+}
+
+export function AdminComercioEditar() {
+  const { data: isAdmin, isLoading } = useIsAppAdmin();
+  const { comerciosQuery, updateComercio } = useAdminComercios();
+  const { comercioId } = useParams();
+  const navigate = useNavigate();
+  if (isLoading) return <p className="p-6">Cargando...</p>;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  const comercio = comerciosQuery.data?.find(c => c.id === comercioId);
+  return <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <header className="flex items-center justify-between gap-3"><h1 className="text-2xl font-bold">Editar comercio</h1><Button asChild variant="outline"><Link to="/admin">Volver</Link></Button></header>
+    {comerciosQuery.isLoading ? <p>Cargando comercio...</p> : comerciosQuery.error ? <p role="alert">No se pudo cargar el comercio.</p> : !comercio ? <p role="alert">Comercio no disponible.</p> : <Card><CardContent className="space-y-5 pt-6">
+      <div className="space-y-2"><Label htmlFor="comercio-usuario">Usuario de ingreso</Label><Input id="comercio-usuario" value={comercio.usuario?.email || 'Sin usuario configurado'} readOnly /></div>
+      <AdminComercioForm initialData={comercioToForm(comercio)} includeAccess={false} isLoading={updateComercio.isPending} submitLabel="Guardar cambios" loadingLabel="Guardando..." onSubmit={({ comercio: formData }) => updateComercio.mutate({ comercioId: comercio.id, comercio: formData }, { onSuccess: () => navigate('/admin') })} />
+      <Button asChild variant="cancel"><Link to="/admin">Cancelar</Link></Button>
+    </CardContent></Card>}
+  </div>;
 }

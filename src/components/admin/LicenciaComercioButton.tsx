@@ -15,10 +15,10 @@ const DetalleVenta = lazy(() => import("@/components/VentasList").then((module) 
 const hoyArgentina = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const importeArs = (value: number) => value.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
 
-export function LicenciaComercioButton({ comercio }: { comercio: AdminComercio }) {
+export function LicenciaComercioButton({ comercio, externo = false }: { comercio: Pick<AdminComercio, 'id' | 'nombre_comercio' | 'cuit'>; externo?: boolean }) {
   const [open, setOpen] = useState(false);
   const [ventaId, setVentaId] = useState<string | null>(null);
-  const licencia = useLicenciaComercio(comercio.id, open);
+  const licencia = useLicenciaComercio(comercio.id, open, externo);
   const { data: parametros } = useComercioParametrizacion();
   const multiple = Boolean(parametros.funciones.multiples_cuit);
   const emisores = useEmisoresFiscales(open && multiple);
@@ -79,6 +79,6 @@ export function LicenciaComercioButton({ comercio }: { comercio: AdminComercio }
           </div>}
       </DialogContent>
     </Dialog>
-    {ventaId && <Suspense fallback={<p role="status">Cargando comprobante...</p>}><DetalleVenta detalleId={ventaId} notificacionComercioIdInicial={comercio.id} onCerrarDetalle={() => setVentaId(null)} /></Suspense>}
+    {ventaId && <Suspense fallback={<p role="status">Cargando comprobante...</p>}><DetalleVenta detalleId={ventaId} notificacionComercioIdInicial={externo ? undefined : comercio.id} onCerrarDetalle={() => setVentaId(null)} /></Suspense>}
   </>;
 }
