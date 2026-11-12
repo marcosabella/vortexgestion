@@ -11,9 +11,9 @@ export function transporteMotivoNoFacturar(s: Pick<TransporteServicio, 'venta_id
   if (!(Number(s.total) > 0)) return 'El servicio debe tener un importe mayor a cero';
   return null;
 }
-export function totalTransporte(s: Pick<TransporteServicio, 'precio_manual' | 'tarifa_snapshot' | 'km_facturables' | 'horas_espera' | 'adicionales'>): number {
+export function totalTransporte(s: Pick<TransporteServicio, 'precio_km' | 'precio_manual' | 'tarifa_snapshot' | 'km_facturables' | 'horas_espera' | 'adicionales'>): number {
   const t = s.tarifa_snapshot;
-  const base = s.precio_manual ?? (t ? Number(t.base) + Math.max(0, s.km_facturables - Number(t.km_incluidos)) * Number(t.precio_km) + s.horas_espera * Number(t.precio_hora) : 0);
+  const base = s.precio_km != null ? Number(s.precio_km) * s.km_facturables : s.precio_manual ?? (t ? Number(t.base) + Math.max(0, s.km_facturables - Number(t.km_incluidos)) * Number(t.precio_km) + s.horas_espera * Number(t.precio_hora) : 0);
   return Math.round((base + s.adicionales) * 100) / 100;
 }
 export function alertaTransporte(p: TransportePlan, u?: TransporteUnidad, hoy = new Date()): 'vencido' | 'proximo' | 'vigente' {

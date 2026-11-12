@@ -47,6 +47,13 @@ assert.match(pagina('/transporte/unidades/unidad/editar', datos), /Editar unidad
 assert.match(pagina('/transporte/unidades/ajena/editar', datos), /no existe o no está disponible/);
 assert.doesNotMatch(pagina('/transporte/unidades/ajena/editar', datos), /<form/);
 assert.doesNotMatch(pagina('/transporte/servicios/servicio/editar', { ...datos, servicios: [{ ...servicio, venta_id: 'venta' }] }), /<form/);
+const edicionFija = pagina('/transporte/servicios/servicio/editar', { ...datos, servicios: [{ ...servicio, precio_manual: 4400, km_facturables: 40 }] });
+assert.match(edicionFija, /name="precio_manual"/);
+assert.doesNotMatch(edicionFija, /name="precio_km"/);
+const edicionKm = pagina('/transporte/servicios/servicio/editar', { ...datos, servicios: [{ ...servicio, precio_manual: null, precio_km: 4400, km_facturables: 40 }] });
+assert.match(edicionKm, /name="precio_km"/);
+assert.doesNotMatch(edicionKm, /name="precio_manual"/);
+assert.match(edicionKm, /176\.000/);
 const operador = { ...datos, admin: false };
 assert.match(pagina('/transporte/tarifas', operador), /requiere acceso de administración/);
 const html = detalle(servicio, operador);

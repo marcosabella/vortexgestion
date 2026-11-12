@@ -13,13 +13,16 @@ const tarifa = { base: 100, km_incluidos: 10, precio_km: 5, precio_hora: 20 };
 assert.equal(totalTransporte({ tarifa_snapshot: tarifa, precio_manual: null, km_facturables: 15, horas_espera: 2, adicionales: 10 }), 175);
 assert.equal(totalTransporte({ tarifa_snapshot: tarifa, precio_manual: 250, km_facturables: 100, horas_espera: 3, adicionales: 10 }), 260);
 assert.equal(totalTransporte({ tarifa_snapshot: tarifa, precio_manual: null, km_facturables: 2, horas_espera: 0, adicionales: 0 }), 100);
+assert.equal(totalTransporte({ precio_km: 4400, precio_manual: null, tarifa_snapshot: null, km_facturables: 40, horas_espera: 0, adicionales: 0 }), 176000);
+assert.equal(totalTransporte({ precio_km: 4400, precio_manual: null, tarifa_snapshot: null, km_facturables: 80, horas_espera: 0, adicionales: 0 }), 352000);
+assert.equal(totalTransporte({ precio_km: 123.45, precio_manual: null, tarifa_snapshot: null, km_facturables: 2.5, horas_espera: 0, adicionales: 10 }), 318.63);
 const plan = { proxima_fecha: '2026-12-01', proximo_km: 1000, proximas_horas: 100, aviso_km: 100, aviso_horas: 10, aviso_dias: 5 };
 const hoy = new Date(2026, 10, 10);
 assert.equal(alertaTransporte(plan, { kilometraje: 1000, horas: 0 }, hoy), 'vencido');
 assert.equal(alertaTransporte(plan, { kilometraje: 900, horas: 0 }, hoy), 'proximo');
 assert.equal(alertaTransporte(plan, { kilometraje: 0, horas: 100 }, hoy), 'vencido');
 assert.equal(alertaTransporte(plan, { kilometraje: 0, horas: 0 }, hoy), 'vigente');
-console.log('OK 7 casos de tarifas y vencimiento por primer criterio');
+console.log('OK 10 casos de tarifas, precio por km y vencimiento por primer criterio');
 
 const pgBin = process.env.PG_BIN || 'C:/Program Files/PostgreSQL/17/bin';
 const tempRoot = realpathSync(os.tmpdir());
@@ -145,7 +148,34 @@ try {
   test('Liquidación admite pagos combinados y recargo de tarjeta', actor + check(`SELECT tipo_comprobante='factura_a' AND total=131 FROM ventas WHERE id='${ventaFinanciada}'`, 'total con financiación') + check(`SELECT count(*)=2 AND sum(monto)=131 FROM pagos_venta WHERE venta_id='${ventaFinanciada}'`, 'pagos conservados'));
   const incompleto = crearFinalizado();
   test('Contado sin pagos y pagos que no cubren el total se rechazan', actor + fail(op('facturar', { servicios: [incompleto], tipo_comprobante: 'recibo_x', modalidad: 'contado', pagos: [], idempotency_key: uuid(43) }), 'ventas_pago_requerido') + fail(op('facturar', { servicios: [incompleto], tipo_comprobante: 'recibo_x', modalidad: 'contado', pagos: [{ tipo_pago: 'contado', monto: 100 }], idempotency_key: uuid(43) }), 'ventas_pagos_no_coinciden') + check(`SELECT venta_id IS NULL FROM transporte_servicios WHERE id='${incompleto}'`, 'sin venta parcial'));
-  console.log(`${passed} pruebas PostgreSQL y 7 casos de dominio correctos. Dependencias externas simuladas en fixture; sin validación remota ni UI.`);
+  const totalesPrevios = sql('SELECT string_agg(id::text||\':\'||total::text,\',\' ORDER BY id) FROM transporte_servicios');
+  sql(migration('20261112120000_transporte_precio_por_km.sql'));
+  assert.equal(sql('SELECT string_agg(id::text||\':\'||total::text,\',\' ORDER BY id) FROM transporte_servicios'), totalesPrevios, 'La migración conserva todos los importes anteriores');
+  test('Precio por km conserva importe fijo y tarifa anteriores', actor + check(`SELECT precio_km IS NULL AND total=121 FROM transporte_servicios WHERE id='${service}'`, 'fijo conservado') + check(`SELECT precio_km IS NULL AND total=175 FROM transporte_servicios WHERE id='${priced}'`, 'tarifa conservada'));
+  const porKm = { ...serviceData, precio_manual: null, precio_km: 4400, km_facturables: 40, horas_espera: 0, adicionales: 0 };
+  const servicioKm = sql(actor + op('servicio', porKm));
+  test('Backend calcula 40 km a 4400 finales sin sumar IVA nuevamente', actor + check(`SELECT total=176000 AND precio_km=4400 AND precio_manual IS NULL FROM transporte_servicios WHERE id='${servicioKm}'`, 'total por km'));
+  test('Precio y km positivos, sin mezclar modos de cobro', actor
+    + fail(op('servicio', { ...porKm, km_facturables: 0 }), 'mayores a cero')
+    + fail(op('servicio', { ...porKm, precio_km: -1 }), 'mayores a cero')
+    + fail(op('servicio', { ...porKm, precio_manual: 4400 }), 'no se combina')
+    + fail(op('servicio', { ...porKm, tarifa_id: tariff }), 'no se combina')
+    + fail(op('servicio', { ...porKm, horas_espera: 1 }), 'no se combina')
+    + fail(op('servicio', { ...porKm, precio_km: 4400.001 }), 'hasta dos decimales')
+    + fail(op('servicio', { ...porKm, km_facturables: 40.01 }), 'hasta dos decimales'));
+  test('Precio por km valida cliente del mismo comercio', actor + fail(op('servicio', { ...porKm, cliente_id: foreign }), 'transporte_relacion_de_otro_comercio'));
+  test('Operador no accede al nuevo precio por km', driverActor + check(`SELECT NOT (x ? 'precio_km') FROM jsonb_array_elements(public.transporte_datos('${tenant}')->'servicios') x WHERE x->>'id'='${servicioKm}'`, 'precio privado'));
+  const decimal = sql(actor + op('servicio', { ...porKm, precio_km: 123.45, km_facturables: 2.5, adicionales: 10 }));
+  test('Redondea precio por km y adicionales a dos decimales', actor + check(`SELECT total=318.63 FROM transporte_servicios WHERE id='${decimal}'`, 'redondeo monetario'));
+  sql(actor + state(servicioKm, 'asignado'));
+  sql(driverActor + state(servicioKm, 'en_camino', { km_salida: 120 }));
+  sql(driverActor + state(servicioKm, 'en_lugar'));
+  sql(driverActor + state(servicioKm, 'trasladando'));
+  sql(driverActor + state(servicioKm, 'finalizado', { km_llegada: 200, km_aproximacion: 20, km_traslado: 20, km_retorno: 40 }));
+  test('Recorrer 80 km conserva cobro sobre 40 km facturables', actor + check(`SELECT total=176000 AND km_llegada-km_salida=80 AND km_facturables=40 FROM transporte_servicios WHERE id='${servicioKm}'`, 'recorrido separado del cobro'));
+  const ventaKm = sql(actor + op('facturar', { servicios: [servicioKm], tipo_comprobante: 'recibo_x', modalidad: 'cta_cte', pagos: [], idempotency_key: uuid(44) }));
+  test('Facturación por km mantiene total final y desglose de IVA', actor + check(`SELECT total=176000 AND round(subtotal+total_iva,2)=176000 FROM ventas WHERE id='${ventaKm}'`, 'importe final') + check(`SELECT sum(monto)=176000 FROM pagos_venta WHERE venta_id='${ventaKm}'`, 'cuenta corriente'));
+  console.log(`${passed} pruebas PostgreSQL y 10 casos de dominio correctos. Dependencias externas simuladas en fixture; sin validación remota ni UI.`);
 } catch (error) {
   console.error(error);
   throw error;

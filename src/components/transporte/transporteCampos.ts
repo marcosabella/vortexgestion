@@ -1,6 +1,6 @@
 import type { TransporteDatos } from '@/types/transporte';
 
-export type TransporteCampo = { key: string; label: string; type?: string; required?: boolean; min?: number; options?: { value: string; label: string }[]; initial?: string | number; help?: string };
+export type TransporteCampo = { key: string; label: string; type?: string; required?: boolean; min?: number; decimales?: number; options?: { value: string; label: string }[]; initial?: string | number; help?: string };
 const opc = (value: string, label: string) => ({ value, label });
 const fechaHoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export function camposTransporte(accion: string, datos: TransporteDatos, editar = false): TransporteCampo[] {
@@ -35,9 +35,11 @@ export function camposTransporte(accion: string, datos: TransporteDatos, editar 
     { key: 'contacto', label: 'Contacto asistido / carga' }, { key: 'telefono', label: 'Teléfono', type: 'tel' }, { key: 'programado_at', label: 'Fecha y hora acordadas', type: 'datetime-local' },
     { key: 'origen', label: 'Ubicación de retiro', required: true }, { key: 'destino', label: 'Destino', required: true }, { key: 'carga', label: 'Vehículo o maquinaria a trasladar', required: true },
     { ...unidad, required: false }, { key: 'equipo_id', label: 'Equipo / acoplado', options: unidades, help: 'Opcional: elegí otro equipo o acoplado distinto de la unidad principal. Si no llevás uno adicional, dejalo sin seleccionar.' }, { key: 'chofer_id', label: 'Chofer', options: datos.choferes.map(ch => opc(ch.id, `${ch.nombre}${!ch.activo ? ' (inactivo)' : ''}`)) },
+    { key: 'modo_precio', label: 'Forma de calcular el precio', required: true, initial: 'por_km', options: [opc('por_km', 'Kilómetros facturables × precio por km'), opc('tarifa', 'Tarifa / convenio'), opc('fijo', 'Importe total fijo')] },
+    { ...opcional('precio_km', 'Precio final por kilómetro, IVA incluido'), decimales: 2, help: 'Se multiplica por los kilómetros facturables. Aproximación, traslado y retorno se registran por separado y no se suman automáticamente al cobro.' },
     { key: 'tarifa_id', label: 'Tarifa / convenio', options: datos.tarifas.map(t => opc(t.id, t.nombre)), help: 'Se valida cliente, tipo y vigencia. La tarifa aplicada queda guardada en el servicio.' },
-    opcional('precio_manual', 'Precio acordado, IVA incluido (reemplaza base y km)'), numero('km_facturables', 'Kilómetros facturables'), numero('horas_espera', 'Horas de espera facturables'), numero('adicionales', 'Adicionales, IVA incluido'),
-    { key: 'iva', label: 'IVA para precio manual (%)', initial: 21, options: [0, 10.5, 21, 27].map(v => opc(String(v), String(v))) },
+    opcional('precio_manual', 'Importe total fijo, IVA incluido'), { ...numero('km_facturables', 'Kilómetros facturables'), decimales: 1, help: 'Base de cobro confirmada. Ejemplo: 40 km × $4.400 finales = $176.000.' }, numero('horas_espera', 'Horas de espera facturables'), { ...numero('adicionales', 'Adicionales, IVA incluido'), decimales: 2 },
+    { key: 'iva', label: 'Alícuota de IVA incluida en el precio (%)', initial: 21, options: [0, 10.5, 21, 27].map(v => opc(String(v), String(v))) },
     ...Object.entries(textos).map(([key, label]) => ({ key: `detalle_${key}`, label })), { key: 'observaciones', label: 'Observaciones', type: 'textarea' },
   ];
   if (accion === 'lectura') return [unidad, numero('kilometraje', 'Lectura de odómetro'), numero('horas', 'Horas de uso'), { key: 'motivo', label: 'Origen / motivo de la lectura', required: true, help: 'Las lecturas son históricas. No se permite retroceder el odómetro o las horas.' }];

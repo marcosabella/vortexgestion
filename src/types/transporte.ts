@@ -12,7 +12,7 @@ export type TransporteServicio = {
   estado: EstadoTransporte; presentacion: string; programado_at: string | null; origen: string; destino: string;
   solicitante: string; expediente: string; contacto: string; telefono: string; carga: string; detalles: Record<string, string>;
   km_salida: number | null; km_llegada: number | null; km_aproximacion: number; km_traslado: number; km_retorno: number;
-  km_facturables: number; horas_espera: number; adicionales: number; precio_manual: number | null;
+  km_facturables: number; horas_espera: number; adicionales: number; precio_manual: number | null; precio_km?: number | null;
   tarifa_snapshot: TransporteTarifa | null; total: number; iva: number; observaciones: string; motivo_cierre: string;
   presupuesto_id: string | null; venta_id: string | null; version: number; created_at: string;
 };

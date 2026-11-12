@@ -37,7 +37,7 @@ export function TransporteFormulario({ query, datos, vista, id }: {
     </header>
     {error ? <p role="alert">{error}</p> : <Card><CardContent className="space-y-5 p-4 sm:p-6">
       <p className="text-sm text-muted-foreground">Datos del comercio activo. Los gastos se registran pendientes y su pago se administra en Gestión.</p>
-      <TransporteForm campos={camposTransporte(config.accion, datos, Boolean(id))} valores={valores} pending={query.isPending} cancelar={volver} guardar={async datosFormulario => {
+      <TransporteForm campos={camposTransporte(config.accion, datos, Boolean(id))} valores={valores} tarifas={datos.tarifas} pending={query.isPending} cancelar={volver} guardar={async datosFormulario => {
         await query.run({ accion: config.accion, id, version: valores && 'version' in valores ? valores.version : undefined, datos: datosFormulario });
         navigate(`/transporte/${vista}`, { replace: true });
       }} />

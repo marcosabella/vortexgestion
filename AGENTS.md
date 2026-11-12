@@ -64,6 +64,10 @@ No ejecutar comandos que escriban artefactos, inicien despliegues o alteren serv
 - Los accesos a las funciones de Vortex Transporte se realizan desde las opciones del menú lateral, sin repetir una fila de botones de navegación dentro de las páginas.
 - Las cuentas y permisos de personas se administran centralmente en Configuración → Usuarios y permisos, también para comercios sin módulos adicionales. Los módulos deben reutilizar esas identidades y conservar únicamente sus vínculos operativos y funciones específicas. Los usuarios nuevos o configurados requieren autorización en el backend; no alcanza con ocultar opciones del menú.
 
+## Vortex Transporte
+
+- En Vortex Transporte, la base de cobro confirmada es kilometros facturables por precio final por kilometro, con IVA incluido. El recorrido operativo (aproximacion, traslado y retorno) se conserva separado y no se suma automaticamente a los kilometros facturables. Conservar las tarifas y los importes fijos historicos al editar registros existentes.
+
 ## Migraciones y proteccion de datos
 
 - Publicar en Netlify solamente por pedido expreso del usuario. Un pedido de commit y push no autoriza una publicacion.
