@@ -426,9 +426,11 @@ async function consultarPadron(
   cuitConsultar: string,
   ambiente: 'homologacion' | 'produccion'
 ): Promise<ReturnType<typeof parseConstanciaInscripcion>> {
+  // Endpoints oficiales con cadena TLS verificable. aws.arca.gob.ar presenta
+  // una cadena incompleta (UnknownIssuer en Deno); conservar la validación HTTPS.
   const wsPadronUrl = ambiente === 'produccion'
-    ? 'https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5'
-    : 'https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5';
+    ? 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5'
+    : 'https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5';
 
   const cuitEmisorLimpio = cuitEmisor.replace(/-/g, '');
 

@@ -83,5 +83,20 @@ export function useIncidentes(filtros: IncidentesFiltros, isAdmin: boolean) {
     // Refresca también si una falla interrumpe el guardado tras actualizar algunas apariciones.
     onSettled: () => client.invalidateQueries({ queryKey: ["admin-incidentes"] }),
   });
-  return { listado, actualizar, comercios };
+  const resolverSeleccionados = useMutation({
+    mutationFn: async (incidentes: Pick<Incidente, "id" | "estado" | "notas">[]) => {
+      if (!isAdmin) throw new Error("Acceso no autorizado");
+      const pendientes = new Map(incidentes.filter((item) => item.estado !== "resuelto").map((item) => [item.id, item]));
+      if (!pendientes.size) throw new Error("No hay incidentes pendientes seleccionados");
+      for (const incidente of pendientes.values()) {
+        const { error } = await api.rpc("admin_actualizar_incidente", {
+          p_id: incidente.id, p_estado: "resuelto", p_notas: incidente.notas,
+        });
+        if (error) throw error;
+      }
+      return pendientes.size;
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ["admin-incidentes"] }),
+  });
+  return { listado, actualizar, resolverSeleccionados, comercios };
 }

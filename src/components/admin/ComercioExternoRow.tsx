@@ -8,9 +8,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { LicenciaComercioButton } from './LicenciaComercioButton';
 
 const fecha = (v: string | null) => v ? new Date(`${v}T12:00:00`).toLocaleDateString('es-AR') : 'Sin fecha informada';
-export function ComercioExternoRow({ externo: e, emisorId, eliminar }: { externo: ComercioExterno; emisorId?: string; eliminar: ReturnType<typeof useComerciosExternos>['eliminar'] }) {
+export function ComercioExternoRow({ externo: e, numero, emisorId, eliminar }: { externo: ComercioExterno; numero: number; emisorId?: string; eliminar: ReturnType<typeof useComerciosExternos>['eliminar'] }) {
   const propio = e.comercio_id === emisorId;
   return <TableRow>
+    <TableCell className="tabular-nums">{numero}</TableCell>
     <TableCell className="font-medium">{e.nombre_comercio}<p className="text-xs font-normal text-muted-foreground">{e.sistema}</p></TableCell>
     <TableCell className="text-muted-foreground">Sistema externo</TableCell>
     <TableCell>{fecha(e.fecha_ingreso_sistema)}</TableCell><TableCell>{fecha(e.membresia_vigente_hasta)}</TableCell>

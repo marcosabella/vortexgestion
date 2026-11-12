@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SITUACIONES_AFIP } from "@/types/cliente";
 import { useConsultarArca } from "@/hooks/useConsultarArca";
 import { useToast } from "@/hooks/use-toast";
@@ -465,7 +465,7 @@ export default function AdminComercios() {
   const { comerciosQuery, createComercio, deleteComercio, setAccess, renovarMembresia, createOrUpdateAccess, resetPassword } = useAdminComercios();
   const externos = useComerciosExternos(isAdmin === true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | "habilitados" | "deshabilitados" | "externos">("todos");
+  const [estadoFiltro, setEstadoFiltro] = useState<"habilitados_externos" | "todos" | "habilitados" | "deshabilitados" | "externos">("habilitados_externos");
 
   if (isAdminLoading) {
     return <div className="p-8">Cargando...</div>;
@@ -476,13 +476,20 @@ export default function AdminComercios() {
   }
 
   const comercios = comerciosQuery.data || [];
-  const registrosExternos = ["todos", "externos"].includes(estadoFiltro) ? externos.query.data?.externos || [] : [];
+  const registrosExternos = ["habilitados_externos", "todos", "externos"].includes(estadoFiltro) ? externos.query.data?.externos || [] : [];
   const importes = new Map(externos.query.data?.licencias.map(l => [l.destinatario_comercio_id, Number(l.importe_mensual)]));
   const today = new Date().toISOString().slice(0, 10);
   const comerciosFiltrados = comercios.filter((comercio) => {
     const habilitado = Boolean(comercio.activo && comercio.usuario?.activo && !comercio.membresia_vencida && (!comercio.membresia_vigente_hasta || comercio.membresia_vigente_hasta >= today));
-    return estadoFiltro === "externos" ? false : estadoFiltro === "todos" || (estadoFiltro === "habilitados" ? habilitado : !habilitado);
+    return estadoFiltro === "externos" ? false : estadoFiltro === "todos" || (["habilitados", "habilitados_externos"].includes(estadoFiltro) ? habilitado : !habilitado);
   });
+  const membresiasVisibles = [
+    ...comerciosFiltrados.map((comercio) => importes.get(comercio.id) ?? 0),
+    ...registrosExternos.map((externo) => Number(externo.importe_mensual)),
+  ].filter((importe) => Number.isFinite(importe) && importe > 0);
+  const totalMembresiaMensual = membresiasVisibles.reduce((total, importe) => total + Math.round(importe * 100), 0) / 100;
+  const cargandoTotales = comerciosQuery.isLoading || externos.query.isLoading;
+  const errorTotales = comerciosQuery.isError || externos.query.isError;
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-full space-y-6 p-4 sm:p-6">
@@ -522,8 +529,9 @@ export default function AdminComercios() {
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <CardTitle className="flex items-center gap-2 text-lg"><Building2 className="h-5 w-5" />Comercios</CardTitle>
           <Select value={estadoFiltro} onValueChange={(value) => setEstadoFiltro(value as typeof estadoFiltro)}>
-            <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[230px]"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="habilitados_externos">Habilitados y externos</SelectItem>
               <SelectItem value="todos">Todos los comercios</SelectItem><SelectItem value="externos">Sistemas externos</SelectItem>
               <SelectItem value="habilitados">Habilitados</SelectItem>
               <SelectItem value="deshabilitados">Deshabilitados</SelectItem>
@@ -531,9 +539,10 @@ export default function AdminComercios() {
           </Select>
         </CardHeader>
         <CardContent>
-          <Table className="[&_th]:whitespace-nowrap [&_th]:px-2 [&_td]:whitespace-nowrap [&_td]:px-2 [&_th:first-child]:w-full [&_td:first-child]:min-w-56 [&_td:first-child]:whitespace-normal [&_td:first-child]:[overflow-wrap:anywhere] [&_td:last-child_button:not([role=switch])]:h-8 [&_td:last-child_button:not([role=switch])]:w-8 [&_td:last-child_button:not([role=switch])]:p-0 [&_td:last-child_a]:h-8 [&_td:last-child_a]:w-8 [&_td:last-child_a]:p-0">
+          <Table className="[&_th]:whitespace-nowrap [&_th]:px-2 [&_td]:whitespace-nowrap [&_td]:px-2 [&_th:nth-child(2)]:w-full [&_tbody_td:nth-child(2)]:min-w-56 [&_tbody_td:nth-child(2)]:whitespace-normal [&_tbody_td:nth-child(2)]:[overflow-wrap:anywhere] [&_td:last-child_button:not([role=switch])]:h-8 [&_td:last-child_button:not([role=switch])]:w-8 [&_td:last-child_button:not([role=switch])]:p-0 [&_td:last-child_a]:h-8 [&_td:last-child_a]:w-8 [&_td:last-child_a]:p-0">
             <TableHeader>
               <TableRow>
+                <TableHead>N.º</TableHead>
                 <TableHead>Comercio</TableHead>
                 <TableHead>Ultimo acceso</TableHead>
                 <TableHead>Pago / alta</TableHead>
@@ -545,23 +554,24 @@ export default function AdminComercios() {
             <TableBody>
               {comerciosQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Cargando comercios...
                   </TableCell>
                 </TableRow>
               ) : comerciosFiltrados.length === 0 && registrosExternos.length === 0 && !externos.query.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     {comercios.length ? "No hay comercios para el filtro seleccionado." : "No hay comercios cargados."}
                   </TableCell>
                 </TableRow>
               ) : (
-                comerciosFiltrados.map((comercio) => {
+                comerciosFiltrados.map((comercio, index) => {
                   const membershipExpired = Boolean(comercio.membresia_vencida || (comercio.membresia_vigente_hasta && comercio.membresia_vigente_hasta < today));
                   const enabled = Boolean(comercio.activo && comercio.usuario?.activo && !membershipExpired);
 
                   return (
                     <TableRow key={comercio.id}>
+                      <TableCell className="tabular-nums">{index + 1}</TableCell>
                       <TableCell className="font-medium">{comercio.nombre_comercio}</TableCell>
                       <TableCell>{formatLastAccess(comercio.usuario?.last_sign_in_at)}</TableCell>
                       <TableCell>{comercio.fecha_ingreso_sistema ? new Date(`${comercio.fecha_ingreso_sistema}T00:00:00`).toLocaleDateString("es-AR") : "-"}</TableCell>
@@ -601,8 +611,17 @@ export default function AdminComercios() {
                   );
                 })
               )}
-              {registrosExternos.map(externo => <ComercioExternoRow key={externo.id} externo={externo} emisorId={externos.comercio?.id} eliminar={externos.eliminar} />)}
+              {registrosExternos.map((externo, index) => <ComercioExternoRow key={externo.id} externo={externo} numero={comerciosFiltrados.length + index + 1} emisorId={externos.comercio?.id} eliminar={externos.eliminar} />)}
             </TableBody>
+            <TableFooter aria-live="polite">
+              {cargandoTotales ? <TableRow><TableCell colSpan={8}>Cargando totales de membresías...</TableCell></TableRow>
+                : errorTotales ? <TableRow><TableCell colSpan={8} role="alert" className="text-destructive">No se pudieron cargar los totales de membresías.</TableCell></TableRow>
+                : <TableRow>
+                  <TableCell colSpan={5} className="!whitespace-normal">Total de comercios con membresía: <span className="tabular-nums">{membresiasVisibles.length}</span></TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums" aria-label="Total de membresía mensual">{totalMembresiaMensual.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}</TableCell>
+                  <TableCell colSpan={2} />
+                </TableRow>}
+            </TableFooter>
           </Table>
         </CardContent>
       </Card>

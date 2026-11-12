@@ -154,7 +154,8 @@ assert.ok(filters.some(([name, from, to]) => name === 'range' && from === 500 &&
 hook.useIncidentes(filtros, false);
 assert.equal(queries[3].enabled, false);
 await assert.rejects(queries[3].queryFn());
-await assert.rejects(mutations[1].mutationFn({ ids: ['incidente'], estado: 'resuelto', notas: '' }));
+await assert.rejects(mutations[2].mutationFn({ ids: ['incidente'], estado: 'resuelto', notas: '' }));
+await assert.rejects(mutations[3].mutationFn([{ id: 'incidente', estado: 'pendiente', notas: '' }]));
 assert.equal(adminRpcCalls, 0);
 const idsGrupo = ['aparicion-1', 'aparicion-2', 'aparicion-3', 'aparicion-4', 'aparicion-5'];
 await mutations[0].mutationFn({ ids: [...idsGrupo, idsGrupo[0]], estado: 'resuelto', notas: 'Validación corregida' });
@@ -172,6 +173,24 @@ assert.equal(invalidaciones.at(-1).queryKey[0], 'admin-incidentes', 'Debe refres
 falloSeguimiento = null;
 await mutations[0].mutationFn({ ids: idsGrupo, estado: 'en_revision', notas: 'Revisando' });
 assert.equal(adminRpcCalls, 12, 'Debe poder reintentar el grupo completo tras una falla parcial');
+const resolver = mutations[1];
+const seleccionMasiva = [
+  { id: 'comercio-1-error-1', estado: 'pendiente', notas: 'Nota original' },
+  { id: 'comercio-2-error-2', estado: 'en_revision', notas: 'Otra nota' },
+  { id: 'ya-resuelto', estado: 'resuelto', notas: 'Conservar' },
+];
+assert.equal(await resolver.mutationFn([...seleccionMasiva, seleccionMasiva[0]]), 2);
+assert.deepEqual(seguimientos.slice(-2), seleccionMasiva.slice(0, 2).map((item) => ({
+  name: 'admin_actualizar_incidente', p_id: item.id, p_estado: 'resuelto', p_notas: item.notas,
+})), 'La resolución múltiple conserva las notas individuales y omite resueltos y duplicados');
+await assert.rejects(resolver.mutationFn([]));
+await assert.rejects(resolver.mutationFn([seleccionMasiva[2]]));
+falloSeguimiento = seleccionMasiva[1].id;
+await assert.rejects(resolver.mutationFn(seleccionMasiva));
+await resolver.onSettled();
+assert.equal(invalidaciones.at(-1).queryKey[0], 'admin-incidentes');
+falloSeguimiento = null;
+assert.equal(await resolver.mutationFn(seleccionMasiva), 2, 'Permite reintentar una resolución múltiple interrumpida');
 hook.useIncidentes({ ...filtros, desde: '2026-10-20' }, true);
 assert.equal(queries[5].enabled, false);
 console.log('OK Incidentes: agrupación por comercio y error, conteo de 551 apariciones entre páginas, seguimiento de cinco apariciones por grupo, reintento tras falla parcial, permisos, privacidad, límites, captura de React Query, filtros y fechas. Supabase simulado; RLS se verifica por separado en test-incidentes-sql.mjs.');

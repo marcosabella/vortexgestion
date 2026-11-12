@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Activity, CheckCheck, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useIsAppAdmin } from "@/hooks/useAdminComercios";
 import { INCIDENTES_POR_PAGINA, useIncidentes, type IncidentesFiltros } from "@/hooks/useIncidentes";
 import { incidenteModulos } from "@/utils/incidentes";
@@ -8,6 +8,7 @@ import type { IncidenteAgrupado } from "@/utils/agruparIncidentes";
 import { incidenteEstados, incidenteOrigenes, type Incidente, type IncidenteEstado } from "@/types/incidente";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,8 @@ export default function AdminIncidentes() {
   const [grupoDetalle, setGrupoDetalle] = useState<IncidenteAgrupado | null>(null);
   const [estado, setEstado] = useState<IncidenteEstado>("pendiente");
   const [notas, setNotas] = useState("");
-  const { listado, actualizar, comercios } = useIncidentes(filtros, isAdmin === true);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const { listado, actualizar, resolverSeleccionados, comercios } = useIncidentes(filtros, isAdmin === true);
 
   if (adminLoading) return <div className="p-8">Cargando permisos...</div>;
   if (!isAdmin) return <Navigate to="/" replace />;
@@ -37,7 +39,21 @@ export default function AdminIncidentes() {
   const paginas = Math.max(1, Math.ceil(total / INCIDENTES_POR_PAGINA));
   const pagina = Math.min(filtros.pagina, paginas - 1);
   const filas = (listado.data?.incidentes ?? []).slice(pagina * INCIDENTES_POR_PAGINA, (pagina + 1) * INCIDENTES_POR_PAGINA);
+  const pendientes = (listado.data?.incidentes ?? []).flatMap((grupo) => grupo.ocurrencias).filter((item) => item.estado !== "resuelto");
+  const seleccion = pendientes.filter((item) => seleccionados.has(item.id));
+  const pendientesPagina = filas.flatMap((grupo) => grupo.ocurrencias).filter((item) => item.estado !== "resuelto");
+  const ocupado = resolverSeleccionados.isPending || listado.isFetching || actualizar.isPending;
+  const marcar = (items: Incidente[], checked: boolean) => {
+    resolverSeleccionados.reset();
+    setSeleccionados((actual) => {
+      const siguiente = new Set(actual);
+      items.forEach((item) => { if (checked) siguiente.add(item.id); else siguiente.delete(item.id); });
+      return siguiente;
+    });
+  };
+  const limpiarSeleccion = () => { setSeleccionados(new Set()); resolverSeleccionados.reset(); };
   const cambiar = (campo: keyof Omit<IncidentesFiltros, "pagina">, value: string) => {
+    limpiarSeleccion();
     setFiltros((actual) => ({ ...actual, [campo]: value, pagina: 0 }));
   };
   const abrir = (incidente: Incidente) => {
@@ -57,7 +73,7 @@ export default function AdminIncidentes() {
         <RefreshCw className={`h-4 w-4 ${listado.isFetching ? "animate-spin" : ""}`} />Actualizar
       </Button>
     </div>
-    <Card><CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5">
+    <Card><CardContent className="pt-6"><fieldset aria-label="Filtros de incidentes" disabled={resolverSeleccionados.isPending} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <div className="space-y-2"><Label htmlFor="inc-comercio">Comercio</Label>
         <select id="inc-comercio" className={selectClass} value={filtros.comercioId} onChange={(event) => cambiar("comercioId", event.target.value)}>
           <option value="">Todos los comercios</option>
@@ -79,18 +95,37 @@ export default function AdminIncidentes() {
       </div>
       <div className="space-y-2"><Label htmlFor="inc-desde">Desde</Label><Input id="inc-desde" type="date" value={filtros.desde} onChange={(event) => cambiar("desde", event.target.value)} /></div>
       <div className="space-y-2"><Label htmlFor="inc-hasta">Hasta</Label><Input id="inc-hasta" type="date" value={filtros.hasta} onChange={(event) => cambiar("hasta", event.target.value)} /></div>
-      <div className="sm:col-span-2 lg:col-span-5"><Button size="sm" variant="ghost" onClick={() => setFiltros(inicial)}>Limpiar filtros</Button></div>
-    </CardContent></Card>
+      <div className="sm:col-span-2 lg:col-span-5"><Button size="sm" variant="ghost" onClick={() => { limpiarSeleccion(); setFiltros(inicial); }}>Limpiar filtros</Button></div>
+    </fieldset></CardContent></Card>
     <p className="text-sm text-muted-foreground">Errores agrupados por comercio, módulo, origen, código y mensaje. Las cantidades y fechas corresponden a los filtros seleccionados.</p>
     {fechaInvalida ? <p role="alert" className="text-destructive">La fecha desde debe ser anterior o igual a la fecha hasta.</p>
       : listado.isError ? <div role="alert" className="rounded-md border border-destructive p-4 text-sm text-destructive">No se pudieron cargar los incidentes. Verificá que la migración de Incidentes esté aplicada y volvé a intentar.</div>
       : <Card><CardContent className="p-0">
+        <div className="flex flex-wrap items-center gap-3 border-b p-4">
+          <span className="text-sm" aria-live="polite">{seleccion.length} apariciones seleccionadas</span>
+          <Button size="sm" disabled={!seleccion.length || ocupado} onClick={() => resolverSeleccionados.mutate(seleccion, { onSuccess: () => setSeleccionados(new Set()) })}>
+            <CheckCheck className="h-4 w-4" />{resolverSeleccionados.isPending ? "Resolviendo..." : "Marcar seleccionados como resueltos"}
+          </Button>
+          <Button size="sm" variant="outline" disabled={!seleccion.length || ocupado} onClick={limpiarSeleccion}>Quitar selección</Button>
+          <p className="w-full text-xs text-muted-foreground">Cada casilla selecciona las apariciones sin resolver del grupo incluidas en los filtros. Podés seleccionar en varias páginas. Se conservan las notas de seguimiento.</p>
+          {resolverSeleccionados.isError && <p role="alert" className="w-full text-sm text-destructive">No se pudo completar la resolución. Algunas apariciones pueden haberse actualizado. Reintentá para resolver las restantes.</p>}
+          {resolverSeleccionados.isSuccess && <p role="status" className="w-full text-sm">Se marcaron {resolverSeleccionados.data} apariciones como resueltas.</p>}
+        </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Fecha y hora</TableHead><TableHead>Comercio</TableHead><TableHead>Módulo</TableHead><TableHead>Origen</TableHead><TableHead>Incidente</TableHead><TableHead>Estado</TableHead><TableHead><span className="sr-only">Acciones</span></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow>
+            <TableHead><Checkbox aria-label="Seleccionar todos los incidentes sin resolver de esta página" disabled={!pendientesPagina.length || ocupado}
+              checked={pendientesPagina.length > 0 && pendientesPagina.every((item) => seleccionados.has(item.id)) ? true : pendientesPagina.some((item) => seleccionados.has(item.id)) ? "indeterminate" : false}
+              onCheckedChange={(checked) => marcar(pendientesPagina, checked === true)} /></TableHead>
+            <TableHead>Fecha y hora</TableHead><TableHead>Comercio</TableHead><TableHead>Módulo</TableHead><TableHead>Origen</TableHead><TableHead>Incidente</TableHead><TableHead>Estado</TableHead><TableHead><span className="sr-only">Acciones</span></TableHead></TableRow></TableHeader>
           <TableBody>
-            {listado.isLoading ? <TableRow><TableCell colSpan={7} className="h-28 text-center">Cargando incidentes...</TableCell></TableRow>
-              : !filas.length ? <TableRow><TableCell colSpan={7} className="h-28 text-center text-muted-foreground">No hay incidentes para los filtros seleccionados.</TableCell></TableRow>
-              : filas.map((incidente) => <TableRow key={incidente.id}>
+            {listado.isLoading ? <TableRow><TableCell colSpan={8} className="h-28 text-center">Cargando incidentes...</TableCell></TableRow>
+              : !filas.length ? <TableRow><TableCell colSpan={8} className="h-28 text-center text-muted-foreground">No hay incidentes para los filtros seleccionados.</TableCell></TableRow>
+              : filas.map((incidente) => {
+                const sinResolver = incidente.ocurrencias.filter((item) => item.estado !== "resuelto");
+                return <TableRow key={incidente.id}>
+                <TableCell><Checkbox aria-label={`Seleccionar incidente de ${incidente.comercio?.nombre_comercio || incidente.comercio_id}: ${incidente.mensaje}`} disabled={!sinResolver.length || ocupado}
+                  checked={sinResolver.length > 0 && sinResolver.every((item) => seleccionados.has(item.id)) ? true : sinResolver.some((item) => seleccionados.has(item.id)) ? "indeterminate" : false}
+                  onCheckedChange={(checked) => marcar(sinResolver, checked === true)} /></TableCell>
                 <TableCell className="whitespace-nowrap"><span className="block">Última: {fechaHora(incidente.creado_en)}</span>{incidente.ocurrencias.length > 1 && <span className="block text-xs text-muted-foreground">Primera: {fechaHora(incidente.primeraOcurrencia)}</span>}</TableCell>
                 <TableCell className="min-w-40">{incidente.comercio?.nombre_comercio || incidente.comercio_id}</TableCell>
                 <TableCell>{incidenteModulos[incidente.modulo] || incidente.modulo}</TableCell>
@@ -100,8 +135,8 @@ export default function AdminIncidentes() {
                   const cantidad = incidente.ocurrencias.filter((ocurrencia) => ocurrencia.estado === key).length;
                   return cantidad > 0 && <Badge key={key} variant={key === "pendiente" ? "destructive" : "secondary"} className="whitespace-nowrap">{label}{cantidad < incidente.ocurrencias.length ? ` (${cantidad})` : ""}</Badge>;
                 })}</div></TableCell>
-                <TableCell><Button variant="outline" size="sm" onClick={() => { setGrupoDetalle(incidente); abrir(incidente); }}>Ver detalle</Button></TableCell>
-              </TableRow>)}
+                <TableCell><Button variant="outline" size="sm" disabled={resolverSeleccionados.isPending} onClick={() => { setGrupoDetalle(incidente); abrir(incidente); }}>Ver detalle</Button></TableCell>
+              </TableRow>; })}
           </TableBody>
         </Table>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">

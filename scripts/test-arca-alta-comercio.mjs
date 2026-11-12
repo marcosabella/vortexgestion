@@ -10,13 +10,22 @@ const load = (file, require = () => ({}), extra = {}) => {
   vm.runInNewContext(code, { exports, require, Request, Response, crypto: webcrypto, TextEncoder, console: { log() {}, error() {} }, ...extra });
   return exports;
 };
-const authorization = load('supabase/functions/consultar-padron-afip/autorizacion.ts');
+const permissions = load('supabase/functions/_shared/usuarios-permisos.ts');
+const authorization = load('supabase/functions/consultar-padron-afip/autorizacion.ts', name => {
+  if (name.includes('usuarios-permisos')) return permissions;
+  throw Error(name);
+});
 const padron = load('supabase/functions/consultar-padron-afip/padron.ts');
 const tickets = load('supabase/functions/_shared/wsaa-cache.ts');
 let state, externalCalls, fiscalCalls, handler;
 const db = {
   auth: { getUser: async token => ({ data: { user: token === 'sesion' ? { id: 'user' } : null }, error: null }) },
   rpc: async (name, args) => {
+    if (name === 'vortex_permiso_servicio') {
+      assert.equal(args.p_user_id, 'user');assert.equal(args.p_comercio_id, 'propio');
+      assert.equal(args.p_modulo, 'clientes');assert.equal(args.p_accion, 'consultar');
+      return { data: !state.sinPermiso, error: null };
+    }
     assert.equal(name, 'afip_wsaa_reservar_ticket');
     assert.equal(args.p_comercio_id, 'propio');
     assert.ok(args.p_clave.includes('ws_sr_constancia_inscripcion'));
@@ -36,7 +45,7 @@ const db = {
 };
 load('supabase/functions/consultar-padron-afip/index.ts', name => {
   if (name.includes('supabase-js')) return { createClient: () => db };
-  if (name.includes('emisor-fiscal')) return { resolverConfiguracionFiscal: async (_, id) => { fiscalCalls.push(id);return state.fiscal ? { certificado_crt: 'CERT-FICTICIO', certificado_key: 'KEY-FICTICIA', cuit_emisor: '20300323872', ambiente: 'produccion' } : null; } };
+  if (name.includes('emisor-fiscal')) return { resolverConfiguracionFiscal: async (_, id) => { fiscalCalls.push(id);return state.fiscal ? { certificado_crt: 'CERT-FICTICIO', certificado_key: 'KEY-FICTICIA', cuit_emisor: '20300323872', ambiente: state.ambiente || 'produccion' } : null; } };
   if (name.includes('wsaa-cache')) return tickets;
   if (name.includes('node-forge')) return {};
   if (name === './padron.ts') return padron;
@@ -46,7 +55,7 @@ load('supabase/functions/consultar-padron-afip/index.ts', name => {
   Deno: { env: { get: () => 'ficticio' }, serve: fn => { handler = fn; } },
   fetch: async (url, options) => {
     externalCalls.push(url);
-    if (url.includes('arca.gob.ar')) {
+    if (url === 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5' || url === 'https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5') {
       assert.ok(options.body.includes('<idPersona>20300323872</idPersona>'));
       if (state.soapError) return new Response('<faultstring>Servicio no autorizado</faultstring>', { status: 500 });
       return new Response('<datosGenerales><nombre>Prueba</nombre><apellido>Persona</apellido><tipoPersona>FISICA</tipoPersona></datosGenerales><actividad><periodo>200505</periodo></actividad>');
@@ -75,13 +84,18 @@ assert.equal(response.success, false);assert.match(response.error, /certificado 
 response = await run({ admin: true, tenants: ['propio'] }, { altaComercio: true, comercioId: 'ajeno' });
 assert.equal(response.success, false);assert.equal(fiscalCalls.length, 0);assert.equal(externalCalls.length, 0);
 response = await run({ admin: true, tenants: ['propio'], fiscal: true }, { altaComercio: true, comercioId: 'propio' });
-assert.equal(response.success, true);assert.equal(response.data.fuente, 'afip_oficial');assert.equal(response.data.periodoInicioActividad, '2005-05');assert.deepEqual(fiscalCalls, ['propio']);assert.equal(externalCalls.length, 1);
+assert.equal(response.success, true, response.error);assert.equal(response.data.fuente, 'afip_oficial');assert.equal(response.data.periodoInicioActividad, '2005-05');assert.deepEqual(fiscalCalls, ['propio']);assert.equal(externalCalls.length, 1);
+assert.equal(externalCalls[0], 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5');
+response = await run({ admin: true, tenants: ['propio'], fiscal: true, ambiente: 'homologacion' }, { altaComercio: true, comercioId: 'propio' });
+assert.equal(response.success, true, response.error);assert.deepEqual(externalCalls, ['https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5']);
+response = await run({ admin: true, tenants: ['propio'], fiscal: true, sinPermiso: true }, { altaComercio: true, comercioId: 'propio' });
+assert.equal(response.success, false);assert.match(response.error, /permiso/);assert.equal(externalCalls.length, 0);
 response = await run({ admin: true, tenants: ['propio'], fiscal: true }, { altaComercio: true });
-assert.equal(response.success, true);assert.deepEqual(fiscalCalls, ['propio'], 'El administrador con un solo comercio puede usar su configuración sin seleccionarlo');
+assert.equal(response.success, true, response.error);assert.deepEqual(fiscalCalls, ['propio'], 'El administrador con un solo comercio puede usar su configuración sin seleccionarlo');
 response = await run({ admin: true, tenants: ['propio'], fiscal: true, soapError: true }, { altaComercio: true });
 assert.equal(response.success, false);assert.match(response.error, /Servicio no autorizado/);assert.equal(externalCalls.length, 1, 'No recurrir a fuentes alternativas si falla el webservice oficial');
 response = await run({ tenants: ['propio'] }, { comercioId: 'propio' });
-assert.equal(response.success, true);assert.deepEqual(fiscalCalls, ['propio'], 'El alta de clientes conserva la consulta de su comercio');
+assert.equal(response.success, true, response.error);assert.deepEqual(fiscalCalls, ['propio'], 'El alta de clientes conserva la consulta de su comercio');
 response = await run({ tenants: ['propio', 'segundo'] }, {});
 assert.match(response.error, /indicar el comercio/);assert.equal(externalCalls.length, 0);
 response = await run({ admin: true }, { altaComercio: 'true' });
