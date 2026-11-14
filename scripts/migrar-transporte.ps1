@@ -1,4 +1,4 @@
-param([ValidateSet('Preflight','Errores','Aplicar','AplicarDocumentacion','AplicarPagos','Verificar')][string]$Paso='Preflight',[string]$RpcHash)
+param([ValidateSet('Preflight','Errores','Aplicar','AplicarDocumentacion','AplicarPagos','AplicarRealizado','VerificarRealizado','Verificar')][string]$Paso='Preflight',[string]$RpcHash)
 $ErrorActionPreference='Stop'
 Add-Type @'
 using System;
@@ -50,10 +50,10 @@ SELECT jsonb_build_object(
  'service_count',(SELECT count(*) FROM public.transporte_servicios)
 ) AS estado;
 '@}
- { $_ -in @('Aplicar','AplicarDocumentacion','AplicarPagos') } {
+ { $_ -in @('Aplicar','AplicarDocumentacion','AplicarPagos','AplicarRealizado') } {
   if($RpcHash -notmatch '^[a-f0-9]{32}$'){throw 'Falta hash de la funcion revisada'}
   $transportePartes=@()
-  $transporteNombres=if($Paso -eq 'AplicarPagos'){@('20261111103000_transporte_liquidacion_recargos_pago')}elseif($Paso -eq 'AplicarDocumentacion'){@('20261111102000_transporte_documentacion_opcional')}else{@('20261111100000_transporte_eliminar_registros','20261111101000_transporte_validar_equipo_servicio')}
+  $transporteNombres=if($Paso -eq 'AplicarRealizado'){@('20261114100000_transporte_viaje_realizado')}elseif($Paso -eq 'AplicarPagos'){@('20261111103000_transporte_liquidacion_recargos_pago')}elseif($Paso -eq 'AplicarDocumentacion'){@('20261111102000_transporte_documentacion_opcional')}else{@('20261111100000_transporte_eliminar_registros','20261111101000_transporte_validar_equipo_servicio')}
   $transporteVersionesSql=($transporteNombres|ForEach-Object {"'"+$_.Substring(0,14)+"'"}) -join ','
   foreach($transporteNombre in $transporteNombres) {
    $transporteVersion=$transporteNombre.Substring(0,14)
@@ -71,6 +71,19 @@ END `$guard`$;
 "@
   "BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='45s';`n$transporteGuard`n$($transportePartes -join "`n")`nNOTIFY pgrst,'reload schema'; COMMIT;"
  }
+ 'VerificarRealizado' {@'
+SELECT jsonb_build_object(
+ 'migrations',(SELECT jsonb_agg(jsonb_build_object('version',version,'name',name) ORDER BY version) FROM supabase_migrations.schema_migrations WHERE version>='20261113000000'),
+ 'rpc_hash',(SELECT md5(prosrc) FROM pg_proc WHERE oid='public.transporte_operar(uuid,text,uuid,integer,jsonb)'::regprocedure),
+ 'carga_directa',(SELECT position('p_accion IN (''servicio'',''viaje_realizado'')' IN prosrc)>0 AND position('pg_advisory_xact_lock' IN prosrc)>0 AND position('Carga administrativa de viaje realizado' IN prosrc)>0 FROM pg_proc WHERE oid='public.transporte_operar(uuid,text,uuid,integer,jsonb)'::regprocedure),
+ 'permisos_centrales',(SELECT position('public.vortex_validar_transporte(c,p_accion,p_id)' IN prosrc)>0 AND position('public.vortex_permiso(c,''transporte'',''operar'')' IN prosrc)>0 FROM pg_proc WHERE oid='public.transporte_operar(uuid,text,uuid,integer,jsonb)'::regprocedure),
+ 'privilegios',jsonb_build_object('authenticated',has_function_privilege('authenticated','public.transporte_operar(uuid,text,uuid,integer,jsonb)','EXECUTE'),'anon',has_function_privilege('anon','public.transporte_operar(uuid,text,uuid,integer,jsonb)','EXECUTE')),
+ 'datos_hash',(SELECT md5(coalesce(string_agg(to_jsonb(s)::text,'' ORDER BY id),'')) FROM public.transporte_servicios s),
+ 'eventos_hash',(SELECT md5(coalesce(string_agg(to_jsonb(e)::text,'' ORDER BY id),'')) FROM public.transporte_eventos e),
+ 'lecturas_hash',(SELECT md5(coalesce(string_agg(to_jsonb(l)::text,'' ORDER BY id),'')) FROM public.transporte_lecturas l),
+ 'service_count',(SELECT count(*) FROM public.transporte_servicios)
+) AS estado;
+'@}
  'Verificar' {@'
 SELECT jsonb_build_object(
  'migrations',(SELECT jsonb_agg(jsonb_build_object('version',version,'name',name) ORDER BY version) FROM supabase_migrations.schema_migrations WHERE version IN ('20261111100000','20261111101000','20261111102000','20261111103000')),

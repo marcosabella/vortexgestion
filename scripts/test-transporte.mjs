@@ -175,6 +175,30 @@ try {
   test('Recorrer 80 km conserva cobro sobre 40 km facturables', actor + check(`SELECT total=176000 AND km_llegada-km_salida=80 AND km_facturables=40 FROM transporte_servicios WHERE id='${servicioKm}'`, 'recorrido separado del cobro'));
   const ventaKm = sql(actor + op('facturar', { servicios: [servicioKm], tipo_comprobante: 'recibo_x', modalidad: 'cta_cte', pagos: [], idempotency_key: uuid(44) }));
   test('Facturación por km mantiene total final y desglose de IVA', actor + check(`SELECT total=176000 AND round(subtotal+total_iva,2)=176000 FROM ventas WHERE id='${ventaKm}'`, 'importe final') + check(`SELECT sum(monto)=176000 FROM pagos_venta WHERE venta_id='${ventaKm}'`, 'cuenta corriente'));
+  sql(migration('20261114100000_transporte_viaje_realizado.sql'));
+  const realizado = { ...porKm, registro_id: uuid(80), programado_at: '2026-10-01T12:00:00Z', km_salida: 90, km_llegada: 100, km_aproximacion: 2, km_traslado: 5, km_retorno: 3 };
+  const lecturaActual = sql(`SELECT kilometraje FROM transporte_unidades WHERE id='${unit}'`);
+  const viaje = sql(actor + op('viaje_realizado', realizado));
+  assert.equal(viaje, uuid(80));
+  test('Viaje realizado se guarda finalizado y sin etapas ficticias', actor + check(`SELECT estado='finalizado' AND total=176000 AND km_llegada=100 AND programado_at='2026-10-01T12:00:00Z' FROM transporte_servicios WHERE id='${viaje}'`, 'fecha e importe') + check(`SELECT count(*)=1 AND bool_and(estado='finalizado' AND user_id='${admin}') FROM transporte_eventos WHERE servicio_id='${viaje}'`, 'auditoria de alta directa') + check(`SELECT kilometraje=${lecturaActual} FROM transporte_unidades WHERE id='${unit}'`, 'odometro actual preservado'));
+  assert.equal(sql(actor + op('viaje_realizado', realizado)), viaje, 'Reintento devuelve el mismo servicio');
+  test('Reintentos no duplican y no aceptan otro contenido', actor + check(`SELECT count(*)=1 FROM transporte_eventos WHERE servicio_id='${viaje}'`, 'sin duplicados') + fail(op('viaje_realizado', { ...realizado, carga: 'Otra carga' }), 'La carga ya existe'));
+  test('Carga directa rechaza fechas futuras, asignación incompleta y odómetros inválidos', actor
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), programado_at: '2099-01-01T12:00:00Z' }), 'no puede ser futura')
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), chofer_id: null }), 'transporte_asigne_unidad_y_chofer')
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), km_salida: null }), 'ambos odómetros')
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), km_llegada: 89 }), 'transporte_kilometraje_invalido')
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), km_traslado: 50 }), 'transporte_tramos_superan_recorrido_real')
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), km_salida: 'NaN' }), 'kilómetros válidos')
+    + check(`SELECT count(*)=0 FROM transporte_servicios WHERE id='${uuid(81)}'`, 'sin altas parciales'));
+  test('Carga administrativa conserva validación de tenant y permisos', actor
+    + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81), cliente_id: foreign }), 'transporte_relacion_de_otro_comercio')
+    + `SET app.test_editar='false';` + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81) }), 'No tenés permiso') + `SET app.test_editar='true';`);
+  test('Chofer no puede usar carga administrativa', driverActor + fail(op('viaje_realizado', { ...realizado, registro_id: uuid(81) }), 'transporte_solo_administracion'));
+  const sinOdometros = sql(actor + op('viaje_realizado', { ...realizado, registro_id: uuid(81), km_salida: null, km_llegada: null }));
+  test('Carga sin odómetros conserva tramos declarados', actor + check(`SELECT km_salida IS NULL AND km_llegada IS NULL AND km_traslado=5 FROM transporte_servicios WHERE id='${sinOdometros}'`, 'sin lecturas inventadas'));
+  const ventaDirecta = sql(actor + op('facturar', { servicios: [viaje, sinOdometros], tipo_comprobante: 'factura_a', modalidad: 'cta_cte', pagos: [], idempotency_key: uuid(82) }));
+  test('Viajes cargados finalizados se liquidan juntos sin presupuesto', actor + check(`SELECT total=352000 FROM ventas WHERE id='${ventaDirecta}'`, 'venta agrupada') + check(`SELECT count(*)=2 AND bool_and(venta_id='${ventaDirecta}' AND presupuesto_id IS NULL) FROM transporte_servicios WHERE id IN ('${viaje}','${sinOdometros}')`, 'vinculos conservados'));
   console.log(`${passed} pruebas PostgreSQL y 10 casos de dominio correctos. Dependencias externas simuladas en fixture; sin validación remota ni UI.`);
 } catch (error) {
   console.error(error);

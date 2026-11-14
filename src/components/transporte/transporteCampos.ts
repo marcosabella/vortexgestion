@@ -1,6 +1,6 @@
 import type { TransporteDatos } from '@/types/transporte';
 
-export type TransporteCampo = { key: string; label: string; type?: string; required?: boolean; min?: number; decimales?: number; options?: { value: string; label: string }[]; initial?: string | number; help?: string };
+export type TransporteCampo = { key: string; label: string; type?: string; required?: boolean; min?: number; decimales?: number; options?: { value: string; label: string }[]; initial?: string | number; help?: string; grupo?: string; complementario?: boolean };
 const opc = (value: string, label: string) => ({ value, label });
 const fechaHoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export function camposTransporte(accion: string, datos: TransporteDatos, editar = false): TransporteCampo[] {
@@ -56,4 +56,22 @@ export function camposTransporte(accion: string, datos: TransporteDatos, editar 
     numero('kilometraje', 'Kilometraje'), numero('horas', 'Horas de uso'), { key: 'proveedor_id', label: 'Taller / proveedor', options: proveedores }, numero('presupuesto', 'Presupuesto estimado'),
     { key: 'gasto_id', label: 'Gasto registrado (costo real)', options: datos.gastos.map(g => opc(g.gasto_id, `${g.gasto?.concepto} · $${g.gasto?.monto}`)), help: 'Registrá primero el gasto en Transporte. El pago se administra desde Gastos y egresos.' }];
   return [];
+}
+
+export function camposViajeRealizado(datos: TransporteDatos): TransporteCampo[] {
+  const servicio = ['tipo', 'cliente_id', 'programado_at', 'origen', 'destino', 'carga'];
+  const operacion = ['unidad_id', 'equipo_id', 'chofer_id'];
+  const importe = ['modo_precio', 'precio_km', 'tarifa_id', 'precio_manual', 'km_facturables', 'horas_espera', 'adicionales', 'iva'];
+  const campos = camposTransporte('servicio', datos).map(f => ({ ...f,
+    ...(f.key === 'programado_at' ? { label: 'Fecha y hora reales del viaje', required: true } : {}),
+    ...(['unidad_id', 'chofer_id'].includes(f.key) ? { required: true } : {}),
+    grupo: servicio.includes(f.key) ? 'Servicio' : operacion.includes(f.key) ? 'Operación' : importe.includes(f.key) ? 'Importe' : 'Más datos',
+    complementario: ![...servicio, ...operacion, ...importe].includes(f.key),
+  }));
+  return [...campos, ...[
+    ['km_salida', 'Odómetro al salir'], ['km_llegada', 'Odómetro al regresar'],
+    ['km_aproximacion', 'Km de aproximación'], ['km_traslado', 'Km de traslado'], ['km_retorno', 'Km de retorno'],
+  ].map(([key, label]) => ({ key, label, type: 'number', min: 0, decimales: 1, grupo: 'Operación',
+    help: key === 'km_salida' ? 'Odómetros opcionales: completá ambos si los conocés. Se conservan en el viaje y no modifican el odómetro actual de la unidad.' : undefined,
+  }))];
 }

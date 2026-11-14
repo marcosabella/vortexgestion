@@ -10,7 +10,7 @@ import WebSocket from 'ws';
 
 const repo = process.cwd();
 const fixtures = `
-export const useTransporte=()=>({data:window.datos,comercio:{id:'comercio',nombre_comercio:'Demo'},isPending:false,isFetching:false,refetch:async()=>{},run:async args=>{window.calls.push(args);if(window.failSave)throw Error('Error simulado');return 'nuevo';}});
+export const useTransporte=()=>({data:window.datos,comercio:{id:'comercio',nombre_comercio:'Demo'},isPending:false,isFetching:false,refetch:async()=>{},run:async args=>{window.calls.push(args);if(window.failSave)throw Error('Error simulado');if(args.accion==='viaje_realizado'){window.datos.servicios.push({...args.datos,id:args.datos.registro_id,numero:88,estado:'finalizado',presentacion:'pendiente_documentacion',total:176000,venta_id:null});return args.datos.registro_id;}return 'nuevo';}});
 export const useComercioParametrizacion=()=>({data:{funciones:{multiples_cuit:false}}});
 export const useEmisoresFiscales=()=>({data:[],isFetching:false});
 export const useBancos=()=>({bancos:[]});
@@ -20,6 +20,8 @@ export const supabase={storage:{from:()=>{throw Error('Sin conexiones externas')
 const entry = `import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter,useLocation} from 'react-router-dom';import Transporte from './src/pages/Transporte';
 window.calls=[];window.fetch=()=>{throw Error('Sin conexiones externas')};
 window.datos={admin:!location.search.includes('operador'),unidades:[{id:'unidad',nombre:'Grúa de prueba',patente:'AA123AA',tipo:'grua',estado:'disponible',activo:true,kilometraje:100,horas:0}],servicios:[{id:'directo',numero:77,tipo:'auxilio',estado:'finalizado',presentacion:'pendiente_documentacion',cliente_id:'cliente',unidad_id:null,chofer_id:null,presupuesto_id:null,venta_id:null,total:121,carga:'Servicio directo',origen:'Retiro',destino:'Taller',created_at:'2026-11-11T12:00:00Z',detalles:{}}],choferes:[],clientes:[{id:'cliente',nombre:'Cliente',apellido:'Directo'}],tarifas:[],planes:[],mantenimientos:[],lecturas:[{id:'lectura',unidad_id:'unidad',user_id:'abb3137b-3145-49d9-9f97-6023888eecaa',kilometraje:100,horas:0,motivo:'Alta de unidad',created_at:'2026-11-11T12:00:00Z'}],gastos:[],eventos:[],adjuntos:[],proveedores:[],usuarios:[{user_id:'abb3137b-3145-49d9-9f97-6023888eecaa',nombre:'Responsable de prueba',email:'responsable@example.test'}]};
+window.datos.choferes=[{id:'chofer',nombre:'Chofer de prueba',activo:true}];
+window.datos.permisos={crear:true,editar:true,operar:!location.search.includes('sin-operar'),facturar:!location.search.includes('sin-facturar')};
 function App(){const {pathname}=useLocation();return <><output id="ruta">{pathname}</output><Transporte/></>;}createRoot(document.getElementById('root')).render(<BrowserRouter><App/></BrowserRouter>);`;
 const bundle = await build({ stdin: { contents: entry, loader: 'tsx', resolveDir: repo }, write: false, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'fixtures', setup(builder) {
   builder.onResolve({ filter: /^@\/(hooks\/(useTransporte|useComercioParametrizacion|useEmisoresFiscales|useBancos|useTarjetas|useTarjetaCuotas)|integrations\/supabase\/client)$/ }, () => ({ path: 'fixtures', namespace: 'fixtures' }));
@@ -55,12 +57,12 @@ try {
 
   for(const vista of ['servicios','unidades','choferes','lecturas','tarifas','gastos','planes','mantenimientos']){
     await navigate('/transporte/'+vista);
-    await click('Nuevo');
-    await wait(`location.pathname==='/transporte/${vista}/nuevo' && Boolean(document.querySelector('form'))`);
+    await click(vista === 'servicios' ? 'Registrar viaje realizado' : 'Nuevo');
+    await wait(`location.pathname==='/transporte/${vista}/${vista === 'servicios' ? 'realizado' : 'nuevo'}' && Boolean(document.querySelector('form'))`);
     assert.equal(await evaluate('Boolean(document.querySelector("[role=dialog]"))'),false,'Alta sin modal: '+vista);
     await click('Cancelar');await wait(`location.pathname==='/transporte/${vista}' && !document.querySelector('form')`);
   }
-  await navigate('/transporte/servicios/nuevo');await wait('Boolean(document.querySelector("form"))');
+  await navigate('/transporte/servicios/directo/editar');await wait('Boolean(document.querySelector("form"))');
   const elegir=async(name,value)=>evaluate(`(()=>{const el=document.querySelector('[name='+${JSON.stringify(name)}+']');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await elegir('equipo_id','unidad');await elegir('unidad_id','unidad');
   await wait('document.querySelector("[name=equipo_id] option[value=unidad]").disabled');
@@ -132,7 +134,7 @@ try {
   await click('Confirmar venta');await wait('window.calls.length===2 && !document.querySelector("[role=dialog]")');
   assert.equal(await evaluate('window.calls[1].datos.modalidad'),'contado','Condición de contado');
   assert.deepEqual(await evaluate('window.calls[1].datos.pagos'),[{tipo_pago:'contado',monto:121,cuotas:1}],'Pago del gestor de Ventas conservado');
-  await navigate('/transporte/servicios/nuevo');await wait('Boolean(document.querySelector("form"))');
+  await navigate('/transporte/servicios/directo/editar');await wait('Boolean(document.querySelector("form"))');
   assert.equal(await evaluate('document.querySelector("[name=modo_precio]").value'),'por_km','El alta propone cobro por km facturables');
   assert.equal(await evaluate('Boolean(document.querySelector("[name=precio_manual]"))'),false,'El importe total fijo no se confunde con el precio por km');
   await elegir('cliente_id','cliente');await set('origen','Del Campillo');await set('destino','Mattaldi');await set('carga','Toyota Hilux');
@@ -152,13 +154,52 @@ try {
   assert.equal(calculado.precio_manual,null);assert.equal(calculado.tarifa_id,null);assert.equal(calculado.horas_espera,0);
   assert.equal('modo_precio' in calculado,false,'El modo visual no se envía como columna');
   assert.equal('total' in calculado,false,'PostgreSQL calcula el total');
-  await navigate('/transporte/servicios/nuevo');await wait('Boolean(document.querySelector("form"))');
+  await navigate('/transporte/servicios/directo/editar');await wait('Boolean(document.querySelector("form"))');
   await elegir('modo_precio','fijo');await wait('Boolean(document.querySelector("[name=precio_manual]"))');
   await set('precio_manual','121');await wait('document.querySelector("[role=status]").textContent.includes("121,00")');
   assert.equal(await evaluate('Boolean(document.querySelector("[name=precio_km]"))'),false,'Modo fijo conserva su significado');
   await elegir('modo_precio','por_km');await wait('Boolean(document.querySelector("[name=precio_km]"))');
+  await navigate('/transporte/servicios');
+  assert.equal(await evaluate('[...document.querySelectorAll("button,a")].some(b=>b.textContent.trim()==="Nuevo")'),false,'Administración solo ve carga de viaje realizado');
+  await click('Registrar viaje realizado');await wait('location.pathname==="/transporte/servicios/realizado"');
+  assert.equal(await evaluate('document.body.textContent.includes("Cargar servicio a realizar")'),false,'Administración no ofrece cambio a paso a paso');
+  assert.equal(await evaluate('Boolean(document.querySelector("[role=dialog]"))'),false,'Viaje realizado se carga como página');
+  assert.equal(await evaluate('document.querySelector("details").open'),false,'Datos complementarios plegados');
+  await click('Guardar y liquidar');await wait('document.body.textContent.includes("Campo obligatorio")');
+  assert.equal(await evaluate('window.calls.length'),0,'No crea viaje incompleto');
+  const completarViaje=async()=>{
+    await elegir('cliente_id','cliente');await elegir('unidad_id','unidad');await elegir('chofer_id','chofer');
+    await set('programado_at','2026-01-01T12:00');await set('origen','Retiro');await set('destino','Taller');await set('carga','Viaje terminado');
+    await set('precio_km','4400');await set('km_facturables','40');
+  };
+  await completarViaje();await set('km_salida','100');await set('km_llegada','90');
+  await click('Guardar y liquidar');await wait('document.body.textContent.includes("Revisá los odómetros")');
+  assert.equal(await evaluate('window.calls.length'),0,'No guarda recorrido inválido');
+  await set('km_salida','');await set('km_llegada','');
+  await evaluate('window.failSave=true');await click('Guardar y liquidar');await wait('document.body.textContent.includes("No se guardaron los cambios")');
+  assert.equal(await evaluate('location.pathname'),'/transporte/servicios/realizado','Error conserva el formulario');
+  await evaluate('window.failSave=false');await click('Guardar y liquidar');
+  await wait('location.pathname==="/transporte/liquidacion" && Boolean(document.querySelector("[role=dialog]"))');
+  assert.equal(await evaluate('window.calls[0].datos.registro_id===window.calls[1].datos.registro_id'),true,'Reintento conserva identificador');
+  assert.equal(await evaluate('window.calls[1].accion'),'viaje_realizado');
+  assert.equal(await evaluate('document.querySelector("[role=dialog]").textContent.includes("1 servicios")'),true,'Liquidación selecciona solo el viaje creado');
+  const viajeCreado=await evaluate('window.calls[1].datos.registro_id');
+  await click('Confirmar venta');await wait('window.calls.length===3 && !document.querySelector("[role=dialog]")');
+  assert.deepEqual(await evaluate('window.calls[2].datos.servicios'),[viajeCreado],'Liquida el viaje recién cargado');
+  assert.equal(await evaluate('document.querySelector("a[href=\'/ventas?detalle=nuevo\']")?.textContent'),'Ver venta y continuar con emisión fiscal','Acceso directo a la venta creada');
+  await navigate('/transporte/servicios/realizado');await wait('Boolean(document.querySelector("form"))');await completarViaje();
+  await click('Guardar y cargar otro');await wait('document.body.textContent.includes("Podés cargar el siguiente")');
+  assert.equal(await evaluate('location.pathname'),'/transporte/servicios/realizado');
+  assert.equal(await evaluate('document.querySelector("[name=carga]").value'),'','Formulario limpio para siguiente viaje');
+  const primerRegistro=await evaluate('window.calls[0].datos.registro_id');
+  await completarViaje();await click('Guardar y cargar otro');await wait('window.calls.length===2');
+  assert.notEqual(await evaluate('window.calls[1].datos.registro_id'),primerRegistro,'Nuevo viaje usa otro identificador');
+  await navigate('/transporte/servicios/realizado?sin-operar');await wait('Boolean(document.querySelector("[role=alert]"))');
+  assert.equal(await evaluate('Boolean(document.querySelector("form"))'),false,'Crear sin operar no habilita carga finalizada');
+  await navigate('/transporte/servicios/realizado?sin-facturar');await wait('Boolean(document.querySelector("form"))');
+  assert.equal(await evaluate('[...document.querySelectorAll("button")].some(b=>b.textContent==="Guardar y liquidar")'),false,'Carga sin permiso de facturación permite solo guardar');
   await navigate('/transporte/unidades/nuevo?operador');await wait('Boolean(document.querySelector("[role=alert]"))');
   assert.equal(await evaluate('Boolean(document.querySelector("form"))'),false,'Alta requiere administración');
   assert.deepEqual(errors,[]);
-  console.log('OK navegador: ocho altas como páginas, edición mediante icono, detalle, confirmación y cancelación de eliminación, responsable por nombre, lecturas protegidas, validaciones y permisos. Sin Supabase.');
+  console.log('OK navegador: altas, edición, detalle y eliminación; viaje realizado, odómetros, reintento, liquidación inmediata, enlace a venta, carga consecutiva y permisos. Sin Supabase.');
 } finally {socket?.close();browser?.kill();await new Promise(resolve=>server.close(resolve));}

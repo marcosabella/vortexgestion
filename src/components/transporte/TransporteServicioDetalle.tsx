@@ -44,7 +44,7 @@ export function TransporteServicioDetalle({ servicio: s, datos: d, run, pending 
     <dl className="grid gap-2 text-sm sm:grid-cols-2">{Object.entries(s.detalles).filter(([, v]) => v).map(([k, v]) => <div key={k}><dt className="font-medium capitalize">{k.replace(/_/g, ' ')}</dt><dd className="whitespace-pre-wrap">{v}</dd></div>)}</dl>
     <div className="flex flex-wrap gap-2">
       {d.admin && puedeEditar && !s.presupuesto_id && !s.venta_id && !['cancelado', 'no_realizado'].includes(s.estado) && <Button asChild variant="outline" disabled={pending}><Link to={`/transporte/servicios/${s.id}/editar`}>Editar datos y asignación</Link></Button>}
-      {puedeOperar && siguientes[s.estado] && <Button disabled={pending} onClick={() => setTransicion(siguientes[s.estado]!)}>{ESTADOS_TRANSPORTE[siguientes[s.estado]!]}</Button>}
+      {!d.admin && puedeOperar && siguientes[s.estado] && <Button disabled={pending} onClick={() => setTransicion(siguientes[s.estado]!)}>{ESTADOS_TRANSPORTE[siguientes[s.estado]!]}</Button>}
       {d.admin && puedeOperar && !final && <><Button variant="outline" disabled={pending} onClick={() => setTransicion('no_realizado')}>No realizado</Button><Button variant="destructive" disabled={pending} onClick={() => setTransicion('cancelado')}>Cancelar servicio</Button></>}
       {d.admin && s.presupuesto_id && <Button asChild variant="outline"><Link to={`/presupuestos/${s.presupuesto_id}/editar`}>Ver presupuesto</Link></Button>}
       {d.admin && s.venta_id && <Button asChild variant="outline"><Link to="/ventas">Ver ventas y cobros</Link></Button>}

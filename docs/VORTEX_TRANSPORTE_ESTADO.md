@@ -1,5 +1,16 @@
 # Vortex Transporte: estado de implementación
 
+## Carga administrativa de viajes realizados — 14/11/2026
+
+- Administración dispone únicamente de **Registrar viaje realizado**, página `/transporte/servicios/realizado`. La URL anterior `/transporte/servicios/nuevo` redirige a esta carga para administración. El chofer conserva el seguimiento por etapas en sus servicios asignados, sin acceso a la carga administrativa; administración no muestra los botones de avance por etapas.
+- Una sola página con Servicio, Operación e Importe; contactos, expediente y documentación complementaria quedan en **Más datos**. Fecha real obligatoria, unidad y chofer obligatorios; odómetros opcionales, ambos juntos si se conocen. La fecha real se conserva en `programado_at`, usada como fecha del servicio en grillas y filtros; `created_at` y el evento registran cuándo y quién lo cargó.
+- **Guardar y cargar otro** finaliza el viaje y limpia el formulario. **Guardar y liquidar** abre su liquidación con el viaje seleccionado; requiere permiso de facturación. Se conservan comprobantes, contado, cuenta corriente, pagos y emisor existentes. Los viajes también pueden liquidarse agrupados por cliente desde la grilla habitual.
+- Después de confirmar la venta aparece un enlace directo a `/ventas?detalle=<id>` para consultar y continuar la emisión fiscal y el CAE desde Gestión. Guardar el viaje o registrar la venta no solicita automáticamente autorización fiscal.
+- Migración local preparada: `20261114100000_transporte_viaje_realizado.sql`. La RPC valida administración, crear y operar, tenant, fecha no futura, asignaciones y kilómetros; conserva el cálculo comercial actual. Alta y finalización son atómicas, con identificación estable y bloqueo para reintentos sin duplicados. No crea etapas intermedias ficticias.
+- Los odómetros retrospectivos se conservan en el servicio y **no actualizan el odómetro actual ni agregan lecturas a la unidad**. Por ello no alteran las alertas ni el indicador de kilómetros del mes basado en lecturas. La carga de lecturas de unidad conserva su circuito habitual.
+- Verificación local: 53 pruebas PostgreSQL y 10 casos de cálculo; prueba automatizada en Chrome con datos ficticios para carga, validación, conservación ante error, reintento, liquidación individual, enlace a venta y siguiente viaje. Sin escrituras remotas ni emisión fiscal real. Pendiente validación manual con una base que tenga instalada la migración.
+- El 14/11/2026, por pedido expreso de aplicar solo la migración, se aplicó `20261114100000_transporte_viaje_realizado` al proyecto vinculado `zhtqkygjvaaizbdwwsbi`, en una transacción que verifica el hash previo de la RPC y registra únicamente esa versión. Se guardó la definición anterior en `private-backups` (ignorado por Git). Verificación remota: versión registrada, rama de carga directa y permisos centrales presentes, ejecución permitida a `authenticated` y denegada a `anon`. Los hashes de servicios, eventos y lecturas permanecieron idénticos; se conservaron los seis servicios existentes. No se crearon operaciones de prueba ni se publicó el frontend.
+
 Fecha: 10 de noviembre de 2026.
 
 ## Implementado

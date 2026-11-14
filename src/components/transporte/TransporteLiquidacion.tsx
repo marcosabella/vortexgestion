@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Eye, FileText, Receipt } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,12 +17,16 @@ import { COMPROBANTES_LIQUIDACION, prepararPagosLiquidacion, totalLiquidacion, t
 
 const presentaciones = PRESENTACIONES_TRANSPORTE;
 export function TransporteLiquidacion({ datos: d, run, pending, verDetalle }: { datos: TransporteDatos; run: ReturnType<typeof useTransporte>['run']; pending: boolean; verDetalle?: (id: string) => void }) {
-  const [cliente, setCliente] = useState('');
+  const [params, setParams] = useSearchParams();
+  const inicial = d.admin && d.permisos?.facturar !== false ? d.servicios.find(s => s.id === params.get('servicio') && !transporteMotivoNoFacturar(s)) : undefined;
+  const [cliente, setCliente] = useState(inicial?.cliente_id || '');
   const [presentacion, setPresentacion] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [seleccion, setSeleccion] = useState<string[]>([]);
-  const [confirmar, setConfirmar] = useState(false);
+  const [seleccion, setSeleccion] = useState<string[]>(inicial ? [inicial.id] : []);
+  const [confirmar, setConfirmar] = useState(Boolean(inicial));
+  const [ventaCreada, setVentaCreada] = useState<string | null>(null);
+  const limpiarDestino = () => { if (params.has('servicio')) { const next = new URLSearchParams(params); next.delete('servicio'); setParams(next, { replace: true }); } };
   const [emisor, setEmisor] = useState('');
   const [tipoComprobante, setTipoComprobante] = useState<ComprobanteLiquidacion>('recibo_x');
   const [condicion, setCondicion] = useState<CondicionLiquidacion>('cta_cte');
@@ -56,7 +60,8 @@ export function TransporteLiquidacion({ datos: d, run, pending, verDetalle }: { 
     }))} />
     <div className="flex flex-wrap items-center gap-3"><strong>{seleccionados.length} servicios · {transporteImporte(total)}</strong><Button disabled={pending || !puedeFacturar || !unCliente || !seleccionados.length} onClick={abrirConfirmacion}>Facturar seleccionados</Button>{seleccionados.length > 0 && !unCliente && <p className="text-sm text-destructive">Seleccioná servicios de un solo cliente.</p>}</div>
     {resultado && <p role="status" className="text-sm">{resultado}</p>}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <Dialog open={confirmar} onOpenChange={open => { if (!pending) setConfirmar(open); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>Registrar liquidación en Gestión</DialogTitle><DialogDescription>Elegí el comprobante y la condición de venta. Podés registrar el cobro ahora o dejar el saldo en cuenta corriente.</DialogDescription></DialogHeader><p>{nombreCliente(seleccionados[0]?.cliente_id)} · {seleccionados.length} servicios</p><ul className="space-y-1 text-sm">{seleccionados.map(s => <li key={s.id}>#{s.numero} · {s.carga} · {transporteImporte(s.total)}</li>)}</ul><strong>Servicios IVA incluido: {transporteImporte(total)}</strong>
+    {ventaCreada && <Button asChild variant="outline"><Link to={`/ventas?detalle=${encodeURIComponent(ventaCreada)}`}>Ver venta y continuar con emisión fiscal</Link></Button>}
+    <Dialog open={confirmar} onOpenChange={open => { if (!pending) { setConfirmar(open); if (!open) limpiarDestino(); } }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>Registrar liquidación en Gestión</DialogTitle><DialogDescription>Elegí el comprobante y la condición de venta. Podés registrar el cobro ahora o dejar el saldo en cuenta corriente.</DialogDescription></DialogHeader><p>{nombreCliente(seleccionados[0]?.cliente_id)} · {seleccionados.length} servicios</p><ul className="space-y-1 text-sm">{seleccionados.map(s => <li key={s.id}>#{s.numero} · {s.carga} · {transporteImporte(s.total)}</li>)}</ul><strong>Servicios IVA incluido: {transporteImporte(total)}</strong>
       <fieldset disabled={pending} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div><Label htmlFor="tr-comprobante">Tipo de comprobante</Label><select id="tr-comprobante" className="h-11 w-full rounded border bg-background px-3" value={tipoComprobante} onChange={e => { setTipoComprobante(e.target.value as ComprobanteLiquidacion); setError(''); }}>{TIPOS_COMPROBANTE.filter(t => COMPROBANTES_LIQUIDACION.includes(t.value as ComprobanteLiquidacion)).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
@@ -78,11 +83,12 @@ export function TransporteLiquidacion({ datos: d, run, pending, verDetalle }: { 
           const firma = JSON.stringify(datosVenta);
           if (intento.current?.firma !== firma) intento.current = { firma, id: crypto.randomUUID() };
           enviando.current = true;
-          await run({ accion: 'facturar', datos: { ...datosVenta, idempotency_key: intento.current.id } });
+          const ventaId = await run({ accion: 'facturar', datos: { ...datosVenta, idempotency_key: intento.current.id } });
+          setVentaCreada(String(ventaId)); limpiarDestino();
           setConfirmar(false); setSeleccion([]); setPagos([]); intento.current = null;
           setResultado(condicion === 'cta_cte' ? 'Venta registrada en cuenta corriente. El cobro está disponible en Gestión.' : 'Venta y pagos registrados en Gestión.');
         } catch (e) { setError(transporteError(e)); } finally { enviando.current = false; }
-      }}>{pending ? 'Registrando…' : 'Confirmar venta'}</Button><Button variant="cancel" disabled={pending} onClick={() => setConfirmar(false)}>Volver</Button>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      }}>{pending ? 'Registrando…' : 'Confirmar venta'}</Button><Button variant="cancel" disabled={pending} onClick={() => { setConfirmar(false); limpiarDestino(); }}>Volver</Button>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </DialogContent></Dialog>
   </div>;
 }

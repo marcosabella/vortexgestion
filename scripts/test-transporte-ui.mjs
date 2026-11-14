@@ -35,13 +35,14 @@ for (const vista of ['resumen', 'servicios', 'unidades', 'choferes', 'lecturas',
 }
 for (const accion of ['servicio', 'unidad', 'chofer', 'lectura', 'tarifa', 'plan', 'gasto', 'mantenimiento']) assert.match(formulario(accion, datos), /<form/);
 for (const vista of ['servicios', 'unidades', 'choferes', 'lecturas', 'tarifas', 'gastos', 'planes', 'mantenimientos']) {
-  assert.match(pagina('/transporte/' + vista, datos), new RegExp('href="/transporte/' + vista + '/nuevo"'));
-  const html = pagina('/transporte/' + vista + '/nuevo', datos);
+  const rutaAlta = '/transporte/' + vista + (vista === 'servicios' ? '/realizado' : '/nuevo');
+  assert.match(pagina('/transporte/' + vista, datos), new RegExp('href="' + rutaAlta + '"'));
+  const html = pagina(rutaAlta, datos);
   assert.match(html, /<form/);
   assert.match(html, /Cancelar/);
   assert.match(html, /Volver/);
   assert.doesNotMatch(html, /role="dialog"/);
-  assert.doesNotMatch(pagina('/transporte/' + vista + '/nuevo', { ...datos, admin: false }), /<form/);
+  assert.doesNotMatch(pagina(rutaAlta, { ...datos, admin: false }), /<form/);
 }
 assert.match(pagina('/transporte/unidades/unidad/editar', datos), /Editar unidad o equipo/);
 assert.match(pagina('/transporte/unidades/ajena/editar', datos), /no existe o no está disponible/);
@@ -57,6 +58,9 @@ assert.match(edicionKm, /176\.000/);
 const operador = { ...datos, admin: false };
 assert.match(pagina('/transporte/tarifas', operador), /requiere acceso de administración/);
 const html = detalle(servicio, operador);
+assert.match(html, />Asignado<\/button>/, 'Chofer conserva el paso a paso');
+assert.doesNotMatch(detalle(servicio, datos), />Asignado<\/button>/, 'Administración no opera el paso a paso');
+assert.doesNotMatch(pagina('/transporte/servicios', operador), /Registrar viaje realizado|>Nuevo</, 'Chofer no ve alta administrativa');
 assert.match(html, /Abrir mapa/);
 assert.match(html, /Adjuntar imagen o PDF/);
 assert.doesNotMatch(html, /Importe IVA incluido|Editar datos y asignación|Cancelar servicio/);

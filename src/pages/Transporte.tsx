@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useTransporte } from '@/hooks/useTransporte';
 import { transporteSecciones, transporteFormularios, type TransporteFormularioVista } from '@/config/transporteNavigation';
 import { ESTADOS_TRANSPORTE, TIPOS_TRANSPORTE, type TransporteDatos, type TransporteServicio } from '@/types/transporte';
-import { alertaTransporte, transporteError, transporteImporte } from '@/utils/transporte';
+import { alertaTransporte, transporteError, transporteImporte, transporteMotivoNoFacturar } from '@/utils/transporte';
 import { TransporteFormulario } from '@/pages/TransporteFormulario';
 import { TransporteServicioDetalle } from '@/components/transporte/TransporteServicioDetalle';
 import { TransporteLiquidacion } from '@/components/transporte/TransporteLiquidacion';
@@ -31,9 +31,11 @@ export default function Transporte() {
   if (registro) {
     const formulario = transporteFormularios[vista as TransporteFormularioVista];
     const nuevo = registro === 'nuevo' && !operacion;
+    const realizado = vista === 'servicios' && registro === 'realizado' && !operacion;
+    if (vista === 'servicios' && nuevo && query.data.admin) return <Navigate to="/transporte/servicios/realizado" replace />;
     const editar = registro !== 'nuevo' && operacion === 'editar' && formulario?.editable;
-    if (!formulario || resto.length || (!nuevo && !editar)) return <Navigate to={`/transporte/${vista}`} replace />;
-    return <TransporteFormulario key={`${query.comercio.id}-${pathname}`} query={query} datos={query.data} vista={vista as TransporteFormularioVista} id={nuevo ? undefined : registro} />;
+    if (!formulario || resto.length || (!nuevo && !editar && !realizado)) return <Navigate to={`/transporte/${vista}`} replace />;
+    return <TransporteFormulario key={`${query.comercio.id}-${pathname}`} query={query} datos={query.data} vista={vista as TransporteFormularioVista} id={nuevo || realizado ? undefined : registro} realizado={realizado} />;
   }
   return <TransporteContenido key={`${query.comercio.id}-${vista}`} query={query} datos={query.data} vista={vista} />;
 }
@@ -61,10 +63,10 @@ function TransporteContenido({ query, datos: d, vista }: { query: ReturnType<typ
       {d.admin && (d.permisos?.editar ?? true) && <span tabIndex={motivo ? 0 : undefined} title={motivo || undefined} className="inline-flex"><Button variant="destructive" size="sm" disabled={Boolean(motivo) || query.isPending} title={motivo || 'Eliminar'} aria-label={`Eliminar ${nombre}`} aria-describedby={motivo ? `restriccion-${seccion}-${row.id}` : undefined} onClick={() => { setErrorEliminar(''); setEliminar({ vista: seccion, id: row.id, nombre, version: row.version }); }}><Trash2 className="h-4 w-4" /></Button>{motivo && <span id={`restriccion-${seccion}-${row.id}`} className="sr-only">{motivo}</span>}</span>}
     </>;
   };
-  const grillaServicios = (registros: TransporteServicio[]) => <TransporteGrilla titulo="Servicios de transporte" columnas={['Servicio', 'Carga', 'Estado', 'Tipo', 'Origen', 'Destino', 'Programado', 'Unidad', ...(d.admin ? ['Cliente', 'Importe'] : [])]} acciones filas={registros.map(s => ({
+  const grillaServicios = (registros: TransporteServicio[]) => <TransporteGrilla titulo="Servicios de transporte" columnas={['Servicio', 'Carga', 'Estado', 'Tipo', 'Origen', 'Destino', 'Fecha del servicio', 'Unidad', ...(d.admin ? ['Cliente', 'Importe'] : [])]} acciones filas={registros.map(s => ({
     id: s.id,
     celdas: [`#${s.numero}`, s.carga, <Badge variant="secondary">{ESTADOS_TRANSPORTE[s.estado]}</Badge>, TIPOS_TRANSPORTE[s.tipo], s.origen, s.destino, fecha(s.programado_at), unidad(s.unidad_id), ...(d.admin ? [cliente(s.cliente_id), transporteImporte(s.total)] : [])],
-    acciones: accionesRegistro('servicios', s, `servicio #${s.numero}`, !s.presupuesto_id && !s.venta_id && !['cancelado', 'no_realizado'].includes(s.estado)),
+    acciones: <>{accionesRegistro('servicios', s, `servicio #${s.numero}`, !s.presupuesto_id && !s.venta_id && !['cancelado', 'no_realizado'].includes(s.estado))}{d.admin && (d.permisos?.facturar ?? true) && !transporteMotivoNoFacturar(s) && <Button asChild variant="outline" size="sm"><Link to={`/transporte/liquidacion?servicio=${s.id}`} title="Liquidar servicio" aria-label={`Liquidar servicio #${s.numero}`}><Receipt className="h-4 w-4" /></Link></Button>}</>,
   }))} />;
   const grillaPlanes = (registros: TransporteDatos['planes'], titulo = 'Planes de mantenimiento') => <TransporteGrilla titulo={titulo} columnas={['Plan', 'Unidad', 'Estado', 'Próximo km', 'Próximas horas', 'Próxima fecha', 'Última lectura']} acciones filas={registros.map(p => ({
     id: p.id,
@@ -77,7 +79,7 @@ function TransporteContenido({ query, datos: d, vista }: { query: ReturnType<typ
   const kmMes = d.unidades.reduce((sum, u) => { const lecturas = lecturasMes.filter(l => l.unidad_id === u.id).sort((a, b) => a.created_at.localeCompare(b.created_at)); const anterior = d.lecturas.filter(l => l.unidad_id === u.id && l.created_at.slice(0, 7) < mes).sort((a, b) => b.created_at.localeCompare(a.created_at))[0]; return sum + (lecturas.length ? lecturas[lecturas.length - 1].kilometraje - (anterior?.kilometraje ?? lecturas[0].kilometraje) : 0); }, 0);
   const alertas = d.planes.filter(p => p.activo && alertaTransporte(p, d.unidades.find(u => u.id === p.unidad_id)) !== 'vigente');
   return <div className="min-w-0 space-y-6 p-3 sm:p-6">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><Truck /> Vortex Transporte</h1><p className="text-muted-foreground">{query.comercio?.nombre_comercio} · {transporteSecciones.find(s => s.vista === vista)?.title}</p></div><div className="flex gap-2"><Button variant="outline" disabled={query.isFetching} aria-label="Actualizar" onClick={() => void query.refetch()}><RefreshCw className="h-4 w-4" /></Button>{d.admin && (d.permisos?.crear ?? true) && transporteFormularios[vista as TransporteFormularioVista] && <Button asChild variant="new"><Link to={`/transporte/${vista}/nuevo`}><Plus className="mr-2 h-4 w-4" />Nuevo</Link></Button>}</div></header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><Truck /> Vortex Transporte</h1><p className="text-muted-foreground">{query.comercio?.nombre_comercio} · {transporteSecciones.find(s => s.vista === vista)?.title}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={query.isFetching} aria-label="Actualizar" onClick={() => void query.refetch()}><RefreshCw className="h-4 w-4" /></Button>{vista !== 'servicios' && d.admin && (d.permisos?.crear ?? true) && transporteFormularios[vista as TransporteFormularioVista] && <Button asChild variant="new"><Link to={`/transporte/${vista}/nuevo`}><Plus className="mr-2 h-4 w-4" />Nuevo</Link></Button>}{vista === 'servicios' && d.admin && (d.permisos?.crear ?? true) && (d.permisos?.operar ?? true) && <Button asChild variant="new"><Link to="/transporte/servicios/realizado"><Plus className="mr-2 h-4 w-4" />Registrar viaje realizado</Link></Button>}</div></header>
     {!d.admin && !['resumen', 'servicios'].includes(vista) ? <p>Esta sección requiere acceso de administración.</p> : <>
       {vista !== 'resumen' && vista !== 'liquidacion' && <div className="flex flex-wrap gap-3"><Input aria-label="Buscar registros" className="sm:max-w-sm" placeholder="Buscar…" value={buscar} onChange={e => setBuscar(e.target.value)} />{vista === 'servicios' && <><select aria-label="Estado del servicio" className="h-11 rounded border bg-background px-3" value={estado} onChange={e => setEstado(e.target.value)}><option value="">Todos los estados</option>{Object.entries(ESTADOS_TRANSPORTE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select><select aria-label="Tipo de servicio" className="h-11 rounded border bg-background px-3" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">Todos los tipos</option>{Object.entries(TIPOS_TRANSPORTE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></>}</div>}
       {vista === 'resumen' && <>

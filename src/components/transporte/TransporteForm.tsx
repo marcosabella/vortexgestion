@@ -9,7 +9,7 @@ import type { TransporteCampo } from './transporteCampos';
 import type { TransporteTarifa } from '@/types/transporte';
 import { totalTransporte, transporteImporte } from '@/utils/transporte';
 
-export function TransporteForm({ campos, valores = {}, tarifas = [], guardar, pending, cancelar }: { campos: TransporteCampo[]; valores?: object; tarifas?: TransporteTarifa[]; guardar: (datos: Record<string, unknown>) => Promise<void>; pending: boolean; cancelar?: () => void }) {
+export function TransporteForm({ campos, valores = {}, tarifas = [], guardar, pending, cancelar, acciones }: { campos: TransporteCampo[]; valores?: object; tarifas?: TransporteTarifa[]; guardar: (datos: Record<string, unknown>, accion?: string) => Promise<void>; pending: boolean; cancelar?: () => void; acciones?: { id: string; label: string }[] }) {
   const row = valores as Record<string, unknown>;
   const servicio = campos.some(f => f.key === 'modo_precio');
   const visible = (key: string, modo: string) => !servicio || !(
@@ -37,6 +37,14 @@ export function TransporteForm({ campos, valores = {}, tarifas = [], guardar, pe
       else if (datos.modo_precio === 'fijo' && !datos.precio_manual.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['precio_manual'], message: 'Ingresá el importe total fijo.' });
     }
     if (datos.unidad_id && datos.equipo_id && datos.unidad_id === datos.equipo_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['equipo_id'], message: 'El equipo adicional debe ser distinto de la unidad principal. Si no usás un acoplado, dejalo sin seleccionar.' });
+    if (campos.some(f => f.key === 'km_salida') && servicio) {
+      if (Boolean(datos.km_salida) !== Boolean(datos.km_llegada)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [datos.km_salida ? 'km_llegada' : 'km_salida'], message: 'Completá ambos odómetros o dejá ambos vacíos.' });
+      if (datos.km_salida && datos.km_llegada) {
+        const recorrido = Number(datos.km_llegada) - Number(datos.km_salida);
+        if (recorrido < 0 || ['km_aproximacion', 'km_traslado', 'km_retorno'].reduce((s, k) => s + Number(datos[k] || 0), 0) > recorrido) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['km_llegada'], message: 'Revisá los odómetros: el recorrido debe cubrir los kilómetros de los tramos.' });
+      }
+      if (!datos.programado_at || new Date(datos.programado_at).getTime() > Date.now()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['programado_at'], message: 'Indicá la fecha real del viaje, que no puede ser futura.' });
+    }
   });
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<Record<string, string>>({ resolver: zodResolver(schema), defaultValues: defaults });
   const unidadSeleccionada = watch('unidad_id');
@@ -46,7 +54,14 @@ export function TransporteForm({ campos, valores = {}, tarifas = [], guardar, pe
   const tarifaId = watch('tarifa_id');
   const tarifa = row.tarifa_id === tarifaId && row.tarifa_snapshot ? row.tarifa_snapshot as TransporteTarifa : tarifas.find(t => t.id === tarifaId) ?? null;
   const total = servicio ? totalTransporte({ precio_km: modo === 'por_km' ? precioKm : null, precio_manual: modo === 'fijo' ? Number(watch('precio_manual') || 0) : null, tarifa_snapshot: modo === 'tarifa' ? tarifa : null, km_facturables: km, horas_espera: modo === 'tarifa' ? Number(watch('horas_espera') || 0) : 0, adicionales: Number(watch('adicionales') || 0) }) : 0;
-  return <form className="space-y-4" onSubmit={handleSubmit(async raw => {
+  const renderCampo = (f: TransporteCampo) => <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
+    <Label htmlFor={`transporte-${f.key}`}>{f.label}{f.required ? ' *' : ''}</Label>
+    {f.options ? <select id={`transporte-${f.key}`} className="mt-1 h-11 w-full rounded-md border bg-background px-3 text-sm" disabled={pending || isSubmitting} {...register(f.key)}><option value="">Seleccionar…</option>{f.options.map(o => <option key={o.value} value={o.value} disabled={f.key === 'equipo_id' && o.value === unidadSeleccionada}>{o.label}</option>)}</select>
+      : f.type === 'textarea' ? <Textarea id={`transporte-${f.key}`} readOnly={pending || isSubmitting} {...register(f.key)} /> : <Input className="mt-1 h-11" id={`transporte-${f.key}`} readOnly={pending || isSubmitting} type={f.type || 'text'} step={f.type === 'number' ? 'any' : undefined} min={f.type === 'number' ? f.min ?? 0 : undefined} {...register(f.key)} />}
+    {f.help && <p className="mt-1 text-xs text-muted-foreground">{f.help}</p>}{errors[f.key] && <p className="text-sm text-destructive">{String(errors[f.key]?.message)}</p>}
+  </div>;
+  const camposVisibles = campos.filter(f => visible(f.key, modo));
+  return <form className="space-y-4" onSubmit={handleSubmit(async (raw, event) => {
     const datos: Record<string, unknown> = {};
     const detalles: Record<string, string> = {};
     for (const f of campos) {
@@ -60,20 +75,19 @@ export function TransporteForm({ campos, valores = {}, tarifas = [], guardar, pe
       else datos[f.key] = f.type === 'number' || f.key === 'iva' ? (value === '' ? null : Number(value)) : f.key === 'activo' ? value === 'true' : f.type === 'datetime-local' ? (value ? new Date(value).toISOString() : null) : value || (f.options || f.type === 'date' ? null : '');
     }
     if (Object.keys(detalles).length) datos.detalles = detalles;
-    try { await guardar(datos); } catch { setError('root', { message: 'No se guardaron los cambios. Revisá el aviso y los datos e intentá nuevamente.' }); }
+    const boton = (event?.nativeEvent as SubmitEvent | undefined)?.submitter as HTMLButtonElement | null;
+    try { await guardar(datos, boton?.value || acciones?.[0]?.id); } catch { setError('root', { message: 'No se guardaron los cambios. Revisá el aviso y los datos e intentá nuevamente.' }); }
   })}>
-    <div className="grid gap-4 sm:grid-cols-2">{campos.filter(f => visible(f.key, modo)).map(f => <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
-      <Label htmlFor={`transporte-${f.key}`}>{f.label}{f.required ? ' *' : ''}</Label>
-      {f.options ? <select id={`transporte-${f.key}`} className="mt-1 h-11 w-full rounded-md border bg-background px-3 text-sm" {...register(f.key)}><option value="">Seleccionar…</option>{f.options.map(o => <option key={o.value} value={o.value} disabled={f.key === 'equipo_id' && o.value === unidadSeleccionada}>{o.label}</option>)}</select>
-        : f.type === 'textarea' ? <Textarea id={`transporte-${f.key}`} {...register(f.key)} /> : <Input className="mt-1 h-11" id={`transporte-${f.key}`} type={f.type || 'text'} step={f.type === 'number' ? 'any' : undefined} min={f.type === 'number' ? f.min ?? 0 : undefined} {...register(f.key)} />}
-      {f.help && <p className="mt-1 text-xs text-muted-foreground">{f.help}</p>}{errors[f.key] && <p className="text-sm text-destructive">{String(errors[f.key]?.message)}</p>}
-    </div>)}</div>
+    {campos.some(f => f.grupo) ? <>
+      {['Servicio', 'Operación', 'Importe'].map(grupo => <section key={grupo} className="space-y-3"><h2 className="font-semibold">{grupo}</h2><div className="grid gap-4 sm:grid-cols-2">{camposVisibles.filter(f => f.grupo === grupo).map(renderCampo)}</div></section>)}
+      <details open={campos.some(f => f.complementario && errors[f.key]) || undefined}><summary className="cursor-pointer py-2 font-semibold">Más datos (opcional)</summary><div className="grid gap-4 sm:grid-cols-2">{camposVisibles.filter(f => f.complementario).map(renderCampo)}</div></details>
+    </> : <div className="grid gap-4 sm:grid-cols-2">{camposVisibles.map(renderCampo)}</div>}
     {servicio && <div className="rounded-md border p-4 text-sm" role="status" aria-live="polite">
       {modo === 'por_km' && <p>{km.toLocaleString('es-AR')} km facturables × {transporteImporte(precioKm)} por km</p>}
       <p className="font-semibold">Total final, IVA incluido: {transporteImporte(Number.isFinite(total) ? total : 0)}</p>
       <p className="text-muted-foreground">Incluye los adicionales cargados. El recorrido de aproximación, traslado y retorno no modifica automáticamente los kilómetros facturables.</p>
     </div>}
     {errors.root && <p role="alert" className="text-sm text-destructive">{errors.root.message}</p>}
-    <div className="flex flex-col gap-3 sm:flex-row"><Button className="h-11 w-full sm:w-auto" disabled={pending || isSubmitting} type="submit">{pending || isSubmitting ? 'Guardando…' : 'Guardar'}</Button>{cancelar && <Button className="h-11 w-full sm:w-auto" variant="outline" disabled={pending || isSubmitting} type="button" onClick={cancelar}>Cancelar</Button>}</div>
+    <div className="flex flex-col flex-wrap gap-3 sm:flex-row">{(acciones || [{ id: 'guardar', label: 'Guardar' }]).map((a, i) => <Button key={a.id} value={a.id} className="h-11 w-full sm:w-auto" variant={i ? 'outline' : 'default'} disabled={pending || isSubmitting} type="submit">{pending || isSubmitting ? 'Guardando…' : a.label}</Button>)}{cancelar && <Button className="h-11 w-full sm:w-auto" variant="outline" disabled={pending || isSubmitting} type="button" onClick={cancelar}>Cancelar</Button>}</div>
   </form>;
 }
