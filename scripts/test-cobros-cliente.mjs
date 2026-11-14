@@ -117,6 +117,7 @@ try {
   sql(migration('20260924150000_pagos_mixtos_clientes.sql'));
   sql(migration('20261002100000_cobros_cliente_multi_comprobante.sql'));
   sql(migration('20261110110000_cobros_cheque_excedente_cliente.sql'));
+  sql(migration('20261114110000_cobros_excedente_todos_medios_cliente.sql'));
   const test = (name, statements) => {
     sql(`BEGIN; ${asUser} ${statements} ROLLBACK;`);
     passed += 1;
@@ -162,10 +163,26 @@ try {
   test('Rechaza venta de otro cliente', fails(call([{ tipo: 'contado', monto: 10 }], [ids.sale1, ids.otherSale]), 'venta_cliente_no_disponible'));
   test('Rechaza venta de otro comercio', fails(call([{ tipo: 'contado', monto: 10 }], [ids.sale1, ids.foreignSale]), 'venta_cliente_no_disponible'));
   test('Rechaza cliente de otro comercio', fails(call([{ tipo: 'contado', monto: 10 }], [ids.foreignSale], ids.foreignClient), 'cliente_no_disponible'));
-  test('Rechaza importe superior a los comprobantes', fails(call([{ tipo: 'contado', monto: 351 }]), 'pagos_cliente_superan_saldo'));
+  for (const [tipo, concepto] of [['contado', 'pago_efectivo'], ['transferencia', 'pago_transferencia'], ['tarjeta', 'pago_tarjeta']]) {
+    test(`${tipo}: factura de 7000 y cobro de 22000 deja 15000 a favor`,
+      `DELETE FROM cuenta_corriente WHERE cliente_id='${ids.client}' AND venta_id='${ids.sale2}';
+       UPDATE cuenta_corriente SET monto=7000 WHERE venta_id='${ids.sale1}';` +
+      call([{ tipo, monto: 22000 }], [ids.sale1]) +
+      check(`SELECT sum(monto)=7000 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id='${ids.sale1}'`, 'factura saldada') +
+      check(`SELECT monto=15000 AND concepto='${concepto}' AND cheque_id IS NULL AND moneda='ARS' FROM cuenta_corriente WHERE venta_id IS NULL`, 'excedente con medio original') +
+      check(`SELECT count(*)=0 FROM cheques`, 'sin cheques ficticios') +
+      check(`SELECT sum(CASE WHEN tipo_movimiento='debito' THEN monto ELSE -monto END)=-15000 FROM cuenta_corriente WHERE cliente_id='${ids.client}'`, 'saldo a favor exacto'));
+  }
   test('Respeta créditos generales del cliente',
     `INSERT INTO cuenta_corriente(comercio_id,cliente_id,tipo_movimiento,monto,concepto) VALUES ('${ids.tenant}','${ids.client}','credito',200,'ajuste');` +
-    fails(call([{ tipo: 'contado', monto: 151 }]), 'pagos_cliente_superan_saldo'));
+    call([{ tipo: 'contado', monto: 151 }]) +
+    check(`SELECT sum(monto)=150 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id IS NOT NULL`, 'imputa hasta saldo global') +
+    check(`SELECT monto=1 FROM cuenta_corriente WHERE concepto='pago_efectivo' AND venta_id IS NULL`, 'nuevo crédito separado'));
+  test('Varios medios pueden generar excedentes conservando sus conceptos',
+    call([{ tipo: 'transferencia', monto: 400 }, { tipo: 'tarjeta', monto: 100 }, { tipo: 'cheque', monto: 50, cheque }]) +
+    check(`SELECT sum(monto)=350 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id IS NOT NULL`, 'deuda cancelada sin sobreimputación') +
+    check(`SELECT sum(monto)=200 AND count(DISTINCT concepto)=3 FROM cuenta_corriente WHERE venta_id IS NULL`, 'excedentes por medio') +
+    check(`SELECT monto=50 AND cuenta_corriente_id IS NOT NULL FROM cheques`, 'cheque completamente a cuenta'));
   test('Cheque mayor cancela comprobantes y conserva excedente sin venta',
     call([{ tipo: 'cheque', monto: 400, cheque }]) +
     check(`SELECT count(*)=1 AND min(monto)=400 FROM cheques`, 'cheque íntegro en cartera') +
@@ -242,10 +259,11 @@ try {
   child.stdin.end(`BEGIN; ${asUser} ${call([{ tipo: 'contado', monto: 100 }], [ids.sale1])} SELECT 'locked'; SELECT pg_sleep(0.5); COMMIT;`);
   await locked;
   const second = command('psql', psqlArgs, `${asUser} ${call([{ tipo: 'contado', monto: 100 }], [ids.sale2])}`);
-  assert.notEqual(second.status, 0);
-  assert.match(second.stderr, /pagos_cliente_superan_saldo/);
+  checked(second);
   assert.equal(await completed, 0, firstError);
-  sql(check(`SELECT sum(CASE WHEN tipo_movimiento='debito' THEN monto ELSE -monto END) = 50 FROM cuenta_corriente WHERE cliente_id='${ids.client}'`, 'saldo tras concurrencia'));
+  sql(check(`SELECT sum(CASE WHEN tipo_movimiento='debito' THEN monto ELSE -monto END) = -50 FROM cuenta_corriente WHERE cliente_id='${ids.client}'`, 'saldo tras concurrencia') +
+    check(`SELECT sum(monto)=50 FROM cuenta_corriente WHERE tipo_movimiento='credito' AND venta_id='${ids.sale2}'`, 'segundo cobro limita imputación') +
+    check(`SELECT monto=50 FROM cuenta_corriente WHERE concepto='pago_efectivo' AND venta_id IS NULL`, 'excedente concurrente a cuenta'));
   passed += 1;
   console.log('OK Cobros simultáneos revalidan el saldo del cliente');
   console.log(`${passed} pruebas de integración correctas (PostgreSQL local temporal).`);

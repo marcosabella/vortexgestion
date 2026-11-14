@@ -196,6 +196,35 @@ try {
   await evaluate(`${sel('button[aria-label="Ver cuenta de CLIENTE"]')}.click()`);
   await wait('document.querySelector("h1").textContent.includes("SIN OPERACIONES")');
   assert.ok((await evaluate('document.body.textContent')).includes('No hay movimientos'),'Cliente sin movimientos abre cuenta vacia');
+  // Todos los medios aceptan excedentes; también permite agregar otro medio
+  // después de cubrir la deuda y cambiar los comprobantes sin perder los pagos.
+  for (const [tipo, label] of [['contado','Efectivo'],['transferencia','Transferencia'],['tarjeta','Tarjeta']]) {
+    await send('Page.navigate',{url:origin},sessionId);
+    await wait(exists('button[aria-label="Ver detalle del comprobante"]'));
+    await click('Registrar pago'); await click('Seleccionar comprobantes');
+    await wait('document.querySelectorAll("[role=dialog]").length===2');
+    await evaluate('Array.from(document.querySelectorAll("[role=dialog]")).at(-1).querySelector("button[role=checkbox]").click()');
+    await click('Aplicar selección (1)');
+    await evaluate('document.querySelector("[role=combobox]").click()');
+    await wait(exists('[role=option]'));
+    await evaluate(`Array.from(document.querySelectorAll('[role=option]')).find(o=>o.textContent.trim()===${JSON.stringify(label)}).click()`);
+    await set('[role=dialog] input[type=number]',300);
+    await click('Agregar');
+    await wait('document.body.textContent.includes("Saldo a favor después del pago:")');
+    assert.ok((await evaluate('document.querySelector("[role=status]").textContent')).includes('50,00'),'Excedente visible de '+label);
+    assert.equal(await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Agregar").disabled'),false,'Permite seguir agregando medios');
+    await set('[role=dialog] input[type=number]',25);
+    await click('Agregar');
+    await click('Seleccionar comprobantes');
+    await wait('document.querySelectorAll("[role=dialog]").length===2');
+    await click('Aplicar selección (1)');
+    await wait('document.querySelectorAll("[role=dialog]").length===1');
+    assert.ok((await evaluate('document.querySelector("[role=status]").textContent')).includes('75,00'),'Conserva excedente y pagos al aplicar selección');
+    await click('Confirmar pago');
+    await wait('window.paymentCalls.length===1');
+    const payment = await evaluate('window.paymentCalls[0]');
+    assert.deepEqual(payment.pagos.map(p=>({tipo:p.tipo,monto:p.monto})),[{tipo,monto:300},{tipo,monto:25}],'Envía importes completos de '+label);
+  }
   // El formulario real permite un cheque completo superior a la deuda.
   await send('Page.navigate',{url:origin},sessionId);
   await wait(exists('button[aria-label="Ver detalle del comprobante"]'));
@@ -228,5 +257,5 @@ try {
   const creditHtml=await evaluate('window.buildReceiptHtml({...window.receipt,importe:300,saldo_anterior:250,saldo_posterior:-50,pagos:[{tipo:"cheque",monto:300}],documentos:[{numero:"0001 - 00000001",importe:250}]})');
   assert.ok(creditHtml.includes('Saldo a favor') && creditHtml.includes('50,00'),'Recibo presenta saldo a favor');
   assert.deepEqual(errors,[]);
-  console.log('OK Cheque excedido con importe completo y saldo a favor; busqueda, historico, venta y recibos con PDF real. Captura: '+path.join(artifacts,'recibo.png'));
+  console.log('OK Todos los medios admiten excedentes y pagos adicionales; busqueda, historico, venta y recibos con PDF real. Captura: '+path.join(artifacts,'recibo.png'));
 } finally { socket?.close(); browser?.kill(); await new Promise(resolve => server.close(resolve)); }

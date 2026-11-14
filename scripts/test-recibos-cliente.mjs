@@ -117,6 +117,7 @@ try {
   sql(migration('20260924150000_pagos_mixtos_clientes.sql'));
   sql(migration('20261002100000_cobros_cliente_multi_comprobante.sql'));
   sql(migration('20261110110000_cobros_cheque_excedente_cliente.sql'));
+  sql(migration('20261114110000_cobros_excedente_todos_medios_cliente.sql'));
 
   sql(`ALTER TABLE public.comercio ADD COLUMN nombre_comercio text DEFAULT 'Comercio prueba', ADD COLUMN calle text, ADD COLUMN numero text, ADD COLUMN localidad text, ADD COLUMN provincia text, ADD COLUMN codigo_postal text, ADD COLUMN telefono text, ADD COLUMN cuit text, ADD COLUMN situacion_afip text, ADD COLUMN ingresos_brutos text, ADD COLUMN fecha_inicio_actividad date, ADD COLUMN logo_url text, ADD COLUMN mostrar_razon_social_con_logo boolean;
     ALTER TABLE public.clientes ADD COLUMN nombre text DEFAULT 'Cliente', ADD COLUMN apellido text DEFAULT 'Prueba', ADD COLUMN cuit text, ADD COLUMN telefono text;
@@ -142,6 +143,16 @@ try {
     check("SELECT count(*)=1 FROM recibos_pago_cliente",'un recibo')+
     check("SELECT sum(monto)=100 FROM cuenta_corriente WHERE tipo_movimiento='credito'",'un cobro')+
     fails(receiptCall(90),'solicitud_recibo_datos_distintos'));
+  for (const tipo of ['contado','transferencia','tarjeta']) {
+    const overpayment = receiptCall(22000,request,ids.client,[ids.sale1],[{tipo,monto:22000}]);
+    test(`Recibo de ${tipo}: cobro de 22000, factura de 7000 y saldo a favor de 15000`,
+      `DELETE FROM cuenta_corriente WHERE cliente_id='${ids.client}' AND venta_id='${ids.sale2}';
+       UPDATE cuenta_corriente SET monto=7000 WHERE venta_id='${ids.sale1}';` +
+      overpayment + overpayment +
+      check(`SELECT count(*)=1 AND min(importe)=22000 AND min(saldo_anterior)=7000 AND min(saldo_posterior)=-15000 FROM recibos_pago_cliente`, 'recibo íntegro e idempotente') +
+      check(`SELECT cardinality(movimiento_ids)=2 AND pagos->0->>'tipo'='${tipo}' FROM recibos_pago_cliente`, 'incluye imputación y excedente') +
+      check(`SELECT sum((d->>'importe')::numeric)=7000 FROM recibos_pago_cliente,jsonb_array_elements(documentos) d`, 'solo deuda aplicada a factura'));
+  }
   const excessCall=receiptCall(400,request,ids.client,[ids.sale1,ids.sale2],[{tipo:'cheque',monto:400,cheque}]);
   test('Recibo de cheque excedido incluye importe completo, saldo a favor e idempotencia',excessCall+excessCall+
     check("SELECT count(*)=1 AND min(importe)=400 AND min(saldo_anterior)=350 AND min(saldo_posterior)=-50 FROM recibos_pago_cliente",'saldo a favor persistido')+
@@ -167,7 +178,8 @@ try {
   test('Modificacion de imputacion invalida el recibo',receiptCall()+
     "UPDATE cuenta_corriente SET monto=99 WHERE tipo_movimiento='credito';"+
     check("SELECT anulado_en IS NOT NULL FROM recibos_pago_cliente",'cambio detectado'));
-  test('Error de cobro revierte todo',fails(receiptCall(351),'pagos_cliente_superan_saldo')+
+  test('Error de cheque revierte incluso el excedente de una transferencia previa',
+    fails(receiptCall(400,request,ids.client,[ids.sale1,ids.sale2],[{tipo:'transferencia',monto:400},{tipo:'cheque',monto:10,cheque:{}}]),'datos_cheque_cliente_incompletos')+
     check("SELECT count(*)=0 FROM recibos_pago_cliente",'sin recibo')+
     check("SELECT count(*)=0 FROM cuenta_corriente WHERE tipo_movimiento='credito'",'sin cobro'));
   test('Aislamiento de empresas y permisos',receiptCall()+

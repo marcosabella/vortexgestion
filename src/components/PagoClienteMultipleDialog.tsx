@@ -104,11 +104,10 @@ export function PagoClienteMultipleDialog({
     .filter((document): document is PendingDocument => Boolean(document));
   const debt = roundMoney(Math.max(Math.min(selectedDocuments.reduce((sum, document) => sum + document.saldo, 0), saldoCliente), 0));
   const assigned = roundMoney(rows.reduce((sum, row) => sum + Number(row.monto), 0));
-  const regularAssigned = roundMoney(rows.filter((row) => row.tipo !== "cheque").reduce((sum, row) => sum + Number(row.monto), 0));
   const remaining = roundMoney(Math.max(debt - assigned, 0));
   const excess = roundMoney(Math.max(assigned - debt, 0));
   const projectedBalance = roundMoney(saldoCliente - assigned);
-  const paymentsValid = Number.isFinite(assigned) && assigned > 0 && regularAssigned <= debt;
+  const paymentsValid = Number.isFinite(assigned) && assigned > 0;
   const selectionValid = selectedDocuments.length > 0 && selectedDocuments.length === documentIds.length;
   const chequeComplete = Boolean(
     Number.isFinite(chequeAmount) && roundMoney(chequeAmount) > 0 && cheque.numero_cheque.trim() && cheque.banco_emisor.trim()
@@ -139,18 +138,12 @@ export function PagoClienteMultipleDialog({
   const toggleDocument = (id: string, checked: boolean) => setDraftDocumentIds((current) =>
     checked ? [...new Set([...current, id])] : current.filter((value) => value !== id));
   const applyDocuments = () => {
-    const selectedDebt = roundMoney(Math.max(Math.min(draftDocumentIds.reduce((sum, id) =>
-      sum + (pendingDocuments.find((document) => document.id === id)?.saldo || 0), 0), saldoCliente), 0));
-    if (selectedDebt < regularAssigned) {
-      toast({ title: "Selección insuficiente", description: "Los comprobantes elegidos no cubren los pagos en efectivo, transferencia o tarjeta ya agregados. Solo los cheques pueden generar un excedente a cuenta.", variant: "destructive" });
-      return;
-    }
     setDocumentIds(draftDocumentIds);
     setDocumentOpen(false);
   };
   const addRegularPayment = () => {
-    if (!selectionValid || !Number.isFinite(amount) || roundMoney(amount) <= 0 || roundMoney(amount) > remaining) {
-      toast({ title: "Importe inválido", description: "El importe debe ser mayor que cero y no superar el saldo restante.", variant: "destructive" });
+    if (!selectionValid || !Number.isFinite(amount) || roundMoney(amount) <= 0) {
+      toast({ title: "Importe inválido", description: "Seleccioná comprobantes e ingresá un importe mayor que cero. El excedente quedará como crédito a cuenta.", variant: "destructive" });
       return;
     }
     setRows((current) => [...current, { localId: crypto.randomUUID(), tipo: method, monto: roundMoney(amount), detail: methodLabels[method] }]);
@@ -218,7 +211,7 @@ export function PagoClienteMultipleDialog({
           <Summary label="Saldo restante" value={remaining} className="text-orange-600" />
         </div>
         {excess > 0 && <div role="status" className="space-y-1 rounded-lg border p-4 text-sm">
-          <p>Se imputarán {money(Math.min(assigned, debt))} a los comprobantes seleccionados. El excedente del cheque de <strong>{money(excess)}</strong> quedará como crédito en la cuenta corriente del cliente.</p>
+          <p>Se imputarán {money(Math.min(assigned, debt))} a los comprobantes seleccionados. El excedente del pago de <strong>{money(excess)}</strong> quedará como crédito en la cuenta corriente del cliente.</p>
           <p>{projectedBalance < 0 ? <>Saldo a favor después del pago: <strong>{money(Math.abs(projectedBalance))}</strong>.</> : projectedBalance > 0 ? <>Saldo total pendiente después del pago: <strong>{money(projectedBalance)}</strong>.</> : "La cuenta quedará saldada."}</p>
         </div>}
         <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_1fr_auto]">
@@ -226,7 +219,7 @@ export function PagoClienteMultipleDialog({
           {method !== "cheque"
             ? <div className="space-y-2"><Label>Importe</Label><Input type="number" min="0.01" step="0.01" value={amount || ""} onChange={(event) => setAmount(Number(event.target.value))} /></div>
             : <div className="flex items-end"><p className="pb-2 text-sm text-muted-foreground">El cheque recibido ingresará en cartera.</p></div>}
-          <div className="flex items-end"><Button type="button" disabled={!selectionValid || debt <= 0 || (method !== "cheque" && remaining <= 0) || registrarPagosMixtos.isPending} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
+          <div className="flex items-end"><Button type="button" disabled={!selectionValid || debt <= 0 || registrarPagosMixtos.isPending} onClick={method === "cheque" ? openChequeForm : addRegularPayment}><Plus className="mr-2 h-4 w-4" />{method === "cheque" ? "Registrar cheque" : "Agregar"}</Button></div>
         </div>
         <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Medio</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Importe</TableHead><TableHead className="w-16" /></TableRow></TableHeader><TableBody>{rows.length === 0
           ? <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Todavía no agregaste medios de pago.</TableCell></TableRow>
