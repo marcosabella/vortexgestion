@@ -629,7 +629,7 @@ export const VentasList = ({ detalleId, onCerrarDetalle, notificacionComercioIdI
       </Card>}
 
       <Dialog open={showDetails} onOpenChange={handleDetailsOpenChange}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalle de Venta</DialogTitle>
             <DialogDescription className="sr-only">Consulta del comprobante, productos y medios de pago.</DialogDescription>
