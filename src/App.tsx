@@ -18,6 +18,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ModuleHelp } from "@/components/ModuleHelp";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Bell, Building2, CalendarClock, LogOut } from "lucide-react";
@@ -269,6 +270,7 @@ function AuthenticatedLayout() {
             {terminalSalon && <nav aria-label="Terminal de salón" className="flex gap-1"><Button size="sm" variant="ghost" asChild><Link to="/restaurante/salon">Mesas</Link></Button><Button size="sm" variant="ghost" asChild><Link to="/restaurante/reservas">Reservas</Link></Button></nav>}
             {terminalRepartidor && accesoRestaurante.data?.permisos.includes("cobros") && <Button size="sm" variant="ghost" asChild><Link to="/restaurante/cobros">Cuentas y cobros</Link></Button>}
             {!terminalRestaurante && <ModuleHelp />}
+            <ThemeToggle />
             {!terminalRestaurante && <Button variant="outline" size="sm" onClick={() => navigate("/notificaciones")} className="relative">
               <Bell className="h-4 w-4" />
               {noLeidas > 0 && (
