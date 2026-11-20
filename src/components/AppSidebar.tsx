@@ -161,6 +161,7 @@ const adminItems: MenuItem[] = [
   { title: "Incidentes", url: "/admin/incidentes", icon: Activity },
   { title: "Notificaciones administrativas", url: "/admin/notificaciones", icon: Bell },
   { title: "Migraciones", url: "/admin/migraciones", icon: Database },
+  { title: "Copias de seguridad", url: "/admin/backups", icon: Database },
 ];
 
 const campoItems: Array<MenuItem & { adminOnly?: boolean }> = [

@@ -59,6 +59,7 @@ import AdminComercioExterno from "./pages/AdminComercioExterno";
 import AdminComercioParametrizacion from "./pages/AdminComercioParametrizacion";
 import AdminNotificaciones from "./pages/AdminNotificaciones";
 import AdminMigraciones from "./pages/AdminMigraciones";
+import AdminBackups from "./pages/AdminBackups";
 import AdminIncidentes from "./pages/AdminIncidentes";
 import AdminConsultasLanding from "./pages/AdminConsultasLanding";
 import AdminReferidos from "./pages/AdminReferidos";
@@ -335,6 +336,9 @@ function AuthenticatedLayout() {
               <Route path="/admin/comercios/externos/:externoId/editar" element={<AdminComercioExterno />} />
               <Route path="/admin/notificaciones" element={<AdminNotificaciones />} />
               <Route path="/admin/migraciones" element={<AdminMigraciones />} />
+              <Route path="/admin/backups" element={<AdminBackups />} />
+              <Route path="/admin/backups/restaurar" element={<AdminBackups />} />
+              <Route path="/admin/backups/restaurar/:id" element={<AdminBackups />} />
               <Route path="/admin/incidentes" element={<AdminIncidentes />} />
               <Route path="/admin/consultas-landing" element={<AdminConsultasLanding />} />
               <Route path="/admin/referidos" element={<AdminReferidos />} />

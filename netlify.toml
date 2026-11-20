@@ -1,2 +1,8 @@
 [functions]
   directory = "netlify/functions"
+
+[functions."admin-backups-background"]
+  included_files = ["netlify/functions/runtime/pg-runtime.tgz", "config/backup-policy.json"]
+
+[functions."admin-backup-restore-background"]
+  included_files = ["netlify/functions/runtime/pg-runtime.tgz", "config/backup-policy.json"]

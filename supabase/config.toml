@@ -1,5 +1,8 @@
 project_id = "zhtqkygjvaaizbdwwsbi"
 
+[functions.admin-backups]
+verify_jwt = false
+
 [functions.obtener-cae-afip]
 verify_jwt = false
 

@@ -35,3 +35,4 @@ private-backups/
 
 # Local Netlify folder
 .netlify
+netlify/functions/runtime/*.tgz

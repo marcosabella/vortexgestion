@@ -18,8 +18,21 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      "^/\\.netlify/functions/admin-backups(?:$|\\?)": {
+        target: "http://127.0.0.1:8787",
+        changeOrigin: false,
+      },
+    },
+    fs: {
+      deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "**/private-backups/**", "**/.netlify/**"],
+    },
   },
   plugins: [
+    { name: "backups-local", async configureServer(server) {
+      const { ensureLocalBackupService } = await import("./scripts/local-backup-service-control.mjs");
+      await ensureLocalBackupService(server.config.env.VITE_SUPABASE_PROJECT_ID, server.config.logger);
+    } },
     { name: "bna-local", configureServer(server) { server.middlewares.use("/.netlify/functions/cotizaciones-bna", async (req, res) => {
       try { const { default: handler } = await import("./netlify/functions/cotizaciones-bna.mjs"); const response = await handler(new Request("http://localhost/.netlify/functions/cotizaciones-bna" + (req.url === "/" ? "" : req.url || ""), { method: req.method })); res.statusCode = response.status; response.headers.forEach((value, key) => res.setHeader(key, value)); res.end(await response.text()); }
       catch { res.statusCode = 502; res.end(JSON.stringify({error: "Banco Nación no disponible."})); }

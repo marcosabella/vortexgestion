@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "excludedTables": [],
+  "sharedTables": ["referidos_campanas"],
+  "referencedTables": ["notificaciones"],
+  "externalComercioReferences": {
+    "membresia_pagos_mercadopago": ["receptor_comercio_id"]
+  },
+  "storage": {
+    "comercio-logos": { "prefix": "{comercio_id}/" },
+    "distribucion-remitos": { "prefix": "{comercio_id}/" },
+    "producto-imagenes": { "prefix": "{comercio_id}/" },
+    "tienda-landing": { "prefix": "{comercio_id}/" },
+    "transporte": { "prefix": "{comercio_id}/" }
+  }
+}
